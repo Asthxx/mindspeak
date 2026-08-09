@@ -160,18 +160,72 @@ var SpeechUtil = {
   },
   // 朗读设置缓存：voice_name（预设声音名称）、voice_rate（语速）、voice_pitch（音调）、
   // instant（是否本地即时语音：不依赖在线连接，用 server SAPI 合成，几乎零延迟）
-  getSettings: function() {
+getSettings: function() {
     if (this._settings) return this._settings;
+    // 即时语音默认值：只有用户没动过 voice_instant 时才做"自动探测"；
+    // 本地有 server 时保持开（零延迟），GitHub Pages/手机等无后端环境自动关。
+    var hasInstant = false;
+    try { hasInstant = (window.localStorage.getItem('voice_instant') !== null); } catch(e) {}
+    var instant;
+    if (hasInstant) instant = Storage.get('voice_instant', '1') === '1';
+    else instant = !(this._serverDown === true);
     this._settings = {
       voiceName: Storage.get('voice_name', ''),
       rate: parseFloat(Storage.get('voice_rate', '')) || 0.9,
       pitch: parseFloat(Storage.get('voice_pitch', '')) || 1,
-      instant: Storage.get('voice_instant', '1') === '1'
+      instant: instant,
+      _defaultInstant: !hasInstant
     };
     return this._settings;
   },
   updateSettings: function(s) {
     this._settings = s;
+  },
+  // 探测本地 server 是否可达：/api/health 返回 200 且 ok=true。
+  // 网页部署（GitHub Pages）/手机打开时，API_BASE 可能指向一个没有后端的站点，
+  // 探测失败 → 自动把"即时语音"默认关掉、改走浏览器语音，避免每次朗读都弹红
+  // "server 未运行"提示。用户手动开过即时语音则尊重用户选择不作改动。
+  _probeServer: function() {
+    if (this._probedServer) return;
+    this._probedServer = true;
+    var self = this;
+    var base = window.API_BASE || '';
+    if (!base) { this._serverDown = true; this._syncInstantDefault(); return; }
+    var ctrl = null, to = null;
+    try { if (typeof AbortController !== 'undefined') ctrl = new AbortController(); } catch(e) {}
+    if (ctrl) to = setTimeout(function() {
+      try { ctrl.abort(); } catch(e) {}
+      self._serverDown = true;
+      self._syncInstantDefault();
+    }, 3000);
+    var done = function() { if (to) clearTimeout(to); self._syncInstantDefault(); };
+    try {
+      fetch(base + '/api/health', { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+        .then(function(r) {
+          if (!r || !r.ok) { self._serverDown = true; return null; }
+          return r.json();
+        })
+        .then(function(j) {
+          if (j && typeof j.ok === 'boolean') self._serverDown = !j.ok;
+          else self._serverDown = false;
+          done();
+        })
+        .catch(function() { self._serverDown = true; done(); });
+    } catch(e) { self._serverDown = true; done(); }
+  },
+  // 探测结果落地：仅影响"用户没手动设过"的默认即时语音开关；降级时轻提示一次
+  _syncInstantDefault: function() {
+    var s = this._settings;
+    if (!s || !s._defaultInstant) return;
+    var target = !(this._serverDown === true);
+    if (s.instant === target) return;
+    s.instant = target;
+    var el = document.getElementById('voice-instant');
+    if (el) el.checked = target;
+    if (this._serverDown === true && !this._probeNotifyShown) {
+      this._probeNotifyShown = true;
+      if (window.Toast) Toast.warning('未检测到本地发音服务（localhost:3000），已自动切换为浏览器语音朗读');
+    }
   },
   // 自定义发音映射（单词 → dataURL 音频），文件名即单词名；读一次后缓存
   getCustomVoice: function() {
@@ -380,9 +434,11 @@ _speakLetterTTS: function(up, opts) {
       this._speakGoogleTTS(text, lang, opts);
       return;
     }
-    // 「本地即时语音」：不走在线引擎，直接用 server SAPI（离线、缓存后几乎零延迟）。
+// 「本地即时语音」：不走在线引擎，直接用 server SAPI（离线、缓存后几乎零延迟）。
     // 点击即读；只有 server 不可用时才回退在线声，避免 file:// 没开 server 时完全静默。
-    if (settings.instant) {
+    // 已探测到 server 不可达（_serverDown=true）→ 直接走在线音而不进 SAPI，
+    // 避免每次点击都先把请求打到死端口上、等超时才降级。
+    if (settings.instant && !(this._serverDown === true)) {
       this._stopLocalAudio();
       var instOpts = {};
       if (opts) for (var k in opts) instOpts[k] = opts[k];
@@ -4998,6 +5054,9 @@ function fillVoiceOptions() {
       else if (voiceSettings.voiceName) voiceSelect.value = voiceSettings.voiceName;
     }
     fillVoiceOptions();
+    // 探测本地 server 是否可达：不可达时自动关闭「本地即时语音」默认值，
+    // 改用浏览器语音（修复 GitHub Pages/手机场景下朗读必弹"server 未运行"红错的根因）
+    SpeechUtil._probeServer();
     // Chrome/Firefox 的 voices 列表是异步加载的，加载完成后重新填充
     window.speechSynthesis.onvoiceschanged = fillVoiceOptions;
     voiceSelect.addEventListener('change', function() {
