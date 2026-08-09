@@ -486,15 +486,22 @@ _speakLetterTTS: function(up, opts) {
     var retryLeft = primedOk ? 2 : 1;
     var voiceWait = 3;
     var failedVoices = [];
-    var attempt = function() {
+var attempt = function() {
       if (self._speakSeq !== mySeq) return;
+      // 网页部署（无 server）：voices 加载失败/没有英文声/在线声连不通时，
+      // 一律交给远程发音/系统默认语音（_speakServerless），不再请求 /api/*（那必然 404）。
+      // 先判定：手机/网页版无本地英文语音，等 voices 也是白等，直接短路出声。
+      var useDeviceVoice = (self._serverDown === true);
+      if (useDeviceVoice) {
+        self._burstMode = 'device';
+        self._burstUntil = Date.now() + 3000;
+        self._speakServerless(text, lang, opts);
+        return;
+      }
       // voices 列表是异步加载的：未就绪时最多等 3 次（共约 2.4s），仍无则先裸 speak
       var voices;
       try { voices = window.speechSynthesis.getVoices() || []; } catch(e) { voices = []; }
       if (!voices.length && voiceWait > 0) { voiceWait--; setTimeout(attempt, 800); return; }
-      // 网页部署（无 server）：voices 加载失败/没有英文声/在线声连不通时，
-      // 一律交给系统默认语音（_speakDeviceVoice），不再请求 /api/*（那必然 404）
-      var useDeviceVoice = (self._serverDown === true);
       // 选声：speakLetter 等注入的 opts.voice（当前所选声音）在首次朗读时优先，
       // 确保 utterance.voice 就是当前选择；失败重试时不再用注入的声音，改为依次跳过
       // failedVoices 换声。否则按 用户保存的 → 本地离线英文声 → 任一英文声 顺序选。
