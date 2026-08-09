@@ -363,6 +363,12 @@ _speakLetterTTS: function(up, opts) {
         this._speakLocal(text, 'en-US', o);
         return;
       }
+      if (this._burstMode === 'device') {
+        console.log('[TTS LETTER] ' + up);
+        console.log('[TTS LETTER] Voice: device-default (burst-locked)');
+        this._speakDeviceVoice(text, 'en-US', o);
+        return;
+      }
     }
     // 选中「在线自然女声（Google 合成）」时，字母同样走 Google 在线合成（HTTPS），
     // 与单词朗读行为一致：选了什么声音，字母就听到什么声音。
@@ -370,7 +376,8 @@ _speakLetterTTS: function(up, opts) {
     if (settings.voiceName === '__online_google__') {
       console.log('[TTS LETTER] ' + up);
       console.log('[TTS LETTER] Voice: online-google');
-      this._speakGoogleTTS(text, 'en-US', o);
+      if (this._serverDown === true) this._speakDeviceVoice(text, 'en-US', o);
+      else this._speakGoogleTTS(text, 'en-US', o);
       return;
     }
     var voice = null;
@@ -419,6 +426,7 @@ _speakLetterTTS: function(up, opts) {
       this._burstUntil = now + 3000;
       if (bm === 'google') { this._speakGoogleTTS(text, lang, opts); return; }
       if (bm === 'local') { this._speakLocal(text, lang, opts); return; }
+      if (bm === 'device') { this._speakDeviceVoice(text, lang, opts); return; }
     }
     // 单个英文字母（A-Z 26 个字母）：统一经 speakLetter → TTSManager.speak 用所选声音读
     // （在线优先）。按需求改为与所选声音一致；失败降级（换声重试→Google→SAPI）在链路内保留。
@@ -427,11 +435,16 @@ _speakLetterTTS: function(up, opts) {
       this.speakLetter(text, opts);
       return;
     }
-    // 「在线自然女声（Google 合成）」：本机网络 WSS 被掐、在线 speechSynthesis 必失败，
+// 「在线自然女声（Google 合成）」：本机网络 WSS 被掐、在线 speechSynthesis 必失败，
     // 该选项改用 HTTPS 合成（translate.googleapis.com，实测可达、天然女声）。
     if (settings.voiceName === '__online_google__') {
       this._stopLocalAudio();
-      this._speakGoogleTTS(text, lang, opts);
+      if (this._serverDown === true) {
+        // 网页版（无 server）：Google 在线走 /api/online-tts 必 404，改用系统默认语音
+        this._speakDeviceVoice(text, lang, opts);
+      } else {
+        this._speakGoogleTTS(text, lang, opts);
+      }
       return;
     }
 // 「本地即时语音」：不走在线引擎，直接用 server SAPI（离线、缓存后几乎零延迟）。
@@ -479,6 +492,9 @@ _speakLetterTTS: function(up, opts) {
       var voices;
       try { voices = window.speechSynthesis.getVoices() || []; } catch(e) { voices = []; }
       if (!voices.length && voiceWait > 0) { voiceWait--; setTimeout(attempt, 800); return; }
+      // 网页部署（无 server）：voices 加载失败/没有英文声/在线声连不通时，
+      // 一律交给系统默认语音（_speakDeviceVoice），不再请求 /api/*（那必然 404）
+      var useDeviceVoice = (self._serverDown === true);
       // 选声：speakLetter 等注入的 opts.voice（当前所选声音）在首次朗读时优先，
       // 确保 utterance.voice 就是当前选择；失败重试时不再用注入的声音，改为依次跳过
       // failedVoices 换声。否则按 用户保存的 → 本地离线英文声 → 任一英文声 顺序选。
@@ -499,8 +515,14 @@ _speakLetterTTS: function(up, opts) {
       // 英文文本必须用英文声：本机没有英文声时 _pickLocalENVoice 会回退到"任意非在线声"
       // （实测回退成中文 Huihui），英文被中文声读 → 读不准。此时直接落本地 SAPI（Zira），
       // 离线、发音准确；在线英文声可用时不受影响。
-      var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
+var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
       if (!voiceEN && /^en/i.test(String(lang || 'en-US'))) {
+        if (useDeviceVoice) {
+          self._burstMode = 'device';
+          self._burstUntil = Date.now() + 3000;
+          self._speakDeviceVoice(text, lang, opts);
+          return;
+        }
         // 连读锁定：本段连读后续全部保持 SAPI 本地合成，避免中途换音色
         self._burstMode = 'local';
         self._burstUntil = Date.now() + 3000;
@@ -539,7 +561,13 @@ _speakLetterTTS: function(up, opts) {
         // 在线声失败 → 先试 HTTPS 在线合成（Google 自然女声）；连它都失败才落
         // server /api/tts（Windows SAPI）保底。只有连保底都失败才提示。绝不静默无声。
         // 连读锁定：降级后本段连读保持同一音源，避免中途换音色。
-        if (online) {
+        if (useDeviceVoice) {
+          // 网页版（无 server）：不再请求 /api/online-tts、/api/tts（必然 404），
+          // 直接交给浏览器系统默认语音，尽力出声
+          self._burstMode = 'device';
+          self._burstUntil = Date.now() + 3000;
+          self._speakDeviceVoice(text, lang, opts);
+        } else if (online) {
           self._burstMode = 'google';
           self._burstUntil = Date.now() + 3000;
           self._speakGoogleTTS(text, lang, opts);
@@ -624,8 +652,13 @@ _speakLetterTTS: function(up, opts) {
   // 保底朗读：在线声不可用/浏览器不支持 speechSynthesis 时，
   // 用本地 server /api/tts（Windows SAPI Microsoft Zira/Huihui，完全离线）
   // 合成 WAV 播放，确保"点击朗读一定有声音"。只有保底也失败才提示用户。
-  _speakLocal: function(text, lang, opts) {
+_speakLocal: function(text, lang, opts) {
     var self = this;
+    // 网页部署（无 server）不得请求 /api/tts（必然 404）：直接交给系统默认语音
+    if (this._serverDown === true) {
+      this._speakDeviceVoice(text, lang, opts);
+      return;
+    }
     var rate = (opts && opts.rate) || this.getSettings().rate || 0.9;
 // 后端地址统一由 js/api-config.js 的 window.API_BASE 决定
     var base = window.API_BASE || '';
@@ -684,8 +717,10 @@ _speakLetterTTS: function(up, opts) {
   // 拦截（WSS 全灭）且需 CORS；Node 直连可达 → 由本地 server /api/online-tts 代理抓音频，
   // 浏览器只访问同源。选中 __online_google__ 时朗读走这里；在线声失败时也降级到这里。
   // 连代理都失败才落 server SAPI（_speakLocal）保底。
-  _speakGoogleTTS: function(text, lang, opts) {
+_speakGoogleTTS: function(text, lang, opts) {
     var self = this;
+    // 网页部署（无 server）：在线女声走 /api/online-tts 必 404，改用系统默认语音
+    if (this._serverDown === true) { this._speakDeviceVoice(text, lang, opts); return; }
     this._stopLocalAudio();
     var tl = /^en/i.test(String(lang || 'en-US')) ? 'en' : (String(lang || 'en').split('-')[0] || 'en');
     // 语速设置映射到 Google 的 ttsspeed（实测 0.4+ 被钳制成同档，只有三档可用）：
@@ -845,16 +880,66 @@ _speakLetterTTS: function(up, opts) {
   },
   // 标记在线声当前不可用：15s 冷却期内后续点击跳过在线声（快速降级出声），
   // 冷却过后/切换声音/预热成功后都会重新尝试，绝不永久换掉用户选的在线音色。
-  _markOnlineBroken: function() {
+_markOnlineBroken: function() {
     this._onlineBroken = true;
     this._onlineBrokenAt = Date.now();
+  },
+  // 设备默认语音兜底：不使用任何选定的 voice，直接把文本交给浏览器 speechSynthesis，
+  // 由系统/浏览器默认引擎发声。用于"本地 server 不存在"的网页部署（GitHub Pages /
+  // 手机直接访问等）：在线 speechSynthesis 声真连不上、或根本列不出 voices 时，
+  // 不再把请求打到不存在的 /api/tts、/api/online-tts 上，而是让浏览器用自己的
+  // 基础语音引擎读出来（绝大多数现代浏览器都能读英文）。全部设备语音也说不了
+  // 才报错提示，绝不弹"server 未运行"误导网页版用户。
+  _speakDeviceVoice: function(text, lang, opts) {
+    var self = this;
+    if (!('speechSynthesis' in window)) {
+      this._deviceFail(opts);
+      return;
+    }
+    this._stopLocalAudio();
+    var settings = this.getSettings();
+    var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
+    var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
+    var u;
+    try { u = new SpeechSynthesisUtterance(String(text || '')); } catch(e) { this._deviceFail(opts); return; }
+    u.lang = /^en/i.test(String(lang || 'en-US')) ? 'en-US' : lang;
+    u.rate = (opts && opts.rate) || this.getSettings().rate || 0.9;
+    u.pitch = settings.pitch || 1;
+    u.volume = settings.volume || 1;
+    var started = false, finished = false;
+    u.onstart = function() { started = true; fireStart(); };
+    u.onend = function() { if (finished) return; finished = true; fireEnd(); };
+    var failed = false;
+    u.onerror = function() {
+      if (finished) return;
+      finished = true;
+      if (!failed) { failed = true; self._deviceFail(opts); }
+    };
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+    try { window.speechSynthesis.speak(u); } catch(e) { if (!finished) { finished = true; self._deviceFail(opts); } }
+    // 无 voices 时浏览器可能不触发 onstart（依赖系统语音），给个较长保底超时提示
+    setTimeout(function() {
+      if (finished || !started) { finished = true; self._deviceFail(opts); }
+    }, started ? 0 : 12000);
+  },
+  _deviceFail: function(opts) {
+    this._stopLocalAudio();
+    if (opts && opts.onerror) opts.onerror(new Error('device-voice-fail'));
+    if (!(opts && opts.noFailToast)) {
+      Toast.error('朗读失败：当前设备没有可用的英文语音，请到系统设置中安装/启用英文 TTS 语音后重试');
+    }
   },
   _ttsLocalFail: function(opts) {
     this._stopLocalAudio();
     if (opts && opts.onerror) opts.onerror(new Error('tts-local-fail'));
     // 即时语音模式下 server 不可用由调用方回退在线声，不弹 Toast
     if (!(opts && opts.noFailToast)) {
-      Toast.error('朗读失败：浏览器在线语音不可用，本地发音服务也未启动。请确认 server 已运行（node server.js），或到「设置-朗读声音」换一个声音');
+      if (this._serverDown === true) {
+        // 网页版/无后端环境不提示"server 未运行"，引导用系统语音或换声音
+        Toast.error('朗读失败：当前设备没有可用的英文语音，请到系统设置中安装/启用英文 TTS 语音，或到「设置-朗读声音」换一个声音');
+      } else {
+        Toast.error('朗读失败：浏览器在线语音不可用，本地发音服务也未启动。请确认 server 已运行（node server.js），或到「设置-朗读声音」换一个声音');
+      }
     }
   },
   // 本地即时语音的预合成：翻卡/列词表时后台让 server 把即将点击的词先合成好
@@ -6169,6 +6254,9 @@ document.addEventListener('DOMContentLoaded', function() {
   ThemeColor.init();
   KeyboardShortcuts.init();
   LearningReminder.init();
+
+  // 启动即探测本地 server 是否可达：决定网页版走系统语音、本机版走本地即时语音
+  SpeechUtil._probeServer();
 
   // iOS Safari 需要在用户手势里激活 speechSynthesis，否则后续自动播放无声。
   // 在首屏任何一次 click/touchstart/keydown 之后调用一次 unlock 即可。
