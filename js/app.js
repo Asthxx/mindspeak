@@ -913,20 +913,70 @@ _markOnlineBroken: function() {
     u.onerror = function() {
       if (finished) return;
       finished = true;
-      if (!failed) { failed = true; self._deviceFail(opts); }
+      if (!failed) { failed = true; self._speakRemoteFallback(text, lang, opts); }
     };
     try { window.speechSynthesis.cancel(); } catch(e) {}
-    try { window.speechSynthesis.speak(u); } catch(e) { if (!finished) { finished = true; self._deviceFail(opts); } }
-    // 无 voices 时浏览器可能不触发 onstart（依赖系统语音），给个较长保底超时提示
+    try { window.speechSynthesis.speak(u); } catch(e) { if (!finished) { finished = true; self._speakRemoteFallback(text, lang, opts); } }
+    // 无 voices 时浏览器可能不触发 onstart（依赖系统语音），给个较短保底超时，
+    // 没出声就接远程在线发音兜底——保证手机/网页版点击必出声。
     setTimeout(function() {
-      if (finished || !started) { finished = true; self._deviceFail(opts); }
-    }, started ? 0 : 12000);
+      if (finished && !started) return;
+      if (!started) { finished = true; self._speakRemoteFallback(text, lang, opts); }
+    }, 4500);
+  },
+  // 手机/网页版在线发音兜底：不依赖本机 TTS、不依赖本地 server，
+  // 直接用浏览器 <audio> 播放远程发音接口的 MP3（浏览器可跨域播 <audio>，无需 CORS）。
+  // 依次尝试：有道词典美音 → Google 翻译发音；任一成功即停，全部失败才真正报错。
+  // 适用场景：手机系统无英文 TTS ⇨ speechSynthesis 无声；或 PC 网页版 server 未启动。
+  _speakRemoteFallback: function(text, lang, opts) {
+    var self = this;
+    this._stopLocalAudio();
+    var q = String(text || '').trim();
+    if (!q) { this._deviceFail(opts); return; }
+    var tl = /^en/i.test(String(lang || 'en-US')) ? 'en' : 'zh';
+    var urls = [
+      'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(q) + '&type=1',
+      'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + tl + '&q=' + encodeURIComponent(q)
+    ];
+    var seq = (this._waSeq || 0) + 1;
+    this._waSeq = seq;
+    var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
+    var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
+    var done = false, started = false, i = 0;
+    var tryNext = function() {
+      if (seq !== self._waSeq) return;               // 已被新朗读打断
+      if (done) return;
+      if (i >= urls.length) { done = true; self._deviceFail(opts); return; }
+      var url = urls[i++];
+      var audio;
+      try { audio = new Audio(url); } catch(e) { tryNext(); return; }
+      self._localAudio = audio;
+      audio.onplay = function() { if (!started) { started = true; fireStart(); } };
+      audio.onended = function() {
+        if (seq !== self._waSeq) return;
+        if (self._localAudio === audio) self._localAudio = null;
+        if (!done) { done = true; fireEnd(); }
+      };
+      audio.onerror = function() {
+        if (self._localAudio === audio) self._localAudio = null;
+        if (seq !== self._waSeq || done) return;
+        tryNext();
+      };
+      var pr;
+      try { pr = audio.play(); } catch(e) { if (!done) tryNext(); return; }
+      if (pr && pr.catch) pr.catch(function(e) {
+        if (e && e.name === 'AbortError') return;
+        if (seq !== self._waSeq || done || started) return;
+        tryNext();
+      });
+    };
+    tryNext();
   },
   _deviceFail: function(opts) {
     this._stopLocalAudio();
     if (opts && opts.onerror) opts.onerror(new Error('device-voice-fail'));
     if (!(opts && opts.noFailToast)) {
-      Toast.error('朗读失败：当前设备没有可用的英文语音，请到系统设置中安装/启用英文 TTS 语音后重试');
+      Toast.error('朗读失败：本机无可用的英文语音，在线发音服务也连接失败。请检查网络后重试，或到「设置-朗读声音」换一个声音');
     }
   },
   _ttsLocalFail: function(opts) {
