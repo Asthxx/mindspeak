@@ -74,18 +74,29 @@ async function bundleJs(BUILD_TIME) {
 
 async function build() {
   const BUILD_TIME = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  // 版本分离：版本号统一维护在根目录 VERSION 文件，构建时注入 dist/
+  let VERSION = '0.0.0';
+  try { VERSION = fs.readFileSync(path.join(SRC, 'VERSION'), 'utf8').trim(); } catch (e) {}
+  const VER_TAG = 'v' + VERSION;
   ensureDir(DIST);
   ensureDir(path.join(DIST, 'css'));
   ensureDir(path.join(DIST, 'js'));
   ensureDir(path.join(DIST, 'assets'));
   ensureDir(path.join(DIST, 'data'));
 
+  // ---- 0. 版本文件 ----
+  fs.writeFileSync(path.join(DIST, 'version.txt'), VER_TAG + '\n构建时间: ' + BUILD_TIME + '\n', 'utf8');
+  console.log('[ok] 版本 ' + VER_TAG + ' (' + BUILD_TIME + ')');
+
   // ---- 1. index.html 复制并更新路径 ----
   let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
   html = html.replace(/<script src="js\/[^"]+\.js(?:\?[^"']*)?"><\/script>\s*/gi, '');
-  html = html.replace(/<\/body>/i, '<!-- MindSpeak dist 构建时间: ' + BUILD_TIME + ' -->\n<script src="js/bundle.js"></script>\n</body>');
+  // 全量源码 version 注入（版本分离）：dist/index.html 始终带当前 VERSION
+  html = html.replace(/(<meta name="app-version" content=")[^"]*(")/i, '$1' + VER_TAG + '$2');
+  html = html.replace(/<\/body>/i,
+    '<!-- MindSpeak dist 构建时间: ' + BUILD_TIME + ' 版本: ' + VER_TAG + ' -->\n<script src="js/bundle.js"></script>\n</body>');
   fs.writeFileSync(path.join(DIST, 'index.html'), html, 'utf8');
-  console.log('[ok] index.html -> dist/');
+  console.log('[ok] index.html -> dist/ (version: ' + VER_TAG + ')');
 
   // ---- 2. 复制 CSS ----
   const cssSrc = path.join(SRC, 'css');
