@@ -6,20 +6,31 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 
-// 支持 server/.env（KEY=VALUE 每行一个）自动加载：与 README 常见习惯一致，
-// 避免用户建了 .env 却静默失效、白费配置
-try {
-  const envFile = path.join(__dirname, '.env');
-  if (fs.existsSync(envFile)) {
-    for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
-      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
-      if (!m) continue;
-      const key = m[1], val = m[2].replace(/^["']|["']$/g, '');
-      if (!(key in process.env)) process.env[key] = val; // 环境变量优先，.env 不覆盖
-    }
-  } else if (['SMTP_USER', 'SMTP_PASS', 'SMTP_HOST', 'PORT'].some(k => process.env[k])) {
-    console.error('[config] 检测到环境变量但 server/.env 不存在——请用 .env 文件或系统环境变量提供配置（均可用）');
+// 敏感配置优先从项目外的私有目录读取（与 JWT 密钥同目录），
+// 避免把邮箱授权码等凭据随项目一起发布/拷贝时泄露：
+//   C:\Users\<当前用户>\.mindspeak\server.env
+// 其次支持 server/.env（KEY=VALUE 每行一个）自动加载：与 README 常见习惯一致，
+// 便于开发者本地调试；二者都缺失时使用系统环境变量。
+function loadEnvFile(envFile) {
+  if (!envFile || !fs.existsSync(envFile)) return 0;
+  let loaded = 0;
+  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+    if (!m) continue;
+    const key = m[1], val = m[2].replace(/^["']|["']$/g, '');
+    if (!(key in process.env)) { process.env[key] = val; loaded++; } // 环境变量优先，.env 不覆盖
   }
+  return loaded;
+}
+try {
+  const secureEnv = path.join(os.homedir(), '.mindspeak', 'server.env');
+  const loaded = loadEnvFile(secureEnv); // ① 项目外私有凭据（生产部署）
+  if (loaded > 0) {
+    if (!process.env.JWT_SECRET && fs.existsSync(path.join(os.homedir(), '.mindspeak', 'jwt-secret'))) {
+      process.env.JWT_SECRET = fs.readFileSync(path.join(os.homedir(), '.mindspeak', 'jwt-secret'), 'utf8').trim();
+    }
+  }
+  loadEnvFile(path.join(__dirname, '.env')); // ② 项目内 .env（本地开发兜底）
 } catch (e) {}
 
 // JWT 密钥：优先环境变量；否则首次启动随机生成并持久化到用户主目录，
