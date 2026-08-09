@@ -366,7 +366,7 @@ _speakLetterTTS: function(up, opts) {
       if (this._burstMode === 'device') {
         console.log('[TTS LETTER] ' + up);
         console.log('[TTS LETTER] Voice: device-default (burst-locked)');
-        this._speakDeviceVoice(text, 'en-US', o);
+        this._speakServerless(text, 'en-US', o);
         return;
       }
     }
@@ -376,7 +376,7 @@ _speakLetterTTS: function(up, opts) {
     if (settings.voiceName === '__online_google__') {
       console.log('[TTS LETTER] ' + up);
       console.log('[TTS LETTER] Voice: online-google');
-      if (this._serverDown === true) this._speakDeviceVoice(text, 'en-US', o);
+      if (this._serverDown === true) this._speakServerless(text, 'en-US', o);
       else this._speakGoogleTTS(text, 'en-US', o);
       return;
     }
@@ -426,7 +426,7 @@ _speakLetterTTS: function(up, opts) {
       this._burstUntil = now + 3000;
       if (bm === 'google') { this._speakGoogleTTS(text, lang, opts); return; }
       if (bm === 'local') { this._speakLocal(text, lang, opts); return; }
-      if (bm === 'device') { this._speakDeviceVoice(text, lang, opts); return; }
+      if (bm === 'device') { this._speakServerless(text, lang, opts); return; }
     }
     // 单个英文字母（A-Z 26 个字母）：统一经 speakLetter → TTSManager.speak 用所选声音读
     // （在线优先）。按需求改为与所选声音一致；失败降级（换声重试→Google→SAPI）在链路内保留。
@@ -440,8 +440,8 @@ _speakLetterTTS: function(up, opts) {
     if (settings.voiceName === '__online_google__') {
       this._stopLocalAudio();
       if (this._serverDown === true) {
-        // 网页版（无 server）：Google 在线走 /api/online-tts 必 404，改用系统默认语音
-        this._speakDeviceVoice(text, lang, opts);
+        // 网页版（无 server）：Google 在线走 /api/online-tts 必 404，改用远程发音优先
+        this._speakServerless(text, lang, opts);
       } else {
         this._speakGoogleTTS(text, lang, opts);
       }
@@ -520,7 +520,7 @@ var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
         if (useDeviceVoice) {
           self._burstMode = 'device';
           self._burstUntil = Date.now() + 3000;
-          self._speakDeviceVoice(text, lang, opts);
+          self._speakServerless(text, lang, opts);
           return;
         }
         // 连读锁定：本段连读后续全部保持 SAPI 本地合成，避免中途换音色
@@ -563,10 +563,10 @@ var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
         // 连读锁定：降级后本段连读保持同一音源，避免中途换音色。
         if (useDeviceVoice) {
           // 网页版（无 server）：不再请求 /api/online-tts、/api/tts（必然 404），
-          // 直接交给浏览器系统默认语音，尽力出声
+          // 优先远程发音，远程失败交给浏览器系统默认语音兜底
           self._burstMode = 'device';
           self._burstUntil = Date.now() + 3000;
-          self._speakDeviceVoice(text, lang, opts);
+          self._speakServerless(text, lang, opts);
         } else if (online) {
           self._burstMode = 'google';
           self._burstUntil = Date.now() + 3000;
@@ -654,9 +654,9 @@ var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
   // 合成 WAV 播放，确保"点击朗读一定有声音"。只有保底也失败才提示用户。
 _speakLocal: function(text, lang, opts) {
     var self = this;
-    // 网页部署（无 server）不得请求 /api/tts（必然 404）：直接交给系统默认语音
+    // 网页部署（无 server）不得请求 /api/tts（必然 404）：走远程发音/系统语音兜底
     if (this._serverDown === true) {
-      this._speakDeviceVoice(text, lang, opts);
+      this._speakServerless(text, lang, opts);
       return;
     }
     var rate = (opts && opts.rate) || this.getSettings().rate || 0.9;
@@ -719,8 +719,8 @@ _speakLocal: function(text, lang, opts) {
   // 连代理都失败才落 server SAPI（_speakLocal）保底。
 _speakGoogleTTS: function(text, lang, opts) {
     var self = this;
-    // 网页部署（无 server）：在线女声走 /api/online-tts 必 404，改用系统默认语音
-    if (this._serverDown === true) { this._speakDeviceVoice(text, lang, opts); return; }
+    // 网页部署（无 server）：在线女声走 /api/online-tts 必 404，走远程发音/系统语音兜底
+    if (this._serverDown === true) { this._speakServerless(text, lang, opts); return; }
     this._stopLocalAudio();
     var tl = /^en/i.test(String(lang || 'en-US')) ? 'en' : (String(lang || 'en').split('-')[0] || 'en');
     // 语速设置映射到 Google 的 ttsspeed（实测 0.4+ 被钳制成同档，只有三档可用）：
@@ -909,19 +909,23 @@ _markOnlineBroken: function() {
     var started = false, finished = false;
     u.onstart = function() { started = true; fireStart(); };
     u.onend = function() { if (finished) return; finished = true; fireEnd(); };
-    var failed = false;
+    var failed = false, isFinal = (opts && opts._noRemoteRetry) === true;
+    var deviceNext = function() {
+      if (isFinal) { self._deviceFail(); return; }
+      self._speakRemoteFallback(text, lang, opts);
+    };
     u.onerror = function() {
       if (finished) return;
       finished = true;
-      if (!failed) { failed = true; self._speakRemoteFallback(text, lang, opts); }
+      if (!failed) { failed = true; deviceNext(); }
     };
     try { window.speechSynthesis.cancel(); } catch(e) {}
-    try { window.speechSynthesis.speak(u); } catch(e) { if (!finished) { finished = true; self._speakRemoteFallback(text, lang, opts); } }
+    try { window.speechSynthesis.speak(u); } catch(e) { if (!finished) { finished = true; deviceNext(); } }
     // 无 voices 时浏览器可能不触发 onstart（依赖系统语音），给个较短保底超时，
     // 没出声就接远程在线发音兜底——保证手机/网页版点击必出声。
     setTimeout(function() {
       if (finished && !started) return;
-      if (!started) { finished = true; self._speakRemoteFallback(text, lang, opts); }
+      if (!started) { finished = true; deviceNext(); }
     }, 4500);
   },
   // 手机/网页版在线发音兜底：不依赖本机 TTS、不依赖本地 server，
@@ -971,6 +975,27 @@ _markOnlineBroken: function() {
       });
     };
     tryNext();
+  },
+  // 网页/手机版（_serverDown=true）的通用朗读入口：不依赖本地 server、
+  // 不依赖浏览器有没有英文语音。
+  // ① 优先：同步播远程发音 MP3（点按手势内立即出声——Google 的自动播放策略
+  //    只放行"手势内发起的播放"，进了 setTimeout 的手势就作废了，iOS 尤甚）；
+  // ② 远程失败 → 退回浏览器系统语音 speechSynthesis（设备有英文声时仍可出声）；
+  // ③ 设备也失败 → 才真正 Toast 报错。绝不静默无声。
+  _speakServerless: function(text, lang, opts) {
+    var self = this;
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+    this._stopLocalAudio();
+    var o = {};
+    if (opts) for (var k in opts) o[k] = opts[k];
+    o.noFailToast = true; // 远程失败时先不弹 Toast，交给设备语音兜底
+    o.onerror = function() {
+      var d = {};
+      if (opts) for (var k in opts) d[k] = opts[k];
+      d._noRemoteRetry = true; // 设备语音失败不再递归远程，直接报错
+      self._speakDeviceVoice(text, lang, d);
+    };
+    this._speakRemoteFallback(text, lang, o);
   },
   _deviceFail: function(opts) {
     this._stopLocalAudio();
