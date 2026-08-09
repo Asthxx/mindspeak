@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F4F3F3"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.98"/><stop offset="1" stop-color="#FAFAFA" stop-opacity="0.98"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" fill="url(#bg)"/>
+  <rect y="34" width="400" height="1" fill="#191919" opacity="0.12"/>
+  <g fill="#191919" opacity="0.05">
+    <path d="M 144 256 L 27.598 256 L 144 139.598 Z"/>
+    <path d="M 256 207.5 L 200 256 L 200 56 L 0 56 L 48 0 L 256 0 Z"/>
+    <path d="M 0 204.402 L 0 112 L 92.402 112 Z"/>
+  </g>
+  <g fill="#191919">
+    <path d="M 144 256 L 27.598 256 L 144 139.598 Z"/>
+    <path d="M 256 207.5 L 200 256 L 200 56 L 0 56 L 48 0 L 256 0 Z"/>
+    <path d="M 0 204.402 L 0 112 L 92.402 112 Z"/>
+  </g>
+  <g filter="drop-shadow(0 10px 24px rgba(25,25,25,0.08))">
+    <rect x="112" y="58" width="176" height="84" rx="8" fill="url(#card)" stroke="#E5E5E5" stroke-width="1"/>
+    <rect x="132" y="78" width="90" height="10" rx="2" fill="#191919"/>
+    <rect x="132" y="96" width="116" height="6" rx="3" fill="#6B6B6B" opacity="0.8"/>
+    <rect x="132" y="110" width="92" height="6" rx="3" fill="#9CA3AF" opacity="0.6"/>
+    <rect x="132" y="126" width="70" height="8" rx="2" fill="#191919"/>
+  </g>
+  <rect x="112" y="156" width="176" height="1" fill="#191919" opacity="0.15"/>
+</svg>

@@ -1,0 +1,168 @@
+﻿{
+  "grammar_exercises": [
+    {
+      "id": 1,
+      "type": "choice",
+      "question": "She _____ to the store yesterday.",
+      "options": ["go", "went", "gone", "going"],
+      "answer": 1,
+      "explanation": "yesterday 表示过去时，go 的过去式是 went。",
+      "topic": "一般过去时"
+    },
+    {
+      "id": 2,
+      "type": "choice",
+      "question": "If I _____ rich, I would travel around the world.",
+      "options": ["am", "was", "were", "be"],
+      "answer": 2,
+      "explanation": "虚拟语气中，与现在事实相反用 were。",
+      "topic": "虚拟语气"
+    },
+    {
+      "id": 3,
+      "type": "choice",
+      "question": "The book _____ by millions of people so far.",
+      "options": ["has read", "has been read", "had read", "was reading"],
+      "answer": 1,
+      "explanation": "so far 提示现在完成时，book 是被读，用被动语态。",
+      "topic": "现在完成时被动语态"
+    },
+    {
+      "id": 4,
+      "type": "choice",
+      "question": "Not only he but also I _____ responsible for this project.",
+      "options": ["is", "are", "am", "be"],
+      "answer": 2,
+      "explanation": "not only...but also...遵循就近原则，与 I 搭配用 am。",
+      "topic": "主谓一致"
+    },
+    {
+      "id": 5,
+      "type": "choice",
+      "question": "It was in the museum _____ she saw the painting.",
+      "options": ["which", "where", "that", "when"],
+      "answer": 2,
+      "explanation": "这是强调句型：It was + 被强调部分 + that...",
+      "topic": "强调句型"
+    },
+    {
+      "id": 6,
+      "type": "fill_blank",
+      "question": "He suggested that we _____ (start) early.",
+      "correct_answer": "start",
+      "explanation": "suggest 后面的宾语从句要用虚拟语气 (should) + 动词原形，should 可省略。",
+      "topic": "虚拟语气"
+    },
+    {
+      "id": 7,
+      "type": "fill_blank",
+      "question": "The man _____ car was stolen called the police.",
+      "correct_answer": "whose",
+      "explanation": "关系代词 whose 表示所属关系，修饰 car。",
+      "topic": "定语从句"
+    },
+    {
+      "id": 8,
+      "type": "fill_blank",
+      "question": "She is interested _____ learning foreign languages.",
+      "correct_answer": "in",
+      "explanation": "be interested in 是固定搭配，表示对…感兴趣。",
+      "topic": "介词搭配"
+    },
+    {
+      "id": 9,
+      "type": "sentence_transform",
+      "original": "He finished his homework.",
+      "transform_type": "passive",
+      "expected_answer": "His homework was finished (by him).",
+      "explanation": "一般过去时的被动语态：was/were + 过去分词。",
+      "topic": "主动变被动"
+    },
+    {
+      "id": 10,
+      "type": "sentence_transform",
+      "original": "I will send you an email.",
+      "transform_type": "reported_speech",
+      "expected_answer": "He said that he would send me an email.",
+      "explanation": "直接引语变间接引语：将来时会态后退为条件将来时。",
+      "topic": "直接引语转间接引语"
+    }
+  ],
+  "reading_passages": [
+    {
+      "id": 1,
+      "title": "The Power of Reading",
+      "difficulty": "CET-4",
+      "text": "Reading is one of the most important skills a person can develop. It opens doors to new ideas, different cultures, and vast knowledge. Many successful people credit reading as a key factor in their achievements.\n\nStudies have shown that regular reading can improve vocabulary, enhance critical thinking, and even reduce stress. People who read for just twenty minutes a day can significantly expand their knowledge base over time.\n\nIn the digital age, reading habits are changing. While some worry about the decline of traditional reading, others see new opportunities in e-books and online articles. The key is to maintain a consistent reading habit, regardless of the medium.",
+      "paragraphs_cn": [
+        "阅读是一个人能培养的最重要的技能之一。它打开了通往新思想、不同文化和丰富知识的大门。许多成功人士将阅读归功于他们成功的关键因素。",
+        "研究表明，定期阅读可以提高词汇量，增强批判性思维，甚至减轻压力。每天阅读仅二十分钟的人，随着时间的推移可以显著扩大知识面。",
+        "在数字时代，阅读习惯正在改变。虽然有人担心传统阅读的衰落，但另一些人看到了电子书和在线文章的新机会。关键在于保持持续的阅读习惯，无论通过什么媒介。"
+      ],
+      "vocabulary_notes": [
+        { "word": "credit", "chinese": "归功于；认为…有功劳" },
+        { "word": "enhance", "chinese": "增强；提高" },
+        { "word": "critical thinking", "chinese": "批判性思维" },
+        { "word": "consistent", "chinese": "持续的；一致的" },
+        { "word": "medium", "chinese": "媒介；手段" }
+      ],
+      "questions": [
+        {
+          "question": "According to the passage, how long should one read daily to see benefits?",
+          "options": ["Ten minutes", "Twenty minutes", "Half an hour", "An hour"],
+          "answer": 1,
+          "explanation": "文中提到：People who read for just twenty minutes a day..."
+        },
+        {
+          "question": "What is the author's main point about digital reading?",
+          "options": [
+            "It is replacing traditional reading completely",
+            "It is worse than traditional reading",
+            "The key is maintaining a reading habit regardless of the medium",
+            "No one reads anymore in the digital age"
+          ],
+          "answer": 2,
+          "explanation": "作者指出：The key is to maintain a consistent reading habit, regardless of the medium."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Climate Change and Our Future",
+      "difficulty": "CET-6",
+      "text": "Climate change represents one of the most pressing challenges facing humanity today. Rising global temperatures are causing ice caps to melt, sea levels to rise, and extreme weather events to become more frequent.\n\nScientists agree that human activities, particularly the burning of fossil fuels, are the primary drivers of climate change. Carbon dioxide emissions have increased by over 50% since the industrial revolution, trapping heat in the Earth's atmosphere.\n\nHowever, there is still hope. Renewable energy sources like solar and wind power are becoming cheaper and more efficient. Many countries are setting ambitious targets to reduce their carbon footprint. Individual actions, from reducing waste to choosing sustainable transportation, can also make a significant difference.",
+      "paragraphs_cn": [
+        "气候变化代表着当今人类面临的最紧迫挑战之一。全球气温上升正导致冰盖融化、海平面上升以及极端天气事件变得更加频繁。",
+        "科学家们一致认为，人类活动——尤其是化石燃料的燃烧——是气候变化的主要推动力。自工业革命以来，二氧化碳排放量增加了超过50%，在地球大气层中锁住了热量。",
+        "然而，希望依然存在。太阳能和风能等可再生能源正变得更便宜、更高效。许多国家设定了雄心勃勃的减少碳足迹目标。个人行为，从减少浪费到选择可持续的交通方式，也能带来显著的改变。"
+      ],
+      "vocabulary_notes": [
+        { "word": "pressing", "chinese": "紧急的；紧迫的" },
+        { "word": "fossil fuels", "chinese": "化石燃料" },
+        { "word": "carbon dioxide", "chinese": "二氧化碳" },
+        { "word": "renewable energy", "chinese": "可再生能源" },
+        { "word": "carbon footprint", "chinese": "碳足迹" },
+        { "word": "sustainable", "chinese": "可持续的" }
+      ],
+      "questions": [
+        {
+          "question": "What percentage increase in carbon dioxide emissions is mentioned?",
+          "options": ["Over 25%", "Over 35%", "Over 50%", "Over 75%"],
+          "answer": 2,
+          "explanation": "文中提到：Carbon dioxide emissions have increased by over 50% since the industrial revolution."
+        },
+        {
+          "question": "Which is NOT mentioned as a consequence of rising temperatures?",
+          "options": [
+            "Ice caps melting",
+            "Sea levels rising",
+            "Desert expansion",
+            "Extreme weather events"
+          ],
+          "answer": 2,
+          "explanation": "文中提到的后果包括冰盖融化、海平面上升和极端天气，沙漠扩张未被提及。"
+        }
+      ]
+    }
+  ]
+}

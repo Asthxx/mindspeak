@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2A1420"/><stop offset="1" stop-color="#1C1216"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.4" r="0.55">
+      <stop offset="0" stop-color="#F06A93" stop-opacity="0.3"/><stop offset="1" stop-color="#F06A93" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F59DB9" stop-opacity="0.95"/><stop offset="0.5" stop-color="#F06A93" stop-opacity="0.4"/><stop offset="1" stop-color="#F06A93" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#311D24" stop-opacity="0.96"/><stop offset="1" stop-color="#271820" stop-opacity="0.96"/>
+    </linearGradient>
+    <linearGradient id="petal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F06A93" stop-opacity="0.55"/><stop offset="1" stop-color="#B93D63" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" fill="url(#bg)"/>
+  <rect width="400" height="200" fill="url(#halo)"/>
+  <circle cx="330" cy="40" r="32" fill="url(#orb)"/>
+  <circle cx="56" cy="48" r="18" fill="url(#orb)"/>
+  <g fill="#F59DB9" opacity="0.8">
+    <g transform="translate(80,36) rotate(15)">
+      <ellipse cx="0" cy="0" rx="9" ry="8"/>
+      <path d="M0 -12a8 8 0 0 1 8 8h-16a8 8 0 0 1 8-8Z"/>
+    </g>
+    <g transform="translate(150,30) rotate(-12)">
+      <ellipse cx="0" cy="0" rx="7" ry="6.5"/>
+      <path d="M0 -10a6.5 6.5 0 0 1 6.5 6.5h-13A6.5 6.5 0 0 1 0-10Z"/>
+    </g>
+    <g transform="translate(230,26) rotate(10)">
+      <ellipse cx="0" cy="0" rx="8" ry="7"/>
+      <path d="M0 -11a7 7 0 0 1 7 7h-14a7 7 0 0 1 7-7Z"/>
+    </g>
+  </g>
+  <path d="M0 160c70-16 150-16 230 0s120 10 170 0v40H0Z" fill="url(#petal)"/>
+  <path d="M0 178c80-10 170-10 260 0 50 5 90 5 140 0v22H0Z" fill="#3A1A26" opacity="0.85"/>
+  <g filter="drop-shadow(0 0 16px rgba(240,106,147,0.45))">
+    <rect x="112" y="64" width="176" height="76" rx="14" fill="url(#card)" stroke="#F06A93" stroke-width="1.5" stroke-opacity="0.7"/>
+    <rect x="132" y="84" width="76" height="9" rx="4.5" fill="#F06A93"/>
+    <rect x="216" y="84" width="52" height="9" rx="4.5" fill="#F59DB9" opacity="0.75"/>
+    <rect x="132" y="102" width="112" height="6" rx="3" fill="#C9A3AF" opacity="0.75"/>
+    <rect x="132" y="116" width="88" height="6" rx="3" fill="#A77E8C" opacity="0.6"/>
+    <rect x="132" y="132" width="64" height="5" rx="2.5" fill="#F06A93" opacity="0.9"/>
+  </g>
+  <g fill="#F59DB9" opacity="0.35">
+    <circle cx="60" cy="122" r="2"/>
+    <circle cx="100" cy="132" r="1.6"/>
+    <circle cx="320" cy="126" r="2"/>
+    <circle cx="290" cy="138" r="1.6"/>
+  </g>
+  <path d="M128 152c14 8 26 8 38 0" fill="none" stroke="#F06A93" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <path d="M240 152c12 8 24 8 36 0" fill="none" stroke="#F06A93" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+</svg>

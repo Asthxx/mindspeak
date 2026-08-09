@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#121218"/><stop offset="1" stop-color="#2E2E3A"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" fill="url(#sky)"/>
+  <g fill="#D4A017">
+    <circle cx="318" cy="52" r="26"/>
+    <path d="M318 18v-6M318 92v-6M284 52h-6M356 52h-6M294 28l-4-4M338 72l4 4M342 28l4-4M294 72l-4 4"/>
+    <circle cx="305" cy="40" r="4" fill="#FDE68A"/>
+    <circle cx="331" cy="62" r="3" fill="#FDE68A"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="60" cy="42" r="2" opacity="0.9"/>
+    <circle cx="105" cy="70" r="1.6" opacity="0.7"/>
+    <circle cx="150" cy="34" r="2.2" opacity="0.85"/>
+    <circle cx="210" cy="60" r="1.6" opacity="0.6"/>
+    <circle cx="250" cy="30" r="1.8" opacity="0.8"/>
+    <circle cx="90" cy="110" r="1.6" opacity="0.5"/>
+    <circle cx="170" cy="100" r="1.8" opacity="0.6"/>
+    <circle cx="240" cy="120" r="1.5" opacity="0.5"/>
+    <circle cx="380" cy="100" r="1.7" opacity="0.6"/>
+    <circle cx="40" cy="150" r="1.5" opacity="0.5"/>
+  </g>
+  <path d="M0 156c70-14 150-14 230 0s110 12 170 0v44H0Z" fill="#1A1A24" opacity="0.95"/>
+  <path d="M0 172c80-10 170-10 250 0 60 6 100 6 150 0v28H0Z" fill="#0F0F14"/>
+  <g stroke="#D4A017" stroke-width="2" opacity="0.35" fill="none">
+    <path d="M70 178l10-8 10 8"/>
+    <path d="M230 178l10-8 10 8"/>
+    <path d="M330 178l10-8 10 8"/>
+  </g>
+  <g fill="#D4A017" opacity="0.5">
+    <rect x="72" y="170" width="3" height="16" rx="1.5"/>
+    <rect x="232" y="170" width="3" height="16" rx="1.5"/>
+    <rect x="332" y="170" width="3" height="16" rx="1.5"/>
+  </g>
+</svg>

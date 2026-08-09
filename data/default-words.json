@@ -1,0 +1,54 @@
+﻿{
+  "categories": [
+    {
+      "name": "CET-4 基础",
+      "words": [
+        { "word": "abandon", "phonetic": "/əˈbændən/", "pos": "v.", "chinese": "放弃，遗弃", "example": "He abandoned his wife and children.", "example_cn": "他抛弃了妻子和孩子。" },
+        { "word": "ability", "phonetic": "/əˈbɪləti/", "pos": "n.", "chinese": "能力；本领", "example": "She has the ability to solve complex problems.", "example_cn": "她有能力解决复杂问题。" },
+        { "word": "absolute", "phonetic": "/ˈæbsəluːt/", "pos": "adj.", "chinese": "绝对的；完全的", "example": "I have absolute confidence in her.", "example_cn": "我对她有着绝对的信心。" },
+        { "word": "absorb", "phonetic": "/əbˈzɔːrb/", "pos": "v.", "chinese": "吸收；吸引", "example": "The sponge absorbed all the water.", "example_cn": "海绵吸收了所有的水。" },
+        { "word": "abstract", "phonetic": "/ˈæbstrækt/", "pos": "adj.", "chinese": "抽象的；理论的", "example": "The concept is too abstract for children.", "example_cn": "这个概念对孩子们来说太抽象了。" },
+        { "word": "abundant", "phonetic": "/əˈbʌndənt/", "pos": "adj.", "chinese": "丰富的；大量的", "example": "The region has abundant wildlife.", "example_cn": "该地区有丰富的野生动物。" },
+        { "word": "accelerate", "phonetic": "/əkˈseləreɪt/", "pos": "v.", "chinese": "加速；促进", "example": "The car accelerated quickly.", "example_cn": "汽车迅速加速了。" },
+        { "word": "accessory", "phonetic": "/əkˈsesəri/", "pos": "n.", "chinese": "附件；配饰", "example": "She sells clothes and accessories.", "example_cn": "她卖服装和配饰。" },
+        { "word": "accomplish", "phonetic": "/əˈkɑːmplɪʃ/", "pos": "v.", "chinese": "完成；实现", "example": "She accomplished her goal of graduating top of her class.", "example_cn": "她实现了以全班第一毕业的目标。" },
+        { "word": "accumulate", "phonetic": "/əˈkjuːmjəleɪt/", "pos": "v.", "chinese": "积累；堆积", "example": "Dust had accumulated on the shelves.", "example_cn": "架子上积满了灰尘。" },
+        { "word": "accurate", "phonetic": "/ˈækjərət/", "pos": "adj.", "chinese": "精确的；准确的", "example": "The report was accurate and well-researched.", "example_cn": "报告准确且研究充分。" },
+        { "word": "achieve", "phonetic": "/əˈtʃiːv/", "pos": "v.", "chinese": "实现；达到", "example": "He achieved success through hard work.", "example_cn": "他通过努力取得了成功。" },
+        { "word": "acknowledge", "phonetic": "/əkˈnɑːlɪdʒ/", "pos": "v.", "chinese": "承认；致谢", "example": "She acknowledged her mistake publicly.", "example_cn": "她公开承认了自己的错误。" },
+        { "word": "acquire", "phonetic": "/əˈkwaɪər/", "pos": "v.", "chinese": "获得；习得", "example": "She acquired a good knowledge of English.", "example_cn": "她学会了英语。" },
+        { "word": "adapt", "phonetic": "/əˈdæpt/", "pos": "v.", "chinese": "适应；改编", "example": "You must adapt to the new environment.", "example_cn": "你必须适应新环境。" }
+      ]
+    },
+    {
+      "name": "CET-6 进阶",
+      "words": [
+        { "word": "abolish", "phonetic": "/əˈbɑːlɪʃ/", "pos": "v.", "chinese": "废除；废止", "example": "They voted to abolish the death penalty.", "example_cn": "他们投票废除了死刑。" },
+        { "word": "ambiguous", "phonetic": "/æmˈbɪɡjuəs/", "pos": "adj.", "chinese": "模棱两可的；含糊的", "example": "His answer was ambiguous.", "example_cn": "他的回答含糊不清。" },
+        { "word": "ambitious", "phonetic": "/æmˈbɪʃəs/", "pos": "adj.", "chinese": "有雄心的；野心勃勃的", "example": "She is very ambitious and determined.", "example_cn": "她很有雄心并且意志坚定。" },
+        { "word": "analogy", "phonetic": "/əˈnælədʒi/", "pos": "n.", "chinese": "类比；类推", "example": "He drew an analogy between the brain and a computer.", "example_cn": "他把大脑比作电脑。" },
+        { "word": "anonymous", "phonetic": "/əˈnɑːnɪməs/", "pos": "adj.", "chinese": "匿名的", "example": "The donation was made by an anonymous donor.", "example_cn": "这笔捐款来自一位匿名捐赠者。" },
+        { "word": "anticipate", "phonetic": "/ænˈtɪsɪpeɪt/", "pos": "v.", "chinese": "预期；期望", "example": "We did not anticipate the problem.", "example_cn": "我们没有预料到这个问题。" },
+        { "word": "apparatus", "phonetic": "/ˌæpəˈreɪtəs/", "pos": "n.", "chinese": "器械；装置", "example": "The lab has modern apparatus.", "example_cn": "实验室有现代化的设备。" },
+        { "word": "approximate", "phonetic": "/əˈprɑːksɪmət/", "pos": "adj.", "chinese": "大约的；近似的", "example": "The approximate cost is $500.", "example_cn": "大约费用是500美元。" },
+        { "word": "attribute", "phonetic": "/əˈtrɪbjuːt/", "pos": "v./n.", "chinese": "归因于；属性", "example": "She attributed her success to hard work.", "example_cn": "她将成功归因于努力工作。" },
+        { "word": "authentic", "phonetic": "/ɔːˈθentɪk/", "pos": "adj.", "chinese": "真实的；正宗的", "example": "This is an authentic painting by Picasso.", "example_cn": "这是毕加索的一幅真迹。" }
+      ]
+    },
+    {
+      "name": "高考高频",
+      "words": [
+        { "word": "abandon", "phonetic": "/əˈbændən/", "pos": "v.", "chinese": "放弃；抛弃", "example": "Never abandon your dreams.", "example_cn": "永远不要放弃你的梦想。" },
+        { "word": "absolutely", "phonetic": "/ˈæbsəluːtli/", "pos": "adv.", "chinese": "绝对地；完全地", "example": "You are absolutely right.", "example_cn": "你完全正确。" },
+        { "word": "accept", "phonetic": "/əkˈsept/", "pos": "v.", "chinese": "接受；认可", "example": "She accepted the invitation gladly.", "example_cn": "她愉快地接受了邀请。" },
+        { "word": "accident", "phonetic": "/ˈæksɪdənt/", "pos": "n.", "chinese": "事故；意外", "example": "There was a car accident on the highway.", "example_cn": "高速公路上发生了一起车祸。" },
+        { "word": "account", "phonetic": "/əˈkaʊnt/", "pos": "n./v.", "chinese": "账户；解释", "example": "He opened a bank account.", "example_cn": "他开了一个银行账户。" },
+        { "word": "across", "phonetic": "/əˈkrɔːs/", "pos": "prep.", "chinese": "穿过；横跨", "example": "She walked across the street.", "example_cn": "她穿过了街道。" },
+        { "word": "action", "phonetic": "/ˈækʃən/", "pos": "n.", "chinese": "行动；行为", "example": "We need to take action now.", "example_cn": "我们现在需要采取行动。" },
+        { "word": "active", "phonetic": "/ˈæktɪv/", "pos": "adj.", "chinese": "积极的；活跃的", "example": "He leads an active lifestyle.", "example_cn": "他过着积极的生活方式。" },
+        { "word": "actually", "phonetic": "/ˈæktʃuəli/", "pos": "adv.", "chinese": "实际上；事实上", "example": "Actually, I prefer tea.", "example_cn": "实际上，我更喜欢茶。" },
+        { "word": "admire", "phonetic": "/ədˈmaɪər/", "pos": "v.", "chinese": "钦佩；赞赏", "example": "I admire her courage.", "example_cn": "我钦佩她的勇气。" }
+      ]
+    }
+  ]
+}

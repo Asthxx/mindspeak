@@ -1,0 +1,358 @@
+// ==================== 闻道 MindSpeak 后端入口 ====================
+// 启动：node server.js   （默认 http://localhost:3000）
+// 同时托管前端静态文件（index.html 所在目录），并挂载 /api/auth 认证接口。
+const express = require('express');
+const path = require('node:path');
+const os = require('node:os');
+const fs = require('node:fs');
+const https = require('node:https');
+const crypto = require('node:crypto');
+const { execFile, exec } = require('node:child_process');
+const config = require('./config');
+const { router: authRouter } = require('./auth');
+const logger = require('./logger');
+
+const app = express();
+const ROOT = path.join(__dirname, '..');
+
+// ==================== 未捕获异常兜底：写结构化错误日志 ====================
+// 任何未捕获的异常/拒绝都落到 server/logs/app.log，配合前端上报形成完整链路。
+process.on('uncaughtException', (err) => {
+  logger.error('process', 'uncaughtException: ' + (err && err.message || err), null, err);
+  // 不退出会造成僵尸进程占用端口、静默变哑；本地自用直接退出，由启动脚本拉起
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('process', 'unhandledRejection: ' + (reason && reason.message || reason), null, reason);
+});
+
+app.use(express.json({ limit: '2mb' }));
+// JSON 解析错误（400 非法 JSON / 413 超大 body）统一返回 JSON，不让 Express 默认 HTML 错误页
+// 泄露堆栈，也不让前端 logger 把失败当网络错误无限缓冲重传
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.type === 'entity.parse.failed')) {
+    return res.status(err.type === 'entity.too.large' ? 413 : 400).json({ ok: false, message: '请求体过大或格式错误' });
+  }
+  next(err);
+});
+
+// 跨域策略：放行"与请求同源"的浏览器 Origin（同源部署到任意 IP/域名都自动放行：
+// localhost、127.0.0.1、局域网 IP、公网 IP/域名全部可用），同时拒绝远程恶意站点
+// 跨源调用未鉴权接口（防验证码邮件轰炸/接口滥用）。file:// 是 null origin 也放行。
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  // 同源判定：Origin 的 host:port 与请求 Host 一致，或本机回环来源
+  let sameOrigin = false;
+  try {
+    const u = new URL(origin);
+    sameOrigin = (u.host === req.headers.host);
+  } catch (e) {}
+  const allowed = !origin || origin === 'null' || sameOrigin
+    || config.allowedOrigins.includes(origin)
+    || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (!allowed) return res.status(403).json({ ok: false, message: '禁止跨源访问' });
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  // Chromium 正在弃用 unload 事件，默认会打印
+  // "Permissions policy violation: unload is not allowed in this document"。
+  // 这里显式声明本文档允许 unload（含扩展注入脚本），消除该控制台噪音。
+  res.setHeader('Permissions-Policy', 'unload=(self)');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+// ==================== 保底朗读：Windows SAPI 离线合成 ====================
+// 本机 Edge 英文声几乎全是在线声（Aria/Guy/...），连不上 speech.platform.bing.com
+// 时浏览器朗读会无声。这里用系统自带的 SAPI（System.Speech，离线、必出声，
+// 本机有 Microsoft Zira 英文声 + Huihui 中文声）合成 WAV，作为在线声失败后的保底。
+const TTS_CACHE = path.join(os.tmpdir(), 'mindspeak-tts');
+const TTS_PS = path.join(TTS_CACHE, 'tts.ps1');
+// 启动时清理 30 天前的旧 TTS 缓存（每日大量合成会占用磁盘）
+try {
+  if (fs.existsSync(TTS_CACHE)) {
+    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    for (const f of fs.readdirSync(TTS_CACHE)) {
+      const fp = path.join(TTS_CACHE, f);
+      try {
+        if (fs.statSync(fp).mtimeMs < cutoff && fs.statSync(fp).isFile()) fs.unlinkSync(fp);
+      } catch (e) {}
+    }
+  }
+} catch (e) {}
+try {
+  fs.mkdirSync(TTS_CACHE, { recursive: true });
+  fs.writeFileSync(TTS_PS, [
+    "$ErrorActionPreference = 'Stop'",
+    "$Lang = $args[0]",
+    "$Rate = [double]$args[1]",
+    "$Out  = $args[2]",
+    "$Text = $args[3]",
+    "Add-Type -AssemblyName System.Speech",
+    "$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer",
+    "$voices = @($synth.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo })",
+    "$wanted = ($Lang -split '-')[0]",
+    "$pick = $voices | Where-Object { $_.Culture.Name -eq $Lang } | Select-Object -First 1",
+    "if (-not $pick) { $pick = $voices | Where-Object { $_.Culture.Name -like \"$wanted-*\" } | Select-Object -First 1 }",
+    "if (-not $pick -and $wanted -eq 'en') { $pick = $voices | Where-Object { $_.Name -match 'Zira|David' } | Select-Object -First 1 }",
+    "if (-not $pick) { $pick = $voices | Select-Object -First 1 }",
+    "if ($pick) { try { $synth.SelectVoice($pick.Name) } catch {} }",
+    "$synth.Rate = [int]((($Rate - 1.0)) * 10.0)",
+    "$synth.SetOutputToWaveFile($Out)",
+    "$synth.Speak($Text)",
+    "$synth.Dispose()",
+    "exit 0"
+  ].join('\n'));
+} catch(e) {
+  console.error('SAPI 保底朗读初始化失败:', e.message);
+  logger.error('tts', 'SAPI 保底朗读初始化失败', { message: e.message }, e);
+}
+
+const ttsPending = new Map(); // key -> [res,...]：同 key 并发请求共享一次合成，避免共享临时文件被并发写坏
+let ttsSeq = 0; // 唯一临时文件名计数器（防不同请求相互覆盖）
+function streamWav(file, res) {
+  const rs = fs.createReadStream(file);
+  rs.on('error', () => { try { res.status(500).end(); } catch(e) {} });
+  rs.pipe(res);
+}
+app.get('/api/tts', (req, res) => {
+  const text = String(req.query.text || '').trim();
+  const lang = String(req.query.lang || 'en-US').slice(0, 64);
+  let rate = parseFloat(req.query.rate);
+  if (!(rate >= 0.5 && rate <= 2)) rate = 1;
+  if (!text || text.length > 500) return res.status(400).json({ ok: false, message: 'text too long or empty' });
+  const key = crypto.createHash('sha1').update(text + '|' + lang + '|' + rate).digest('hex');
+  const wav = path.join(TTS_CACHE, key + '.wav');
+  if (!fs.existsSync(TTS_PS)) {
+    logger.error('tts', 'TTS 脚本缺失，本地朗读不可用', { file: TTS_PS });
+    return res.status(500).json({ ok: false, message: 'tts not ready' });
+  }
+  res.setHeader('Content-Type', 'audio/wav');
+  // 内容寻址：相同文本+语速合成结果不变，允许长期缓存
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  if (fs.existsSync(wav)) {
+    try { streamWav(wav, res); } catch(e) { res.status(500).end(); }
+    return;
+  }
+  // 并发去重：同 key 正在合成时，新请求挂到它后面，合成完一起回传
+  const pending = ttsPending.get(key);
+  if (pending) { pending.push(res); return; }
+  ttsPending.set(key, [res]);
+  const temp = wav + '.tmp' + (++ttsSeq) + '-' + process.pid;
+  // text 作为参数传给 powershell -File：Node 走 CreateProcess 传 UTF-16，
+  // 中文等非 ASCII 不会乱码；也规避了 execFile 管道 stdin 读取在 Windows 上挂起的问题。
+  execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', TTS_PS, lang, String(rate), temp, text],
+    { timeout: 20000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
+    (err) => {
+      let ok = false;
+      try {
+        if (!err && fs.existsSync(temp)) {
+          fs.renameSync(temp, wav);
+          ok = true;
+        }
+      } catch(e) {}
+      try { if (!ok) fs.unlinkSync(temp); } catch(e) {}
+      const list = ttsPending.get(key) || [];
+      ttsPending.delete(key);
+      if (!ok) {
+        logger.error('tts', '本地 SAPI 合成失败', {
+          lang: lang, rate: rate,
+          text: text.slice(0, 120),
+          err: err && err.message || 'no output file'
+        }, err);
+      }
+      for (const r of list) {
+        if (r.headersSent) continue;
+        try {
+          if (ok) streamWav(wav, r);
+          else r.status(500).json({ ok: false, message: 'tts failed' });
+        } catch(e) { try { r.status(500).end(); } catch(e2) {} }
+      }
+    });
+});
+
+// ==================== 在线自然女声（Google 合成代理） ====================
+// 本机浏览器直连 translate.googleapis.com 会被代理/TUN 拦截且需 CORS，
+// 但 Node 直连可达。这里在服务端抓取 Google TTS 音频并回传，
+// 浏览器只访问同源 /api/online-tts，网络与 CORS 都由服务端处理。
+const onlineCache = new Map(); // 内容寻址内存缓存（text+lang+speed）
+const onlinePending = new Map(); // 相同请求并发去重：共享同一次 Google 抓取
+app.get('/api/online-tts', (req, res) => {
+  const text = String(req.query.text || '').trim();
+  const lang = String(req.query.lang || 'en').slice(0, 32);
+  const speed = String(req.query.ttsspeed || '0.24').slice(0, 8);
+  if (!text || text.length > 500) return res.status(400).json({ ok: false, message: 'text too long or empty' });
+  const key = crypto.createHash('sha1').update(text + '|' + lang + '|' + speed).digest('hex');
+  const cached = onlineCache.get(key);
+  if (cached) {
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(cached);
+  }
+  // 并发去重：同一内容已有请求在抓取中 → 挂到它后面，抓完一起回传，避免重复打 Google
+  const waiting = onlinePending.get(key);
+  if (waiting) {
+    waiting.push(res);
+    return;
+  }
+  onlinePending.set(key, [res]);
+  const gUrl = 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&ttsspeed='
+    + encodeURIComponent(speed) + '&q=' + encodeURIComponent(text) + '&tl=' + encodeURIComponent(lang);
+  const finish = (buf, reason) => {
+    const list = onlinePending.get(key) || [];
+    onlinePending.delete(key);
+    if (buf) {
+      if (onlineCache.size > 500) onlineCache.clear();
+      onlineCache.set(key, buf);
+    } else {
+      logger.warn('online-tts', '在线语音抓取失败', {
+        lang: lang, speed: speed,
+        text: text.slice(0, 120),
+        reason: reason || 'http error'
+      });
+    }
+    for (const r of list) {
+      if (r.headersSent) continue;
+      try {
+        if (buf) {
+          r.setHeader('Content-Type', 'audio/mpeg');
+          r.setHeader('Cache-Control', 'public, max-age=86400');
+          r.send(buf);
+        } else {
+          r.status(502).json({ ok: false, message: 'online tts failed' });
+        }
+      } catch(e) {} // 客户端已断开：忽略
+    }
+  };
+  const gReq = https.get(gUrl, {
+    timeout: 12000,
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36' }
+  }, (gRes) => {
+    if (gRes.statusCode !== 200) {
+      gRes.resume();
+      return finish(null, 'google status ' + gRes.statusCode);
+    }
+    const chunks = [];
+    gRes.on('data', (c) => chunks.push(c));
+    gRes.on('error', () => finish(null, 'stream error'));
+    gRes.on('end', () => {
+      const buf = Buffer.concat(chunks);
+      if (buf.length < 100) return finish(null, 'empty payload ' + buf.length);
+      finish(buf);
+    });
+  });
+  gReq.on('timeout', () => { gReq.destroy(); finish(null, 'timeout 12s'); });
+  gReq.on('error', (e) => finish(null, 'request error: ' + (e && e.message || e)));
+});
+
+// API 路由
+app.get('/api/health', (req, res) => res.json({ ok: true, smtp: require('./mailer').configured }));
+app.use('/api/auth', authRouter);
+
+// ==================== 前端错误日志上报（AI 可读）====================
+// 浏览器端 logger.js 捕获的 error/warn 通过 POST /api/logs 批量上报，
+// 最终与 server 端日志合并写入 server/logs/app.log（JSON Lines）。
+app.post('/api/logs', (req, res) => {
+  const body = Array.isArray(req.body) ? req.body : [];
+  const now = Date.now();
+  let n = 0;
+  for (const item of body) {
+    if (!item || typeof item !== 'object') continue;
+    // 浏览器日志项：一般为 { lvl, mod, msg, data, stack, page, url, ts, rep }
+    // rep=1 表示离线补传（localStorage 缓冲），时间窗放宽到 7 天，
+    // 否则离线几分钟以上的日志一重放就被 10 分钟过滤丢弃。
+    const lvl = ['error', 'warn', 'info', 'debug'].includes(item.lvl) ? item.lvl : 'info';
+    if (lvl === 'debug') continue; // 不上报 debug 噪声
+    const age = now - (parseInt(item.ts) || 0);
+    const maxAge = (item.rep === 1 || item.rep === true || item.rep === '1') ? 7 * 24 * 3600 * 1000 : 10 * 60 * 1000;
+    if (age > maxAge) continue;
+    // msg 超长截断而非丢弃（超 500 字符的日志事件信息仍有排查价值）
+    if (typeof item.msg === 'string' && item.msg.length > 500) item.msg = item.msg.slice(0, 500);
+    // mod/src 长度防护：防超大字符串把单行 JSONL 撑到近 2MB、拖垮读接口
+    if (typeof item.mod === 'string' && item.mod.length > 60) item.mod = item.mod.slice(0, 60);
+    if (typeof item.page === 'string' && item.page.length > 120) item.page = item.page.slice(0, 120);
+    logger.writeBrowser(item); // 见 logger.js
+    n++;
+    if (n >= 100) break; // 单次上限，防刷
+  }
+  res.json({ ok: true, accepted: n });
+});
+
+// 「查看错误日志」：读取 server/logs/app.log 末尾 N 行（JSONL 逐行解析），
+// 返回结构化数组供前端弹窗展示；AI 排查也直接调它拿结构化日志。
+app.get('/api/logs/read', (req, res) => {
+  const logFile = logger.LOG_FILE;
+  const n = Math.min(parseInt(req.query.n) || 100, 500);
+  try {
+    if (!fs.existsSync(logFile)) return res.json({ ok: true, lines: [], file: 0 });
+    const raw = fs.readFileSync(logFile, 'utf8').trim();
+    if (!raw) return res.json({ ok: true, lines: [], file: 0 });
+    const all = raw.split('\n');
+    const tail = all.slice(-n);
+    const lines = [];
+    for (const ln of tail) {
+      try { lines.push(JSON.parse(ln)); }
+      catch (e) { lines.push({ lvl: 'warn', src: 'server', mod: 'logger', msg: '非JSON日志行', data: { raw: ln.slice(0, 300) } }); }
+    }
+    res.json({ ok: true, lines: lines, file: fs.statSync(logFile).size });
+  } catch (e) {
+    logger.error('logs', '读取日志失败', null, e);
+    res.status(500).json({ ok: false, message: 'read log failed' });
+  }
+});
+
+// 「打开错误日志」：在系统资源管理器中定位到 server/logs/app.log（方便查看/发给 AI）。
+app.post('/api/logs/open', (req, res) => {
+  const logFile = logger.LOG_FILE;
+  try {
+    fs.mkdirSync(path.dirname(logFile), { recursive: true });
+    if (!fs.existsSync(logFile)) fs.writeFileSync(logFile, '', 'utf8');
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: 'log init failed' });
+  }
+  // Windows 资源管理器打开 logs 目录。注意：execFile 直调 explorer.exe /select 会因
+  // CreateProcess 引号解析失败（实测 Command failed，窗口不弹），必须经 cmd 的 start。
+  // 目录里只有 app.log 一个文件，用管理员直接打开资源管理器即可定位。
+  const dirView = path.dirname(logFile);
+  exec('start "" "' + dirView + '"', { windowsHide: true }, (err) => {
+    if (err) logger.warn('logs', '打开日志文件夹失败', { file: logFile, err: err && err.message });
+  });
+  res.json({ ok: true, file: logFile, dir: dirView });
+});
+
+// 静态资源（index.html、css/js/data）
+// favicon：页面已用 <link> 指向 assets/favicon.svg；老请求/直接输入 /favicon.ico 空响应即可
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+// 本地开发服务器：禁用浏览器缓存，避免用户长期加载到旧版 js/css 而"功能失效"
+// 白名单中间件：只放行前端资源，防止 server/ 目录（含 config.js 密钥、data/app.db
+// 用户库、node_modules）被 HTTP 直接下载。
+// 注意：必须先 decode+normalize 再匹配——否则 /js/../server/config.js 这类
+// 原始（未归一化）路径能绕过前缀检查直达 express.static 根目录（ROOT 含 server/）。
+const STATIC_PUBLIC = ['/index.html', '/js/', '/css/', '/data/', '/assets/'];
+app.use((req, res, next) => {
+  let p = req.path;
+  try { p = decodeURIComponent(p); } catch (e) {}
+  // 统一按 POSIX 语义归一化（Windows 的 path.normalize 会把 / 变 \ 或产生 UNC // 前缀）
+  p = path.posix.normalize('/' + p);
+  if (p === '/' || p === '/index.html' || STATIC_PUBLIC.some((a) => p.startsWith(a))) return next();
+  return res.status(404).json({ ok: false, message: 'Not Found' });
+});
+app.use(express.static(ROOT, {
+  index: 'index.html',
+  etag: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+  }
+}));
+
+// 404 -> JSON（对非静态资源）
+app.use((req, res) => res.status(404).json({ ok: false, message: 'Not Found' }));
+
+// 监听地址与端口：默认 127.0.0.1 仅本机；server/.env 或环境变量 HOST=0.0.0.0
+// 可让局域网设备（安卓/苹果手机）访问，公网部署时配合防火墙/反代使用。
+app.listen(config.port, config.host, () => {
+  console.log('🌐 闻道 MindSpeak 服务已启动:  http://' + (config.host === '0.0.0.0' ? '局域网IP' : 'localhost') + ':' + config.port);
+  console.log('   邮箱验证码 SMTP 配置:', require('./mailer').configured ? '已配置 ✓' : '未配置（开发模式，验证码打印在控制台）');
+});
