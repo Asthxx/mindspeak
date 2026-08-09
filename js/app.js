@@ -4808,7 +4808,7 @@ App.prototype.initNav = function() {
     });
     self._navGroups[id] = group;
   });
-  // 恢复折叠状态
+// 恢复折叠状态
   var saved = DataStore.getProgress('nav_collapsed', {}) || {};
   document.querySelectorAll('.nav-group').forEach(function(group) {
     if (saved[group.id]) {
@@ -4817,9 +4817,43 @@ App.prototype.initNav = function() {
       if (t) t.setAttribute('aria-expanded', 'false');
     }
   });
+
+  // ---- 移动端抽屉导航：汉堡按钮开合 + 遮罩关闭 + 选中后自动收起 ----
+  this._initMobileDrawer();
+};
+App.prototype._initMobileDrawer = function() {
+  var self = this;
+  var sidebar = document.querySelector('.sidebar');
+  var scrim = document.querySelector('.sidebar-scrim');
+  var menuBtn = document.getElementById('btn-menu');
+  this._drawerEls = { sidebar: sidebar, scrim: scrim, btn: menuBtn };
+  if (!sidebar) return;
+  var close = function() {
+    sidebar.classList.remove('open');
+    sidebar.setAttribute('data-open', 'false');
+    if (scrim) scrim.classList.remove('show');
+    if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+    if (this && this.completeQ) this.completeQ('.drawer-open');
+  };
+  if (menuBtn) menuBtn.addEventListener('click', function() {
+    var isOpen = sidebar.classList.contains('open');
+    if (isOpen) close();
+    else {
+      sidebar.classList.add('open');
+      sidebar.setAttribute('data-open', 'true');
+      if (scrim) scrim.classList.add('show');
+      if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
+    }
+  });
+  if (scrim) scrim.addEventListener('click', close);
 };
 App.prototype.showTab = function(tab) {
   this.currentTab = tab;
+  // 移动端：选中后自动收起抽屉导航
+  if (this._drawerEls && this._drawerEls.sidebar) {
+    this._drawerEls.sidebar.classList.remove('open');
+    if (this._drawerEls.scrim) this._drawerEls.scrim.classList.remove('show');
+  }
   document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === tab); });
   document.querySelectorAll('.page').forEach(function(p) { p.classList.toggle('active', p.id === 'page-' + tab); });
   // 目标按钮所在的折叠分组自动展开
