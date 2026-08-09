@@ -232,7 +232,9 @@ getSettings: function() {
     if (!this._customVoice) this._customVoice = Storage.getJSON('custom_voice', {});
     return this._customVoice;
   },
-  speak: function(text, lang, opts) {
+speak: function(text, lang, opts) {
+    var self = this;
+    this._diag('speak-enter', String(text).slice(0, 20));
     // 单词（无空格）且有自定义录音 → 优先播真人录音（不依赖 speechSynthesis）
     var key = (text || '').trim().toLowerCase();
     var custom = this.getCustomVoice();
@@ -401,8 +403,9 @@ _speakLetterTTS: function(up, opts) {
   //  3. 在线声真失败会进入 15s 冷却（_markOnlineBroken），期间后续点击跳过在线声
   //     立即出声；冷却过后重新尝试，网络恢复后自动回到所选在线音色，不会永久换声；
   //  4. 全部失败才 Toast 提示，绝不静默无声。
-  _speakTTS: function(text, lang, opts) {
+_speakTTS: function(text, lang, opts) {
     var self = this;
+    this._diag('tts-enter', String(text).slice(0, 20) + ' serverDown=' + this._serverDown);
     var settings = this.getSettings();
     // 上一次在线声朗读还挂在队列里没 START（连接慢/断线），用户又点了新朗读：
     // 直接判定在线声已坏（本会话不再尝试），本次立即走 Google 合成/SAPI 出声。
@@ -914,10 +917,11 @@ _markOnlineBroken: function() {
     u.pitch = settings.pitch || 1;
     u.volume = settings.volume || 1;
     var started = false, finished = false;
-    u.onstart = function() { started = true; fireStart(); };
+    u.onstart = function() { started = true; this._diag && this._diag('device-start', String(text).slice(0,20)); fireStart(); }.bind(this);
     u.onend = function() { if (finished) return; finished = true; fireEnd(); };
     var failed = false, isFinal = (opts && opts._noRemoteRetry) === true;
     var deviceNext = function() {
+      self._diag('device-fail', isFinal ? 'final' : '->remote');
       if (isFinal) { self._deviceFail(); return; }
       self._speakRemoteFallback(text, lang, opts);
     };
@@ -960,8 +964,9 @@ _markOnlineBroken: function() {
       if (i >= urls.length) { done = true; self._deviceFail(opts); return; }
       var url = urls[i++];
       var audio;
-      try { audio = new Audio(url); } catch(e) { tryNext(); return; }
+      try { audio = new Audio(url); } catch(e) { self._diag('remote-ctr', String(e)); tryNext(); return; }
       self._localAudio = audio;
+      audio.oncanplaythrough = function() { try { audio.play(); } catch(e) {} };
       audio.onplay = function() { if (!started) { started = true; fireStart(); } };
       audio.onended = function() {
         if (seq !== self._waSeq) return;
@@ -969,13 +974,15 @@ _markOnlineBroken: function() {
         if (!done) { done = true; fireEnd(); }
       };
       audio.onerror = function() {
+        self._diag('remote-err', 'idx=' + (i - 1) + ' ' + (audio.error ? audio.error.code : '?'));
         if (self._localAudio === audio) self._localAudio = null;
         if (seq !== self._waSeq || done) return;
         tryNext();
       };
       var pr;
-      try { pr = audio.play(); } catch(e) { if (!done) tryNext(); return; }
+      try { pr = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!done) tryNext(); return; }
       if (pr && pr.catch) pr.catch(function(e) {
+        self._diag('remote-play-rej', e && e.name ? e.name : String(e));
         if (e && e.name === 'AbortError') return;
         if (seq !== self._waSeq || done || started) return;
         tryNext();
@@ -993,6 +1000,7 @@ _markOnlineBroken: function() {
     var self = this;
     try { window.speechSynthesis.cancel(); } catch(e) {}
     this._stopLocalAudio();
+    this._diag('serverless', String(text).slice(0, 20));
     var o = {};
     if (opts) for (var k in opts) o[k] = opts[k];
     o.noFailToast = true; // 远程失败时先不弹 Toast，交给设备语音兜底
@@ -1003,6 +1011,14 @@ _markOnlineBroken: function() {
       self._speakDeviceVoice(text, lang, d);
     };
     this._speakRemoteFallback(text, lang, o);
+  },
+  // 朗读诊断记录：写入 window.__speechDiag，设置页可显示，便于排查手机无声问题
+  _diag: function(tag, msg) {
+    try {
+      window.__speechDiag = window.__speechDiag || [];
+      window.__speechDiag.push(Date.now() + ' [' + tag + '] ' + msg);
+      if (window.__speechDiag.length > 200) window.__speechDiag.shift();
+    } catch(e) {}
   },
   _deviceFail: function(opts) {
     this._stopLocalAudio();
@@ -1998,10 +2014,18 @@ cat.words = merged;
     document.getElementById('word-front').classList.toggle('hidden');
     document.getElementById('word-back').classList.toggle('hidden');
   };
-  WordModule.prototype.speakCurrent = function() {
-    var words = this.getCurrentWords();
-    if (!words.length) return;
-    SpeechUtil.speakWord(words[this.currentIndex].word);
+WordModule.prototype.speakCurrent = function() {
+    var self = this;
+    SpeechUtil._diag('speakCurrent-btn', 'words=' + (this.getCurrentWords ? this.getCurrentWords().length : '?') + ' idx=' + this.currentIndex);
+    try {
+      var words = this.getCurrentWords();
+      if (!words.length) { SpeechUtil._diag('speakCurrent-empty', 'no words'); return; }
+      var w = words[this.currentIndex];
+      SpeechUtil._diag('speakCurrent-word', w ? String(w.word).slice(0, 20) : 'undefined');
+      SpeechUtil.speakWord(w.word);
+    } catch(e) {
+      SpeechUtil._diag('speakCurrent-err', String(e));
+    }
   };
   WordModule.prototype.favoriteCurrent = function() {
     var words = this.getCurrentWords();
@@ -5128,6 +5152,37 @@ App.prototype.bindSettings = function() {
   safeBind('btn-export-data', 'click', function() { self.exportData(); });
 safeBind('btn-import-data', 'click', function() { self.importData(); });
   safeBind('btn-open-logs', 'click', function() { self.openLogs(); });
+  // 朗读诊断：把 window.__speechDiag 的链路信息弹窗显示，用于排查手机无声
+  safeBind('btn-open-speech-diag', 'click', function() { self.openSpeechDiag(); });
+  App.prototype.openSpeechDiag = function() {
+    var lines = (window.__speechDiag || []);
+    var pre = null;
+    if (!lines.length) {
+      pre = '（尚无朗读记录：请先点一次任意单词/字母的朗读按钮，再回来点此按钮）\n\n提示：口腔没有当前离线/本地 TTS 时，朗读会走「远程在线发音」：\n点单词后应立即出声，若没声音可能是自动播放被浏览器拦截或网络不通。';
+    } else {
+      pre = lines.join('\n');
+    }
+    // 自绘弹窗（手机浏览器 `prompt()` 常被禁用），方便复制诊断内容
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(8,12,10,.6);padding:20px;font-family:-apple-system,Segoe UI,Microsoft YaHei,sans-serif';
+    var box = document.createElement('div');
+    box.style.cssText = 'width:min(720px,96vw);max-height:86vh;overflow:auto;background:#fff;border-radius:12px;padding:18px;font-size:13px;';
+    var btn = document.createElement('button');
+    btn.textContent = '关闭';
+    btn.style.cssText = 'margin-top:14px;padding:8px 22px;border:0;border-radius:8px;background:#2f8f6b;color:#fff;font-size:14px;cursor:pointer';
+    btn.onclick = function() { try { document.body.removeChild(wrap); } catch(e) {} };
+    var title = document.createElement('div');
+    title.style.cssText = 'font-weight:700;font-size:15px;margin-bottom:10px;color:#2f3b36';
+    title.textContent = '朗读诊断';
+    var t = document.createElement('div');
+    t.textContent = pre;
+    t.style.cssText = 'background:#f6f8f7;border:1px solid #e3e8e5;border-radius:8px;padding:12px;margin:8px 0;max-height:420px;overflow:auto';
+    box.appendChild(title);
+    box.appendChild(t);
+    box.appendChild(btn);
+    wrap.appendChild(box);
+    document.body.appendChild(wrap);
+  };
   // 事件委托兜底：即使旧缓存 HTML 里按钮绑定时序异常，点击同样生效
   // （但依赖按钮 ID 存在；HTML 必定包含该按钮，旧版也有）
   var settingsEl = document.getElementById('page-settings');
