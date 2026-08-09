@@ -2,14 +2,12 @@
   "name": "ai-english-coach-server",
   "version": "1.0.0",
   "private": true,
-  "description": "AI English Coach 后端：邮箱注册登录 + 验证码",
+  "description": "MindSpeak 后端：TTS 合成 / 日志 / 静态托管",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.16"
+    "express": "^4.21.2"
   }
 }

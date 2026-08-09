@@ -13,7 +13,6 @@ const jsOrder = [
   'js/logger.js', // 前端错误日志必须最先加载：捕获其他所有脚本的错误
   'js/tts-manager.js', // 全局统一 TTS 服务必须最先加载（其他文件都依赖 window.TTSManager）
   'js/app.js',
-  'js/auth.js',
   'js/badges.js',
   'js/daily-plan.js',
   'js/dashboard.js',

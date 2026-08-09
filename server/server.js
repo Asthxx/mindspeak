@@ -1,6 +1,6 @@
 // ==================== 闻道 MindSpeak 后端入口 ====================
 // 启动：node server.js   （默认 http://localhost:3000）
-// 同时托管前端静态文件（index.html 所在目录），并挂载 /api/auth 认证接口。
+// 同时托管前端静态文件（index.html 所在目录），并挂载 TTS / 日志等接口。
 const express = require('express');
 const path = require('node:path');
 const os = require('node:os');
@@ -9,7 +9,6 @@ const https = require('node:https');
 const crypto = require('node:crypto');
 const { execFile, exec } = require('node:child_process');
 const config = require('./config');
-const { router: authRouter } = require('./auth');
 const logger = require('./logger');
 
 const app = express();
@@ -38,7 +37,7 @@ app.use((err, req, res, next) => {
 
 // 跨域策略：放行"与请求同源"的浏览器 Origin（同源部署到任意 IP/域名都自动放行：
 // localhost、127.0.0.1、局域网 IP、公网 IP/域名全部可用），同时拒绝远程恶意站点
-// 跨源调用未鉴权接口（防验证码邮件轰炸/接口滥用）。file:// 是 null origin 也放行。
+// 跨源调用未鉴权接口（防远程恶意站点滥用）。file:// 是 null origin 也放行。
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   // 同源判定：Origin 的 host:port 与请求 Host 一致，或本机回环来源
@@ -247,8 +246,7 @@ app.get('/api/online-tts', (req, res) => {
 });
 
 // API 路由
-app.get('/api/health', (req, res) => res.json({ ok: true, smtp: require('./mailer').configured }));
-app.use('/api/auth', authRouter);
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // ==================== 前端错误日志上报（AI 可读）====================
 // 浏览器端 logger.js 捕获的 error/warn 通过 POST /api/logs 批量上报，
@@ -354,5 +352,4 @@ app.use((req, res) => res.status(404).json({ ok: false, message: 'Not Found' }))
 // 可让局域网设备（安卓/苹果手机）访问，公网部署时配合防火墙/反代使用。
 app.listen(config.port, config.host, () => {
   console.log('🌐 闻道 MindSpeak 服务已启动:  http://' + (config.host === '0.0.0.0' ? '局域网IP' : 'localhost') + ':' + config.port);
-  console.log('   邮箱验证码 SMTP 配置:', require('./mailer').configured ? '已配置 ✓' : '未配置（开发模式，验证码打印在控制台）');
 });
