@@ -190,27 +190,44 @@ getSettings: function() {
     this._probedServer = true;
     var self = this;
     var base = window.API_BASE || '';
+    this._diag('probe', 'base=' + base + ' href=' + location.href);
     if (!base) { this._serverDown = true; this._syncInstantDefault(); return; }
     var ctrl = null, to = null;
     try { if (typeof AbortController !== 'undefined') ctrl = new AbortController(); } catch(e) {}
     if (ctrl) to = setTimeout(function() {
       try { ctrl.abort(); } catch(e) {}
       self._serverDown = true;
+      self._diag('probe', 'timeout-after-3000ms serverDown=true');
       self._syncInstantDefault();
     }, 3000);
     var done = function() { if (to) clearTimeout(to); self._syncInstantDefault(); };
     try {
       fetch(base + '/api/health', { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
         .then(function(r) {
-          if (!r || !r.ok) { self._serverDown = true; return null; }
+          if (!r || !r.ok) {
+            self._serverDown = true;
+            self._diag('probe', 'http ' + (r && r.status) + ' serverDown=true');
+            throw new Error('health-not-ok');
+          }
           return r.json();
         })
         .then(function(j) {
-          if (j && typeof j.ok === 'boolean') self._serverDown = !j.ok;
-          else self._serverDown = false;
-          done();
+          if (j && typeof j.ok === 'boolean') {
+            self._serverDown = !j.ok;
+            self._diag('probe', 'json ok=' + j.ok + ' serverDown=' + self._serverDown);
+          } else {
+            self._serverDown = false;
+            self._diag('probe', 'json-no-ok serverDown=false');
+          }
         })
-        .catch(function() { self._serverDown = true; done(); });
+        .catch(function(e) {
+          // health-not-ok：404 时上面已正确置 serverDown=true，这里不能再覆盖回 false
+          if (!(e && e.message === 'health-not-ok')) {
+            self._serverDown = true;
+            self._diag('probe', 'catch ' + (e && e.message || '?') + ' serverDown=true');
+          }
+        })
+        .then(function() { done(); });
     } catch(e) { self._serverDown = true; done(); }
   },
   // 探测结果落地：仅影响"用户没手动设过"的默认即时语音开关；降级时轻提示一次
@@ -504,12 +521,15 @@ var attempt = function() {
       // voices 列表是异步加载的：未就绪时最多等 3 次（共约 2.4s），仍无则先裸 speak
       var voices;
       try { voices = window.speechSynthesis.getVoices() || []; } catch(e) { voices = []; }
+      self._diag('voices', 'count=' + voices.length + ' wait=' + voiceWait);
       if (!voices.length && voiceWait > 0) { voiceWait--; setTimeout(attempt, 800); return; }
       // 选声：speakLetter 等注入的 opts.voice（当前所选声音）在首次朗读时优先，
       // 确保 utterance.voice 就是当前选择；失败重试时不再用注入的声音，改为依次跳过
       // failedVoices 换声。否则按 用户保存的 → 本地离线英文声 → 任一英文声 顺序选。
       var voice = (opts && opts.voice && !failedVoices.length) ? opts.voice : self._pickVoice(settings.voiceName, failedVoices);
+      self._diag('voice-pick', (voice && voice.name) || 'null');
       var online = voice ? self._isOnlineVoice(voice) : false;
+      self._diag('online?', online ? 'yes' : 'no');
       // 在线声刚失败（15s 冷却期内）：不再干等超时重试，直接落 HTTPS 在线合成
       // （Google 自然女声）保住"在线音色"，保证点击即出声，避免"多点几下就没声"。
       // 冷却期过后会重新尝试所选在线声——一旦网络恢复，自动回到用户选的音色。
@@ -544,10 +564,11 @@ var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
       var timeoutId = null;
       // 在线声尝试标记：供 _speakTTS 判断"上一次在线声挂起未 START"。只对在线声设置，
       // START/END/失败即清除；被新朗读作废的旧尝试因 _speakSeq 变化不会误清新尝试的标记。
-      if (online) { self._onlineAttemptActive = true; self._onlineStarted = false; }
+if (online) { self._onlineAttemptActive = true; self._onlineStarted = false; }
       var fail = function(reason) {
         if (finished || self._speakSeq !== mySeq) return;
         finished = true;
+        self._diag('online-fail', reason);
         self._onlineAttemptActive = false;
         if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
         // cancel 清队列：卡住/排队的朗读必须先清掉，否则下一次 speak 排不进去
@@ -614,8 +635,9 @@ var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
         if (e && e.error === 'interrupted') return;
         fail((e && e.error) || 'synthesis-failed');
       };
-      var u;
+var u;
       try {
+        self._diag('speech-speak', (voice && voice.name) || 'no-voice');
         // 统一经 TTSManager.speak 朗读（内部 cancel + 100ms 后 speak，套用全局
         // 声音/语速/音调/音量）；重试换声时用 voice 覆盖。返回 null = 同步失败。
         u = TTSManager.speak(text, {
@@ -664,6 +686,7 @@ var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
   // 合成 WAV 播放，确保"点击朗读一定有声音"。只有保底也失败才提示用户。
 _speakLocal: function(text, lang, opts) {
     var self = this;
+    this._diag('local-enter', String(text).slice(0, 20) + ' serverDown=' + this._serverDown);
     // 网页部署（无 server）不得请求 /api/tts（必然 404）：走远程发音/系统语音兜底
     if (this._serverDown === true) {
       this._speakServerless(text, lang, opts);
@@ -700,9 +723,10 @@ _speakLocal: function(text, lang, opts) {
       if (self._localAudio === audio) self._localAudio = null;
       fireEnd();
     };
-    audio.onerror = function() {
+audio.onerror = function() {
       // 已被下一次点击取代（pause+清 src 会触发 onerror）→ 正常现象，不算失败
-      if (self._localAudio !== audio) return;
+      if (self._localAudio !== audio) { self._diag('local-old-abort', String(text).slice(0, 20)); return; }
+      self._diag('local-onerror', 'code=' + (audio.error ? audio.error.code : '?'));
       failOnce();
     };
     fireStart();
@@ -710,16 +734,18 @@ _speakLocal: function(text, lang, opts) {
     // 例如在线声超时/失败后的降级播放）。同一段音频改用 Web Audio 播放：AudioContext
     // 已通过 _unlockAudio() 在手势内创建/解锁，异步播放不受自动播放策略限制。
     // 同步抛错（NotSupportedError 等）同样处理。绝不静默。
-    var waFallback = function() {
+var waFallback = function() {
       self._unlockAudio();
+      self._diag('local-wa-fallback', String(text).slice(0, 20));
       self._speakLocalWA(url, opts);
     };
     var pr;
-    try { pr = audio.play(); } catch(e) { waFallback(); return; }
+    try { pr = audio.play(); } catch(e) { self._diag('local-play-throw', String(e)); waFallback(); return; }
     // play() 是异步的：Promise 拒绝（自动播放被拦/服务器未启动）也改走 Web Audio。
     // 被下一次点击的 pause 打断（AbortError）是正常现象，不算失败，不弹 Toast。
     if (pr && pr.catch) pr.catch(function(e) {
-      if (e && e.name === 'AbortError') return;
+      if (e && e.name === 'AbortError') { self._diag('local-abort', String(text).slice(0, 20)); return; }
+      self._diag('local-play-rej', (e && e.name) || String(e));
       waFallback();
     });
   },
@@ -754,14 +780,16 @@ _speakGoogleTTS: function(text, lang, opts) {
     var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
     var failed = false;
-    var failOnce = function() {
+var failOnce = function() {
       if (failed) return;
       failed = true;
       if (self._localAudio === audio) self._localAudio = null;
+      self._diag('google-fail', String(text).slice(0, 20));
       self._speakLocal(text, lang, opts);
     };
     audio.onended = function() {
       if (self._localAudio === audio) self._localAudio = null;
+      self._diag('local-ended', String(text).slice(0, 20));
       fireEnd();
     };
     audio.onerror = function() {
@@ -772,16 +800,18 @@ _speakGoogleTTS: function(text, lang, opts) {
     // <audio>.play() 在非手势的异步回调里会被自动播放策略拒绝（NotAllowedError）：
     // 同一段音频改用 Web Audio 播放（AudioContext 已通过 _unlockAudio() 解锁）。
     // 同步抛错（NotSupportedError 等）同样处理。绝不静默。
-    var waFallback = function() {
+var waFallback = function() {
       self._unlockAudio();
+      self._diag('google-wa-fallback', String(text).slice(0, 20));
       self._speakGoogleWA(url, text, lang, opts);
     };
     var pr;
-    try { pr = audio.play(); } catch(e) { waFallback(); return; }
+    try { pr = audio.play(); } catch(e) { self._diag('google-play-throw', String(e)); waFallback(); return; }
     // play() 是异步的：Promise 拒绝（自动播放被拦/服务器未启动）也改走 Web Audio。
     // 被下一次点击的 pause 打断（AbortError）是正常现象，不算失败，不弹 Toast。
     if (pr && pr.catch) pr.catch(function(e) {
       if (e && e.name === 'AbortError') return;
+      self._diag('google-play-rej', (e && e.name) || String(e));
       waFallback();
     });
   },
@@ -827,8 +857,9 @@ _speakGoogleTTS: function(text, lang, opts) {
   },
   // file:// 下的保底朗读：fetch 拿到 WAV → decodeAudioData → Web Audio 播放。
   // 与 <audio> 路径同样的语义：onstart/onend 回调、失败只报一次、可被新点击打断。
-  _speakLocalWA: function(url, opts) {
+_speakLocalWA: function(url, opts) {
     var self = this;
+    this._diag('wa-local-enter', url.slice(-80));
     this._stopLocalAudio();
     var seq = (this._waSeq || 0) + 1;
     this._waSeq = seq;
@@ -836,6 +867,7 @@ _speakGoogleTTS: function(text, lang, opts) {
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
     var failOnce = function() {
       if (seq !== self._waSeq) return;
+      self._diag('wa-local-fail', 'tts-local-fail');
       self._ttsLocalFail(opts);
     };
     fireStart();
@@ -852,6 +884,7 @@ _speakGoogleTTS: function(text, lang, opts) {
           src.connect(ac.destination);
           src.onended = function() {
             if (self._waSrc === src) self._waSrc = null;
+            self._diag('wa-local-end', 'ok');
             fireEnd();
           };
           self._waSrc = src;
@@ -860,8 +893,9 @@ _speakGoogleTTS: function(text, lang, opts) {
           return src;
         });
       })
-      .catch(function() {
+      .catch(function(e) {
         if (seq !== self._waSeq) return;
+        self._diag('wa-local-catch', (e && e.message) || String(e));
         failOnce();
       });
   },
@@ -949,46 +983,130 @@ _markOnlineBroken: function() {
     var q = String(text || '').trim();
     if (!q) { this._deviceFail(opts); return; }
     var tl = /^en/i.test(String(lang || 'en-US')) ? 'en' : 'zh';
-    var urls = [
-      'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(q) + '&type=1',
-      'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + tl + '&q=' + encodeURIComponent(q)
-    ];
+    // 长文本切块：词文串学整篇（300+ 字符）、AI「朗读全部」、例句等会把整段拼进 URL。
+    // 有道/谷歌远程发音对 URL 超长文本会拒播（谷歌 ~200 字符上限，实测超过即 400），
+    // 导致整篇/长句"点了没声"。这里按句子边界切成 ≤170 字符的小块逐块排队播放，
+    // 每块独立走「有道→谷歌」失败重试；全部块播完才 fireEnd，中途失败只跳该块。
+    var chunks = this._chunkRemoteText(q, 170);
     var seq = (this._waSeq || 0) + 1;
     this._waSeq = seq;
     var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
-    var done = false, started = false, i = 0;
-    var tryNext = function() {
-      if (seq !== self._waSeq) return;               // 已被新朗读打断
-      if (done) return;
-      if (i >= urls.length) { done = true; self._deviceFail(opts); return; }
-      var url = urls[i++];
+    var done = false, fireStartFired = false, anyPlayed = false;
+    var ci = 0, src = 0; // ci=当前块下标，src=当前块内 0=有道 1=谷歌
+    var playChunk = function() {
+      if (seq !== self._waSeq || done) return;
+      // 当前块两种源都用尽 → 该块失败，跳到下一块继续（网络波动不中断整篇）
+      while (ci < chunks.length && src >= 2) {
+        self._diag('remote-chunk-skip', 'chunk=' + ci);
+        ci++;
+        src = 0;
+      }
+      // 全部块处理完：只要有任一块成功过就正常结束，全部失败才真正报错
+      if (ci >= chunks.length) {
+        done = true;
+        if (anyPlayed) { fireEnd(); return; }
+        self._deviceFail(opts); return;
+      }
+      var currentStarted = false; // 仅当前 Audio 的“已出声”标志：超时守护按块独立，跨块不误伤
+      var url = src === 0
+        ? 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(chunks[ci]) + '&type=1'
+        : 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + tl + '&q=' + encodeURIComponent(chunks[ci]);
       var audio;
-      try { audio = new Audio(url); } catch(e) { self._diag('remote-ctr', String(e)); tryNext(); return; }
+      try { audio = new Audio(url); } catch(e) { self._diag('remote-ctr', String(e)); src++; playChunk(); return; }
       self._localAudio = audio;
+      // 超时兜底：手机网络对部分发音源（如谷歌被墙）会有既不报错也不可播放的挂起，
+      // 不给超时的话整条链会永远卡住，连设备语音兜底都不会触发。8s 内没出声即判失败换下一个。
+      var to = setTimeout(function() {
+        self._diag('remote-timeout', 'chunk=' + ci + ' src=' + src);
+        if (seq !== self._waSeq || done || currentStarted) return;
+        if (self._localAudio === audio) self._localAudio = null;
+        try { audio.pause(); audio.src = ''; } catch(e) {}
+        src++;
+        playChunk();
+      }, 8000);
       audio.oncanplaythrough = function() { try { audio.play(); } catch(e) {} };
-      audio.onplay = function() { if (!started) { started = true; fireStart(); } };
+      audio.onplay = function() {
+        if (!currentStarted) { currentStarted = true; if (to) { clearTimeout(to); to = null; } }
+        if (!fireStartFired) { fireStartFired = true; fireStart(); }
+      };
       audio.onended = function() {
         if (seq !== self._waSeq) return;
         if (self._localAudio === audio) self._localAudio = null;
-        if (!done) { done = true; fireEnd(); }
+        if (to) { clearTimeout(to); to = null; }
+        if (!done) { anyPlayed = true; ci++; src = 0; playChunk(); }
       };
       audio.onerror = function() {
-        self._diag('remote-err', 'idx=' + (i - 1) + ' ' + (audio.error ? audio.error.code : '?'));
+        self._diag('remote-err', 'chunk=' + ci + ' src=' + src + ' ' + (audio.error ? audio.error.code : '?'));
+        if (to) { clearTimeout(to); to = null; }
         if (self._localAudio === audio) self._localAudio = null;
         if (seq !== self._waSeq || done) return;
-        tryNext();
+        src++;
+        playChunk();
       };
       var pr;
-      try { pr = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!done) tryNext(); return; }
+      try { pr = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!done) { src++; playChunk(); } return; }
       if (pr && pr.catch) pr.catch(function(e) {
         self._diag('remote-play-rej', e && e.name ? e.name : String(e));
         if (e && e.name === 'AbortError') return;
-        if (seq !== self._waSeq || done || started) return;
-        tryNext();
+        if (seq !== self._waSeq || done || currentStarted) return;
+        src++;
+        playChunk();
       });
     };
-    tryNext();
+    playChunk();
+  },
+  // 把超长朗读文本沿句子边界切成小块（每块 ≤ maxLen），保证远程发音 URL 不超长。
+  // 中英文句末标点（。！？!?.…）后断句；无标点的长串按空格回退，最后仍超长则硬切。
+  _chunkRemoteText: function(text, maxLen) {
+    var max = maxLen || 170;
+    var s = String(text || '');
+    if (!s) return [];
+    if (s.length <= max) return [s];
+    var out = [];
+    var cur = '';
+    // 优先按句子切分：句末标点 + 其后空格/结尾
+    var re = /[^。！？!?.…]+[。！？!?.…]+(?:\s+|$)|[^。！？!?.…]+(?:\s+|$)/g;
+    var m;
+    while ((m = re.exec(s)) !== null) {
+      var piece = m[0].trim();
+      if (!piece) continue;
+      // 单句超长：再按空格拆
+      if (piece.length > max) {
+        if (cur) { out.push(cur); cur = ''; }
+        var words = piece.split(/\s+/);
+        var buf = '';
+        for (var wi = 0; wi < words.length; wi++) {
+          var w = words[wi];
+          if ((buf + ' ' + w).trim().length > max) {
+            if (buf) { out.push(buf); buf = ''; }
+            // 单个超长词（罕见）：硬切
+            while (w.length > max) { out.push(w.slice(0, max)); w = w.slice(max); }
+            buf = w;
+          } else {
+            buf = (buf + ' ' + w).trim();
+          }
+        }
+        if (buf) cur = buf;
+        continue;
+      }
+      if ((cur + ' ' + piece).trim().length > max) {
+        out.push(cur);
+        cur = piece;
+      } else {
+        cur = (cur + ' ' + piece).trim();
+      }
+    }
+    if (cur) out.push(cur);
+    // 兜底：万一还有残留超长块（正则漏网），硬切
+    var final = [];
+    for (var i = 0; i < out.length; i++) {
+      if (out[i].length > max) {
+        while (out[i].length > max) { final.push(out[i].slice(0, max)); out[i] = out[i].slice(max); }
+        if (out[i]) final.push(out[i]);
+      } else final.push(out[i]);
+    }
+    return final.length ? final : [s];
   },
   // 网页/手机版（_serverDown=true）的通用朗读入口：不依赖本地 server、
   // 不依赖浏览器有没有英文语音。
@@ -1029,6 +1147,7 @@ _markOnlineBroken: function() {
   },
   _ttsLocalFail: function(opts) {
     this._stopLocalAudio();
+    this._diag('local-fail', 'tts-local-fail');
     if (opts && opts.onerror) opts.onerror(new Error('tts-local-fail'));
     // 即时语音模式下 server 不可用由调用方回退在线声，不弹 Toast
     if (!(opts && opts.noFailToast)) {
