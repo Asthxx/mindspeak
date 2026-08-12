@@ -7,15 +7,32 @@
 
 ---
 
-## 📲 下载安卓 App（APK）
+## 📲 立即下载安卓 App（APK）
+
+> **免费 · 免注册 · 离线可用**，安装到手机即可开启学习之旅。
+
+<div align="center">
+
+**[⬇️ 下载最新版 APK（v1.1.0）](https://github.com/Asthxx/mindspeak/releases/download/v1.1.0/app-debug.apk)**
+
+[查看全部版本 / Release 页面](https://github.com/Asthxx/mindspeak/releases)
+
+</div>
+
+### 安装方法
+
+1. 点击上方绿色按钮下载 `app-debug.apk` 到手机；
+2. 打开文件安装（首次需在手机设置中允许「安装未知来源应用」）；
+3. 安装完成，打开「闻道 MindSpeak」即可开始背词学习。
+
+### 其他方式
 
 | 渠道 | 说明 |
 |---|---|
-| **最新 APK** | ▶️ [GitHub Releases 下载](https://github.com/Asthxx/mindspeak/releases/latest)（含自动打包的安卓安装包，直接传到手机安装即可） |
-| 手动触发打包 | 在仓库 **Actions → 打包安卓安装包 APK → Run workflow**，跑完到 **Artifacts** 下载  |
+| **在线版（无需安装）** | [打开 GitHub Pages 在线版](https://asthxx.github.io/mindspeak/)（PWA，可"添加到主屏幕"当 App 用，覆盖全部功能） |
+| 手动触发打包 | 仓库 **Actions → 打包安卓安装包 APK → Run workflow**，跑完到 **Artifacts** 下载  |
 
 > 每次发布版本时在 GitHub 创建 `v1.x.x` 标签，Actions 会自动把 APK 挂到 Releases 页面。
-> 安装新 APK 需在手机设置中允许「安装未知来源应用」。
 
 ---
 
