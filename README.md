@@ -57,7 +57,23 @@ npm install         # 安装 terser
 node build.js       # 生成 dist/
 ```
 
-### 方式三：自建本地服务（完整发音 + 日志）
+在线版已内置 **PWA（渐进式 Web 应用）**：App 图标、离线缓存、全屏沉浸、刘海屏安全区，**可添加到主屏幕当 App 用**：
+
+- 📱 **Android**：Chrome 打开在线地址 → 菜单「添加到主屏幕 / 安装应用」
+- 🍎 **iOS**：Safari 打开 → 分享 → 「添加到主屏幕」
+
+### 方式三：打包成安卓安装包（APK）
+
+用 [PWABuilder](https://www.pwabuilder.com)（免费、无需本地 SDK）把在线版 PWA 打成 APK：
+
+1. 打开 <https://www.pwabuilder.com>，输入在线地址（如 `https://asthxx.github.io/mindspeak/`）→ **Start**；
+2. 检查通过后点 **Package for stores** → **Android**；
+3. 勾选 **Minifest/APK** → **Download** 下载 APK；
+4. 将 APK 传入手机直接安装（需允许安装未知来源应用）。
+
+> 也支持商店分包（Trusted Web Activity / Chrome Web Store / Play Store），详情见 PWABuilder 文档。
+
+### 方式四：自建本地服务（完整发音 + 日志）
 
 ```bash
 cd server
@@ -74,15 +90,17 @@ node server.js
 
 ```
 .
-├── index.html          # 单页入口（全部页面/弹窗 DOM）
+├── index.html          # 单页入口（全部页面/弹窗 DOM + PWA 注册）
 ├── css/                # 样式（组件 / 主题 / 移动端）
 ├── js/                 # 逻辑（app.js、各模块、日志、TTS 管理）
 ├── data/               # 词库与扩展数据（all-data.js 等）
-├── assets/             # 图标、音频、图片等静态资源
+├── assets/             # 图标、音频、图片、PWA 应用图标(pwa/)等
 ├── server/             # 可选本地服务：TTS / 日志 / 配置
 ├── dist/               # 构建产物（可部署目录，bundle.js 混淆压缩）
-├── build.js            # 构建脚本（合并 JS + terser + 版本注入）
+├── build.js            # 构建脚本（合并 JS + terser + 版本注入 + PWA 生成）
 ├── merge-data.js       # 词库合并脚本
+├── sw.js               # Service Worker（离线缓存，构建时注入版本）
+├── manifest.webmanifest # PWA 应用清单（构建时生成 dist/pwa-manifest.json）
 ├── VERSION             # 当前版本号（构建时读取）
 └── CHANGELOG.md        # 迭代记录
 ```
@@ -94,6 +112,7 @@ node server.js
 - 纯原生 HTML / CSS / JS（无框架，零依赖，离线可跑）
 - Node.js（可选，仅供本地发音服务与会话日志）
 - Terser（构建混淆）
+- **PWA**：manifest + Service Worker 离线缓存，可安装到主屏幕 / 打包 APK
 - 部署：GitHub Pages / Vercel / Cloudflare Pages 均可
 
 ---

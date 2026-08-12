@@ -34,14 +34,26 @@ function copyFile(src, dst) {
   fs.copyFileSync(src, dst);
 }
 
-function copyDir(srcDir, dstDir) {
+function copyDir(srcDir, dstDir, opts) {
+  opts = opts || {};
   if (!fs.existsSync(dstDir)) fs.mkdirSync(dstDir, { recursive: true });
   for (const f of fs.readdirSync(srcDir)) {
+    if (opts.whitelist && opts.whitelist.indexOf(f) === -1) continue;
     const sp = path.join(srcDir, f);
     const dp = path.join(dstDir, f);
-    if (fs.statSync(sp).isDirectory()) copyDir(sp, dp);
-    else copyFile(sp, dp);
+    if (fs.statSync(sp).isDirectory()) copyDir(sp, dp, opts);
+    else if (opts.filterConsole && /\.js$/.test(f)) {
+      copyFileFiltered(sp, dp);
+    } else copyFile(sp, dp);
   }
+}
+
+function copyFileFiltered(src, dst) {
+  ensureDir(path.dirname(dst));
+  const content = fs.readFileSync(src, 'utf8')
+    .replace(/^\s*console\.(?:log|debug)\([^\n]*\);\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n');
+  fs.writeFileSync(dst, content, 'utf8');
 }
 
 function toKB(n) { return (n / 1024).toFixed(1) + 'KB'; }
@@ -72,6 +84,18 @@ async function bundleJs(BUILD_TIME) {
   }
 }
 
+function buildStamp(BUILD_TIME) { return BUILD_TIME.replace(/[^0-9]/g, ''); }
+
+function gatherReferencedData() {
+  if (!fs.existsSync(path.join(SRC, 'data'))) return [];
+  const html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
+  const set = new Set();
+  const re = /src="data\/([^"]+)"/g;
+  let m;
+  while ((m = re.exec(html))) set.add(m[1]);
+  return Array.from(set);
+}
+
 async function build() {
   const BUILD_TIME = new Date().toISOString().replace('T', ' ').slice(0, 19);
   // 版本分离：版本号统一维护在根目录 VERSION 文件，构建时注入 dist/
@@ -93,8 +117,9 @@ async function build() {
   html = html.replace(/<script src="js\/[^"]+\.js(?:\?[^"']*)?"><\/script>\s*/gi, '');
   // 全量源码 version 注入（版本分离）：dist/index.html 始终带当前 VERSION
   html = html.replace(/(<meta name="app-version" content=")[^"]*(")/i, '$1' + VER_TAG + '$2');
+  const bStamp = buildStamp(BUILD_TIME);
   html = html.replace(/<\/body>/i,
-    '<!-- MindSpeak dist 构建时间: ' + BUILD_TIME + ' 版本: ' + VER_TAG + ' -->\n<script src="js/bundle.js"></script>\n</body>');
+    '<!-- MindSpeak dist 构建时间: ' + BUILD_TIME + ' 版本: ' + VER_TAG + ' -->\n<script src="js/bundle.js?v=' + bStamp + '"></script>\n</body>');
   fs.writeFileSync(path.join(DIST, 'index.html'), html, 'utf8');
   console.log('[ok] index.html -> dist/ (version: ' + VER_TAG + ')');
 
@@ -108,13 +133,23 @@ async function build() {
   if (fs.existsSync(assetsSrc)) copyDir(assetsSrc, path.join(DIST, 'assets'));
   console.log('[ok] assets/ -> dist/assets/');
 
-  // ---- 4. 复制 data ----
+  // ---- 4. 复制 data（只拷 index.html 引用的合并产物，避免 70+ 个散词库冗余约12MB）----
   const dataSrc = path.join(SRC, 'data');
-  if (fs.existsSync(dataSrc)) copyDir(dataSrc, path.join(DIST, 'data'));
-  console.log('[ok] data/ -> dist/data/');
+  if (fs.existsSync(dataSrc)) {
+    const referenced = gatherReferencedData();
+    copyDir(dataSrc, path.join(DIST, 'data'), { whitelist: referenced, filterConsole: true });
+    console.log('[ok] data/ -> dist/data/（仅 ' + referenced.length + ' 个被引用文件，已过滤 console 日志）');
+  }
 
   // ---- 5. 合并 JS + terser 混淆 ----
   await bundleJs(BUILD_TIME);
+
+  // ---- 6. PWA：manifest + Service Worker（注入构建时间戳强制缓存刷新）----
+  const stamp = buildStamp(BUILD_TIME);
+  const swSource = fs.readFileSync(path.join(SRC, 'sw.js'), 'utf8');
+  fs.writeFileSync(path.join(DIST, 'sw.js'), swSource.replace('__BUILD_STAMP__', stamp), 'utf8');
+  copyFile(path.join(SRC, 'manifest.webmanifest'), path.join(DIST, 'pwa-manifest.json'));
+  console.log('[ok] PWA manifest + sw.js (cache: mindspeak-v' + stamp + ')');
 }
 
 build().then(() => {

@@ -1,34 +1,77 @@
-/* AI English Growth Companion - Mobile Responsive */
-/* 策略：≤768px 切换为「移动 App 抽屉式」界面——
-   顶栏保留汉堡按钮，左侧导航收进抽屉（滑出式），内容区全宽。 */
+/* AI English Growth Companion - Mobile Responsive (App级适配)
+   适配目标：PWA / WebView 打包成手机软件——
+   全屏沉浸、安全区(刘海/底部手势条)、动态视口(dvh)、
+   44px 触摸目标、防误触/双击缩放、无横向溢出、布局重排。 */
 @media (max-width:768px){
-  :root{--header:56px;--sidebar:280px}
-  .app-header{padding:0 var(--sp-3);height:var(--header)}
-  .header-left{display:flex;align-items:center;gap:var(--sp-2)}
-  .btn-menu{display:flex;margin-right:var(--sp-1)}
-  .logo{font-size:1.05rem;gap:var(--sp-2)}
-  .logo .text{display:none}
-  .stats-bar{gap:var(--sp-1)}
-  .stats-bar span{padding:4px 8px;font-size:0.7rem}
+  /* 顶部安全区：刘海屏状态栏不透出顶栏 */
+  :root{
+    --header:calc(48px + env(safe-area-inset-top,0px));
+    --header-h:var(--header);
+    --sidebar:280px;
+  }
+  html{
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+  body{
+    height:100dvh;
+    overflow:hidden;
+    overscroll-behavior:none;
+    /* 禁用双击缩放触发（iOS/Android 浏览器） */
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
 
-  /* ---- 侧边栏改为抽屉 ---- */
+  /* ---- 顶栏 ---- */
+  .app-header{
+    height:var(--header);
+    padding:0 var(--sp-3);
+    padding-top:env(safe-area-inset-top,0px);
+  }
+  .header-left{display:flex;align-items:center;gap:var(--sp-2);min-width:0}
+  .btn-menu{
+    display:flex;margin-right:var(--sp-1);
+    width:44px;height:44px;
+  }
+  .btn-menu:active{background:var(--sage-surface)}
+  .logo{font-size:1.02rem;gap:var(--sp-2);white-space:nowrap}
+  .logo .text{display:none}
+  .logo .icon{width:24px;height:24px}
+  .header-right{gap:2px;flex-shrink:0}
+  .theme-toggle{width:40px;height:40px}
+  .stats-bar{gap:4px}
+  .stats-bar span{flex-shrink:0;padding:6px 9px;font-size:0.7rem}
+  /* 超窄屏只保留"积分"与"道具"两项，避免挤压图标区 */
+  .stats-bar span:nth-child(n+4){display:none}
+  @media (max-width:400px){
+    .stats-bar span:nth-child(n+3){display:none}
+  }
+
+  /* ---- 侧边栏改为抽屉（App 抽屉式导航） ---- */
   .sidebar{
     position:fixed;top:var(--header);left:0;
-    width:var(--sidebar);max-width:78vw;height:calc(100vh - var(--header));
-    padding:var(--sp-3) var(--sp-2);gap:var(--sp-1);
+    width:var(--sidebar);max-width:80vw;height:calc(100dvh - var(--header));
+    padding:var(--sp-3) var(--sp-2);
+    padding-bottom:calc(var(--sp-3) + env(safe-area-inset-bottom,0px));
+    gap:var(--sp-1);
     transform:translateX(-110%);
     transition:transform var(--duration-slower) var(--ease-out);
     z-index:100;
     box-shadow:var(--shadow-xl);
     overflow-y:auto;overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
   }
   .sidebar.open{transform:translateX(0)}
   .btn-menu:hover{background:var(--sage-surface)}
-  /* 抽屉内恢复完整导航文案 */
-  .nav-btn{padding:12px 14px;justify-content:flex-start;border-radius:var(--radius-md);font-size:0.95rem}
+  /* 抽屉内恢复完整导航文案，导航项保证 48px 触摸高度 */
+  .nav-btn{
+    padding:12px 14px;justify-content:flex-start;border-radius:var(--radius-md);
+    font-size:0.95rem;min-height:48px;
+  }
+  .nav-btn:active{background:var(--sidebar-hover);transform:scale(0.99)}
   .nav-btn .label{display:inline}
   .nav-btn .icon{width:20px;height:20px}
-  .nav-group-title{display:flex;padding:8px 10px}
+  .nav-group-title{display:flex;padding:10px;min-height:44px}
   .nav-group.collapsed .nav-btn{display:none}
   .nav-group.collapsed .nav-chevron{transform:rotate(-90deg)}
   .sidebar > .nav-group + .nav-group,
@@ -41,80 +84,203 @@
   .sidebar-scrim{
     position:fixed;inset:0;background:rgba(0,0,0,0.35);
     opacity:0;visibility:hidden;transition:opacity var(--duration-normal) var(--ease);
-    z-index:90;backdrop-filter:blur(2px);
+    z-index:90;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
   }
   .sidebar-scrim.show{opacity:1;visibility:visible}
 
-  /* 内容区全宽 */
-  .content{margin-left:0;margin-top:var(--header);padding:var(--sp-4) var(--sp-3)}
+  /* ---- 内容区全宽：留出底部手势条安全区 ---- */
+  .content{
+    margin-left:0;margin-top:var(--header);
+    padding:var(--sp-4) var(--sp-4);
+    padding-bottom:calc(var(--sp-6) + env(safe-area-inset-bottom,0px));
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
+  }
   h2{font-size:1.15rem;margin-bottom:var(--sp-4)}
   h3{font-size:1rem}
 
-  .word-card{min-height:250px;padding:var(--sp-7) var(--sp-4);border-radius:var(--radius-lg)}
-  .word-main{font-size:2.2rem}
-  .chinese-meaning{font-size:1.1rem}
-  .word-actions{gap:var(--sp-2)}
-  .word-actions .btn{flex:1;min-width:70px;font-size:0.78rem;padding:8px 6px}
+  /* ================= 首页 控制面板 ================= */
+  .dash-greeting{flex-direction:column;align-items:stretch;gap:var(--sp-3)}
+  .dash-greeting .btn{width:100%}
+  .dash-stat-card{padding:12px 14px;gap:10px}
+  .dash-stat-num{font-size:1.2rem}
+  .dash-stat-label{font-size:0.7rem}
+  .dash-card{padding:14px 14px}
 
+  /* ================= 学习卡片 ================= */
+  .card-area{max-width:100%;padding:0 var(--sp-1)}
+  .word-card{
+    min-height:min(46vh,360px);
+    padding:var(--sp-8) var(--sp-4);
+    border-radius:var(--radius-lg);
+  }
+  .word-card::before,.word-card::after{width:28px;height:28px}
+  .word-main{font-size:2.6rem;word-break:break-word}
+  .chinese-meaning{font-size:1.3rem}
+  .word-phonetic{font-size:0.95rem}
+  .word-actions{gap:var(--sp-2)}
+  .word-actions .btn{flex:1;min-width:0;font-size:0.8rem;padding:12px 6px;white-space:nowrap}
+  .word-nav{gap:var(--sp-3);margin-bottom:var(--sp-4)}
+  .nav-arrow{width:44px;height:44px;flex-shrink:0}
+  #word-progress{min-width:64px;font-size:0.8rem}
+
+  /* ================= 统计/报告网格 ================= */
   .word-stats,.phonetic-stats,.mistake-stats,.report-grid,.mt-stats{grid-template-columns:repeat(2,1fr);gap:var(--sp-3)}
   .stat-card{padding:var(--sp-4) var(--sp-3)}
   .stat-num{font-size:1.6rem}
   .stat-label{font-size:0.68rem}
 
-  .section-header{flex-direction:column;gap:var(--sp-3);padding:var(--sp-4)}
-  .section-header select,.section-header input{width:100%;padding:8px 12px}
+  /* ================= 工具条 / 筛选 ================= */
+  .section-header{flex-direction:column;gap:var(--sp-3);padding:var(--sp-4);align-items:stretch}
+  .section-header select,.section-header input{width:100%;padding:10px 12px;font-size:0.95rem}
+  .word-list-toolbar{padding:var(--sp-3)}
+  .word-search{min-width:0;width:100%;padding:12px 14px;font-size:1rem}
+  .filter-btn{padding:8px 14px;font-size:0.85rem}
 
-  .spelling-input-area,.listening-input-area{flex-direction:column}
-  .spelling-input-area input,.listening-input-area input{width:100%}
-
-  .spelling-card,.listening-card{padding:var(--sp-7) var(--sp-5);border-radius:var(--radius-lg)}
-  .spelling-prompt .prompt-word{font-size:1.8rem}
+  /* ================= 拼写 / 听力 ================= */
+  .spelling-input-area,.listening-input-area{flex-direction:column;gap:var(--sp-2)}
+  .spelling-input-area input,.listening-input-area input{width:100%;padding:12px 14px;font-size:1rem}
+  .spelling-card,.listening-card{padding:var(--sp-6) var(--sp-4);border-radius:var(--radius-lg)}
+  .spelling-prompt .prompt-word{font-size:1.9rem}
   .spelling-options{grid-template-columns:1fr;max-width:100%}
+  .spelling-option-btn,.pk-option-btn,.option-btn{padding:var(--sp-4);font-size:1rem;min-height:48px;display:flex;align-items:center;justify-content:center;text-align:center}
+  .spelling-result,.listening-result{font-size:0.95rem;padding:var(--sp-3)}
 
-  .score-circle{width:100px;height:100px}
-  .score-num{font-size:1.6rem}
+  /* ================= 跟读 / 语法 ================= */
+  .speak-btn-area{flex-direction:column;align-items:stretch;gap:var(--sp-2)}
+  .speak-btn-area .btn, .speak-btn-area .btn-speak-play, .speak-btn-area .btn-speak-record{width:100%;justify-content:center}
+  .speak-card{padding:var(--sp-6) var(--sp-4)}
+  .speak-word{font-size:1.8rem}
 
-  .modal-content{width:95%;max-height:85vh;overflow-y:auto;padding:var(--sp-5);border-radius:var(--radius-lg)}
-
-  .ob-goal-options{grid-template-columns:1fr 1fr;gap:var(--sp-3)}
-  .ob-goal-opt{padding:var(--sp-4);font-size:1.1rem}
-  .ob-view-0 h2{font-size:1.5rem}
-  .ob-question{font-size:1.25rem}
-
+  /* ================= 收藏 ================= */
   .fav-item{flex-direction:column;align-items:flex-start;gap:var(--sp-3)}
   .fav-actions{width:100%;justify-content:space-between}
+  .fav-word{font-size:1rem}
 
+  /* ================= 音标 ================= */
   .phonetic-grid{grid-template-columns:repeat(3,1fr);gap:var(--sp-2)}
-  .ph-card{padding:var(--sp-3) var(--sp-2)}
-  .ph-card .ph-symbol{font-size:1.4rem}
+  .ph-card{padding:var(--sp-3) var(--sp-1);min-height:56px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+  .ph-card .ph-symbol{font-size:1.35rem}
+  .ph-card .ph-sound{font-size:0.62rem}
 
-  .ebbinghaus-plan{overflow-x:auto;padding:var(--sp-3) var(--sp-4)}
+  /* ================= 艾宾浩斯 ================= */
+  .ebbinghaus-plan{overflow-x:auto;padding:var(--sp-3) var(--sp-4);-webkit-overflow-scrolling:touch}
   .ebbinghaus-plan h3{font-size:0.85rem}
   .plan-table{min-width:320px;font-size:0.8rem}
   .calendar-grid{gap:2px}
-  .cal-day{font-size:0.72rem}
-  .story-toolbar{gap:var(--sp-2)}
+  .cal-day{font-size:0.72rem;min-height:36px}
+  .cal-day.has-data{min-height:36px}
+
+  /* ================= 故事 / 阅读 ================= */
+  .story-toolbar{gap:var(--sp-2);flex-wrap:wrap}
   .story-paragraph{padding:var(--sp-3) var(--sp-4)}
   .story-en{font-size:0.95rem}
   .story-word-row{flex-wrap:wrap}
+  .reading-content{font-size:0.98rem;padding:var(--sp-4)}
+
+  /* ================= 每日计划 ================= */
   .daily-plan-card{padding:var(--sp-3) var(--sp-4)}
   .dp-header{flex-direction:column;align-items:flex-start}
   .dp-row{gap:var(--sp-2)}
   .dp-label{min-width:48px}
   .dp-val{min-width:110px}
   .dp-bar{min-width:80px}
-  .badge-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--sp-3)}
+
+  /* ================= 徽章 ================= */
+  .badge-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--sp-3)}
+
+  /* ================= 听力跟读 ================= */
   .la-display{padding:var(--sp-4) var(--sp-3)}
-  .la-word{font-size:2rem}
+  .la-word{font-size:1.9rem}
   .la-toolbar{gap:var(--sp-2)}
+
+  /* ================= 单词表 ================= */
+  .view-toggle{width:100%;justify-content:center}
+  .view-btn{flex:1;padding:8px 6px;font-size:0.9rem}
+  .wl-row{flex-wrap:wrap;gap:var(--sp-1);padding:var(--sp-2) var(--sp-3)}
+  .wl-action .btn{padding:8px 12px;min-height:40px}
+
+  /* ================= 道具店 ================= */
+  .item-shop-grid,.theme-shop-grid{grid-template-columns:repeat(2,1fr);gap:var(--sp-3)}
+  .item-bag{flex-direction:column;align-items:stretch}
+  .item-bag-card{min-width:0;width:100%;padding:12px 14px}
+  .item-bag-btn{padding:10px 14px}
+  .item-card .btn,.theme-card .btn{width:100%;padding:10px 12px}
+
+  /* ================= 弹窗全屏化（App 底部抽屉式） ================= */
+  .modal{align-items:flex-end;justify-content:center}
+  .modal-content{
+    width:100%;max-width:100%;max-height:88dvh;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    padding:var(--sp-5);
+    padding-bottom:calc(var(--sp-5) + env(safe-area-inset-bottom,0px));
+    animation:modalSheetIn 0.28s var(--ease-out);
+  }
+  @keyframes modalSheetIn{
+    from{opacity:0;transform:translateY(40px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  .modal-actions{flex-direction:column-reverse}
+  .modal-actions .btn{width:100%;padding:12px;min-height:48px}
+  .assess-modal-content{width:100%;max-width:100%;max-height:92dvh}
+  .assess-modal-content,.ob-modal-content, .modal-content[style*="width:860px"],
+  .modal-content[style*="width:550px"], .modal-content[style*="width:500px"]{
+    width:100%!important;max-width:100%!important;
+  }
+  .aside-review-modal .modal-content{border-radius:var(--radius-lg)}
+  .mistake-review-content{max-height:none}
+
+  /* ================= 能力测评 ================= */
+  .assess-view{padding:var(--sp-5) var(--sp-2) var(--sp-4)}
+  .assess-head{padding-bottom:var(--sp-3)}
+  .aw-dim{padding:var(--sp-2) var(--sp-3);font-size:0.82rem}
+
+  /* ================= 目标选择 / 每日计划 ================= */
+  .ob-goal-options{grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+  .ob-goal-opt{padding:var(--sp-4);font-size:1.1rem}
+  .ob-view-0 h2{font-size:1.5rem}
+  .ob-question{font-size:1.25rem}
+
+  /* ================= 搜索 ================= */
+  .search-result-main .result-word{font-size:1.5rem}
+  .result-phonetic{font-size:0.9rem}
+  .collapse-toggle{min-height:44px}
+
+  /* ================= 番茄钟 ================= */
+  .pomodoro-display{padding:var(--sp-6) var(--sp-4)}
+  .pomodoro-timer{font-size:3.5rem}
+  .pomodoro-controls{gap:var(--sp-2);flex-wrap:wrap}
+
+  /* ================= 设置 ================= */
+  .settings-group{padding:var(--sp-4)}
+  .settings-group .setting-row{flex-wrap:wrap;gap:var(--sp-2)}
+  .settings-group input[type="number"]{font-size:1rem}
+  .score-circle{width:100px;height:100px}
+  .score-num{font-size:1.6rem}
 }
 
 @media (max-width:480px){
   .phonetic-grid{grid-template-columns:repeat(3,1fr)}
   .report-grid{grid-template-columns:1fr 1fr}
-  .word-main{font-size:2rem}
-  .stats-bar span:nth-child(n+3){display:none}
-  .word-card{min-height:220px}
+  .word-main{font-size:2.2rem}
+  .word-card{min-height:min(44vh,320px)}
+  .item-shop-grid,.theme-shop-grid{grid-template-columns:1fr}
+  .fav-stats{grid-template-columns:1fr 1fr}
+  .dash-stat-grid{grid-template-columns:1fr 1fr}
+  .dash-stat-card{flex-direction:column;align-items:flex-start;gap:6px;padding:12px}
+  .dag-card{min-width:0}
+  .ob-goal-options{grid-template-columns:1fr}
+  .story-toolbar .btn{flex:1;padding:10px 8px;font-size:0.82rem}
+  .spelling-prompt .prompt-word{font-size:1.7rem}
+}
+
+/* 安全区兜底：不支持 env() 的旧 Android WebView 也能正常显示 */
+@supports not (padding-top:env(safe-area-inset-top)){
+  @media (max-width:768px){
+    :root{--header:48px}
+  }
 }
 
 /* Dark Mode */
@@ -131,7 +297,7 @@
     --shadow-xs:0 1px 2px rgba(0,0,0,0.2);--shadow-sm:0 2px 4px rgba(0,0,0,0.25);
     --shadow-md:0 4px 12px rgba(0,0,0,0.3);--shadow-lg:0 8px 24px rgba(0,0,0,0.35);
     --shadow-xl:0 16px 48px rgba(0,0,0,0.4);
-    --shadow-coral:0 4px 20px rgba(255,154,120,0.2);--shadow-sage:0 4px 20px rgba(107,168,138,0.15);
+    --shadow-coral:0 4px 20px rgba(255,154,120,0.2);--shadow-sage:0 4px 20px rgba(107,168,137,0.15);
   }
   .app-header{background:rgba(15,20,25,0.85);border-bottom-color:var(--border)}
   .sidebar{border-right-color:var(--border)}
@@ -144,7 +310,7 @@
   .modal-content{background:var(--ivory-card)}
 }
 
-/* Animations */
+/* Animations + 触摸反馈 */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
@@ -155,5 +321,15 @@
 .stat-card,.report-card{transition:all var(--duration-normal) var(--ease-out)}
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
-@media (hover:none){.btn:hover,.word-card:hover,.fav-item:hover,.stat-card:hover,.report-card:hover{transform:none;box-shadow:var(--shadow-sm)}}
+/* 触屏：移除 hover 悬浮变形/位移，避免"粘住" */
+@media (hover:none){
+  .btn:hover,.word-card:hover,.fav-item:hover,.stat-card:hover,.report-card:hover,
+  .dash-card:hover,.theme-card:hover,.item-card:hover{transform:none;box-shadow:var(--shadow-sm)}
+  .fav-item:hover{transform:none}
+  .nav-arrow:hover,.option-btn:hover,.pk-option-btn:hover,.spelling-option-btn:hover,
+  .filter-btn:hover,.btn-icon:hover{transform:none}
+}
+/* 滚动条细线化（移动端视觉轻盈） */
+.content::-webkit-scrollbar{width:0}
+.sidebar::-webkit-scrollbar{width:0}
 @media print{.sidebar,.app-header,.btn,.modal{display:none!important}.content{margin:0;padding:0}}

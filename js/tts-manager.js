@@ -74,7 +74,7 @@ var TTSManager = (function() {
       try { saved = localStorage.getItem('tts_voice'); } catch (e) {}
       if (!saved) { try { saved = localStorage.getItem('selectedVoice'); } catch (e) {} }
       if (!saved) { try { saved = localStorage.getItem('voice_name'); } catch (e) {} }
-      if (saved && saved !== '__online_google__') {
+      if (saved && saved !== '__online_google__' && saved.indexOf('__online_') !== 0) {
         const v = this._pickByName(saved);
         if (v) { this.voice = v; return; }
       }
@@ -116,7 +116,9 @@ var TTSManager = (function() {
     // 用户在下拉框切换声音：找到对应 voice 设为当前声音并持久化到 localStorage["tts_voice"]。
     // 切换时是否 cancel 正在播的声音由调用方决定（设置页会在切换后重新朗读）。
     setVoice(name) {
-      if (!name || name === '__online_google__') {
+      // 虚拟在线音色（__online_*）不是真实 speechSynthesis voice：选择它时清除本地
+      // speechSynthesis 选择，避免误用系统声音；实际发声由 app.js 的 remoteFallback 接管
+      if (!name || (typeof name === 'string' && name.indexOf('__online_') === 0)) {
         this.voice = null;
         try {
           localStorage.removeItem('tts_voice');

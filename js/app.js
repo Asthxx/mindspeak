@@ -389,14 +389,17 @@ _speakLetterTTS: function(up, opts) {
         return;
       }
     }
-    // 选中「在线自然女声（Google 合成）」时，字母同样走 Google 在线合成（HTTPS），
+    // 选中「在线自然女声（Google 合成）」或其它虚拟在线音色时，字母同样走对应在线合成，
     // 与单词朗读行为一致：选了什么声音，字母就听到什么声音。
     var settings = this.getSettings();
-    if (settings.voiceName === '__online_google__') {
+    if (settings.voiceName && settings.voiceName.indexOf('__online_') === 0) {
       console.log('[TTS LETTER] ' + up);
-      console.log('[TTS LETTER] Voice: online-google');
-      if (this._serverDown === true) this._speakServerless(text, 'en-US', o);
-      else this._speakGoogleTTS(text, 'en-US', o);
+      console.log('[TTS LETTER] Voice: ' + settings.voiceName);
+      if (settings.voiceName === '__online_google__' && !(this._serverDown === true)) {
+        this._speakGoogleTTS(text, 'en-US', o);
+      } else {
+        this._speakServerless(text, 'en-US', o);
+      }
       return;
     }
     var voice = null;
@@ -457,13 +460,16 @@ _speakTTS: function(text, lang, opts) {
     }
 // 「在线自然女声（Google 合成）」：本机网络 WSS 被掐、在线 speechSynthesis 必失败，
     // 该选项改用 HTTPS 合成（translate.googleapis.com，实测可达、天然女声）。
-    if (settings.voiceName === '__online_google__') {
+    // 其它虚拟在线音色（__online_baidu__/__online_youdao_*__/__online_google_*__）：
+    // 一律走远程发音兜底链（_speakServerless），选中的音色源会排到最前。
+    if (settings.voiceName && settings.voiceName.indexOf('__online_') === 0) {
       this._stopLocalAudio();
-      if (this._serverDown === true) {
-        // 网页版（无 server）：Google 在线走 /api/online-tts 必 404，改用远程发音优先
-        this._speakServerless(text, lang, opts);
-      } else {
+      if (settings.voiceName === '__online_google__' && !(this._serverDown === true)) {
+        // Google 美音在带 server 的本机走 /api/online-tts 代理（可达、音质好）
         this._speakGoogleTTS(text, lang, opts);
+      } else {
+        // 其余在线音色 / server 不可用：走远程发音（百度/有道/谷歌按所选优先）
+        this._speakServerless(text, lang, opts);
       }
       return;
     }
@@ -993,16 +999,80 @@ _markOnlineBroken: function() {
     var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
     var done = false, fireStartFired = false, anyPlayed = false;
-    var ci = 0, src = 0; // ci=当前块下标，src=当前块内 0=百度 1=有道 2=谷歌
-    // 发音源顺序：百度翻译（国内直连可达、免费、长短文/中文都稳）→ 有道 → 谷歌（墙内兜底）
-    var SRC_COUNT = 3;
-    var remoteUrl = function(text) {
-      if (src === 0) return 'https://fanyi.baidu.com/gettts?lan=' + tl + '&text=' + encodeURIComponent(text) + '&spd=3&source=web';
-      if (src === 1) return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=1';
-      return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + tl + '&q=' + encodeURIComponent(text);
+    var ci = 0, src = 0; // ci=当前块下标，src=当前块内源下标（顺序见 order）
+    var ENC = encodeURIComponent;
+    // 在线发音源表：每个源对应一种音色/服务，均可用浏览器 <audio> 直连跨域播放（无需 CORS）。
+    // 百度/有道国内直连可达且免费；谷歌可选的音色最多（美/英/澳音），墙内不可达时作为兜底。
+    var SRC_ALL = [
+      { id: 'baidu',     name: '百度·美音', url: function(t, l) { return 'https://fanyi.baidu.com/gettts?lan=' + l + '&text=' + ENC(t) + '&spd=3&source=web'; } },
+      { id: 'youdao_us', name: '有道·美音', url: function(t) { return 'https://dict.youdao.com/dictvoice?audio=' + ENC(t) + '&type=1'; } },
+      { id: 'youdao_uk', name: '有道·英音', url: function(t) { return 'https://dict.youdao.com/dictvoice?audio=' + ENC(t) + '&type=2'; } },
+      { id: 'google_us', name: '谷歌·美音', url: function(t, l) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + l + '&q=' + ENC(t); } },
+      { id: 'google_uk', name: '谷歌·英音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-GB&q=' + ENC(t); } },
+      { id: 'google_au', name: '谷歌·澳音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-AU&q=' + ENC(t); } },
+      { id: 'google_in', name: '谷歌·印度音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-IN&q=' + ENC(t); } }
+    ];
+    // 虚拟在线音色 → 首先尝试的源。设置页选中的在线音色（voice_name 存 __online_*）会
+    // 把对应源排到最前，选中源失败再按默认顺序兜底换源，实现"选了什么音色，远程就出什么声"。
+    var VOICE_FIRST = {
+      '__online_baidu__': 'baidu',
+      '__online_youdao_us__': 'youdao_us',
+      '__online_youdao_uk__': 'youdao_uk',
+      '__online_google__': 'google_us',
+      '__online_google_uk__': 'google_uk',
+      '__online_google_au__': 'google_au',
+      '__online_google_in__': 'google_in'
+    };
+    var DEFAULT_ORDER = ['baidu', 'youdao_us', 'youdao_uk', 'google_us', 'google_uk', 'google_au', 'google_in'];
+    var vn = '';
+    try { if (self.getSettings) vn = self.getSettings().voiceName || ''; } catch(e) {}
+    var firstId = VOICE_FIRST[vn] || '';
+    var orderIds = firstId ? [firstId].concat(DEFAULT_ORDER.filter(function(x) { return x !== firstId; })) : DEFAULT_ORDER.slice();
+    var order = [];
+    for (var oi = 0; oi < orderIds.length; oi++) {
+      for (var aj = 0; aj < SRC_ALL.length; aj++) {
+        if (SRC_ALL[aj].id === orderIds[oi]) { order.push(SRC_ALL[aj]); break; }
+      }
+    }
+    var SRC_COUNT = order.length || 1;
+    // 源健康表（会话级）：某个源连续失败 2 次即视为"本会话不可达"，从并行候选剔除，
+    // 避免每次点击都去连被墙/受限的源又干等——手机网络下谷歌源必挂，剔除后百度/有道立即出声。
+    // 失败成功交替会重置，网络恢复后自动重新纳入，不永久封禁。
+    var markSrcFail = function(id) {
+      var h = self._srcHealth || (self._srcHealth = {});
+      h[id] = (h[id] || 0) + 1;
+    };
+    var markSrcOk = function(id) {
+      var h = self._srcHealth || (self._srcHealth = {});
+      h[id] = 0;
+    };
+    // 并行抢播源集合：首选源（用户选的音色）+ 国内直连兜底（百度/有道美音），
+    // 最多 3 个同时发起（并发过多会触发百度/有道反爬返回空 HTML），谁先出声用谁。
+    var pickSrcs = function() {
+      var first = order[src] || order[0];
+      var ids = [first.id];
+      var fb = ['baidu', 'youdao_us', 'youdao_uk'];
+      for (var fi = 0; fi < fb.length; fi++) {
+        if (ids.indexOf(fb[fi]) === -1 && !(self._srcHealth && (self._srcHealth[fb[fi]] || 0) >= 2)) ids.push(fb[fi]);
+      }
+      var out = [];
+      for (var oi2 = 0; oi2 < ids.length; oi2++) {
+        for (var aj2 = 0; aj2 < SRC_ALL.length; aj2++) {
+          if (SRC_ALL[aj2].id === ids[oi2]) { out.push(SRC_ALL[aj2]); break; }
+        }
+      }
+      return out.length ? out : [order[0]];
     };
     var playChunk = function() {
       if (seq !== self._waSeq || done) return;
+      // 每个 chunk 开始时清理上一块残留的并行 audio（避免旧块败者延迟回调用到新块变量）
+      var stale = self._pendingAudio;
+      self._pendingAudio = [];
+      if (stale) {
+        for (var si2 = 0; si2 < stale.length; si2++) {
+          try { stale[si2].pause(); stale[si2].src = ''; } catch(e) {}
+        }
+      }
       // 当前块所有源都用尽 → 该块失败，跳到下一块继续（网络波动不中断整篇）
       while (ci < chunks.length && src >= SRC_COUNT) {
         self._diag('remote-chunk-skip', 'chunk=' + ci);
@@ -1015,53 +1085,74 @@ _markOnlineBroken: function() {
         if (anyPlayed) { fireEnd(); return; }
         self._deviceFail(opts); return;
       }
-      var currentStarted = false; // 仅当前 Audio 的“已出声”标志：超时守护按块独立，跨块不误伤
-      var url = remoteUrl(chunks[ci]);
-      var audio;
-      try { audio = new Audio(url); } catch(e) { self._diag('remote-ctr', String(e)); src++; playChunk(); return; }
-      // 百度源校验 Referer（非 fanyi.baidu.com 会返回空 HTML → 错误码4）。
-      // <audio> 默认带页面来源 Referer（github.io），会被拒播；设 no-referrer 绕过。
-      // 有道源不受 Referer 限制，设此属性也无副作用。
-      try { audio.referrerPolicy = 'no-referrer'; } catch(e) {}
-      self._localAudio = audio;
-      // 超时兜底：手机网络对部分发音源（如谷歌被墙）会有既不报错也不可播放的挂起，
-      // 不给超时的话整条链会永远卡住，连设备语音兜底都不会触发。8s 内没出声即判失败换下一个。
+      var srcs = pickSrcs();
+      // 块级兜底窗口：并行源里没有一个在 3.2s 内出声（全部连不上/被墙挂起）→ 判该块失败。
+      // 相比旧的"每源 8s 串行换源"，手机网络下首选源不可达时不再干等，最多 ~3s 就换块/降级。
+      var win = null, resolved = false;
       var to = setTimeout(function() {
-        self._diag('remote-timeout', 'chunk=' + ci + ' src=' + src);
-        if (seq !== self._waSeq || done || currentStarted) return;
-        if (self._localAudio === audio) self._localAudio = null;
-        try { audio.pause(); audio.src = ''; } catch(e) {}
+        self._diag('remote-timeout', 'chunk=' + ci);
+        if (seq !== self._waSeq || done || resolved) return;
+        var els = self._pendingAudio = self._pendingAudio || [];
+        for (var pi = 0; pi < els.length; pi++) {
+          try { els[pi].pause(); els[pi].src = ''; } catch(e) {}
+        }
+        // 整块超时 = 参与本次的源都没出声，全部记一次失败（健康降级）
+        for (var hi = 0; hi < srcs.length; hi++) markSrcFail(srcs[hi].id);
+        self._pendingAudio = [];
+        if (self._localAudio) { try { self._localAudio.pause(); self._localAudio.src = ''; } catch(e) {} self._localAudio = null; }
         src++;
         playChunk();
-      }, 8000);
-      audio.oncanplaythrough = function() { try { audio.play(); } catch(e) {} };
-      audio.onplay = function() {
-        if (!currentStarted) { currentStarted = true; if (to) { clearTimeout(to); to = null; } }
-        if (!fireStartFired) { fireStartFired = true; fireStart(); }
-      };
-      audio.onended = function() {
-        if (seq !== self._waSeq) return;
-        if (self._localAudio === audio) self._localAudio = null;
-        if (to) { clearTimeout(to); to = null; }
-        if (!done) { anyPlayed = true; ci++; src = 0; playChunk(); }
-      };
-      audio.onerror = function() {
-        self._diag('remote-err', 'chunk=' + ci + ' src=' + src + ' ' + (audio.error ? audio.error.code : '?'));
-        if (to) { clearTimeout(to); to = null; }
-        if (self._localAudio === audio) self._localAudio = null;
-        if (seq !== self._waSeq || done) return;
-        src++;
-        playChunk();
-      };
-      var pr;
-      try { pr = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!done) { src++; playChunk(); } return; }
-      if (pr && pr.catch) pr.catch(function(e) {
-        self._diag('remote-play-rej', e && e.name ? e.name : String(e));
-        if (e && e.name === 'AbortError') return;
-        if (seq !== self._waSeq || done || currentStarted) return;
-        src++;
-        playChunk();
-      });
+      }, 3200);
+      for (var si = 0; si < srcs.length; si++) {
+        (function(srcObj) {
+          var audio;
+          try { audio = new Audio(srcObj.url(chunks[ci], tl)); } catch(e) { self._diag('remote-ctr', String(e)); return; }
+          // 百度源校验 Referer（非 fanyi.baidu.com 会返回空 HTML → 错误码4）。
+          // <audio> 默认带页面来源 Referer（github.io），会被拒播；设 no-referrer 绕过。
+          // 有道源不受 Referer 限制，设此属性也无副作用。
+          try { audio.referrerPolicy = 'no-referrer'; } catch(e) {}
+          (self._pendingAudio = self._pendingAudio || []).push(audio);
+          var claim = function() {
+            if (seq !== self._waSeq || done || resolved) return;
+            resolved = true;
+            win = audio;
+            self._localAudio = audio;
+            if (to) { clearTimeout(to); to = null; }
+            // 胜者确定后立刻停掉其余并行源，避免几路一起出声（双声/三声重叠）
+            var els = self._pendingAudio;
+            for (var pi2 = 0; pi2 < els.length; pi2++) {
+              if (els[pi2] !== audio) { try { els[pi2].pause(); els[pi2].src = ''; } catch(e) {} }
+            }
+            self._pendingAudio = [];
+          markSrcOk(srcObj.id);
+            if (!fireStartFired) { fireStartFired = true; fireStart(); }
+          };
+          audio.oncanplaythrough = function() { if (!resolved) { try { audio.play(); } catch(e) {} } };
+          audio.onplay = claim;
+          audio.onended = function() {
+            if (seq !== self._waSeq) return;
+            // 只认获胜者：败者在被 pause/清 src 时也可能触发 ended，误推进块会跳过剩余 chunk
+            if (win !== audio && resolved) return;
+            if (self._localAudio === audio) self._localAudio = null;
+            if (to) { clearTimeout(to); to = null; }
+            if (!done) { anyPlayed = true; ci++; src = 0; playChunk(); }
+          };
+          audio.onerror = function() {
+            self._diag('remote-err', 'chunk=' + ci + ' src=' + srcObj.id + ' ' + (audio.error ? audio.error.code : '?'));
+            // 败者被 pause/清 src 触发的 AbortError 不算失败（健康标记只记真实源问题）；
+            // 只有"generate 阶段已决定不是胜者"的源才跳过。resolved 后其它源全是被主动停的。
+            if (!resolved) markSrcFail(srcObj.id);
+            // 单个源失败不立即换源：并行其它源可能正在出声，交给块级窗口兜底
+          };
+          var pr;
+          try { pr = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!resolved) markSrcFail(srcObj.id); }
+          if (pr && pr.catch) pr.catch(function(e) {
+            self._diag('remote-play-rej', e && e.name ? e.name : String(e));
+            if (e && e.name === 'AbortError') return;
+            if (!resolved) markSrcFail(srcObj.id);
+          });
+        })(srcs[si]);
+      }
     };
     playChunk();
   },
@@ -5388,7 +5479,7 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
   // 朗读声音设置：预设声音（按系统 voices 归类男/女声）+ 语速，所有朗读统一生效
   var voiceSelect = document.getElementById('voice-select');
   var voiceRateSelect = document.getElementById('voice-rate');
-  if (voiceSelect && ('speechSynthesis' in window)) {
+  if (voiceSelect) {
     var voiceSettings = SpeechUtil.getSettings();
     // 存了具体声音 → 朗读必须用它：默认不进入「本地即时语音」（即时模式走 server SAPI，
     // 不认所选声音，会让"在线语音切换"失效——选了什么音色读出来都是本地声）
@@ -5410,10 +5501,25 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
       return v.name + (g ? '（' + g + (lang ? ' · ' + lang : '') + '）' : (lang ? '（' + lang + '）' : ''));
     }
 function fillVoiceOptions() {
-      var voices = window.speechSynthesis.getVoices() || [];
+      var voices = [];
+      try { voices = window.speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
       var cur = voiceSelect.value;
-      var html = '<option value="">系统默认（自动选本地语音）</option>'
-        + '<option value="__online_google__">在线自然女声（Google 合成，需网络）</option>';
+      // 在线音色（虚拟声音）：手机/网页无英文系统语音时也可靠出声、且音色可选。
+      // 选中的在线音色会把对应发音源排到远程兜底最前（见 _speakRemoteFallback）。
+      // 值以 __online_ 开头，与系统声音区分；不匹配任何 speechSynthesis voice。
+      var ONLINE_STATIC = [
+        { v: '__online_baidu__', label: '百度·美音（国内直连，推荐）' },
+        { v: '__online_youdao_us__', label: '有道·美音（国内直连）' },
+        { v: '__online_youdao_uk__', label: '有道·英音（国内直连）' },
+        { v: '__online_google__', label: '在线自然女声（Google 美音，需网络）' },
+        { v: '__online_google_uk__', label: '谷歌·英音（需网络）' },
+        { v: '__online_google_au__', label: '谷歌·澳音（需网络）' },
+        { v: '__online_google_in__', label: '谷歌·印度口音（需网络）' }
+      ];
+      var html = '<option value="">系统默认（自动选本地语音）</option>';
+      for (var vi2 = 0; vi2 < ONLINE_STATIC.length; vi2++) {
+        html += '<option value="' + ONLINE_STATIC[vi2].v + '">' + onlineStaticLabel(ONLINE_STATIC[vi2].v, ONLINE_STATIC[vi2].label) + '</option>';
+      }
       voiceSelect.innerHTML = html;
       var enVoices = [];
       for (var i = 0; i < voices.length; i++) {
@@ -5437,12 +5543,25 @@ function fillVoiceOptions() {
       if (cur) voiceSelect.value = cur;
       else if (voiceSettings.voiceName) voiceSelect.value = voiceSettings.voiceName;
     }
+    // 在线音色名称：优先用内建中文名，不认识的 __online_* 也给出可读占位名
+    function onlineStaticLabel(v, fallback) {
+      var map = {
+        '__online_baidu__': '百度·美音（国内直连，推荐）',
+        '__online_youdao_us__': '有道·美音（国内直连）',
+        '__online_youdao_uk__': '有道·英音（国内直连）',
+        '__online_google__': '在线自然女声（Google 美音，需网络）',
+        '__online_google_uk__': '谷歌·英音（需网络）',
+        '__online_google_au__': '谷歌·澳音（需网络）',
+        '__online_google_in__': '谷歌·印度口音（需网络）'
+      };
+      return map[v] || fallback || v;
+    }
     fillVoiceOptions();
     // 探测本地 server 是否可达：不可达时自动关闭「本地即时语音」默认值，
     // 改用浏览器语音（修复 GitHub Pages/手机场景下朗读必弹"server 未运行"红错的根因）
     SpeechUtil._probeServer();
     // Chrome/Firefox 的 voices 列表是异步加载的，加载完成后重新填充
-    window.speechSynthesis.onvoiceschanged = fillVoiceOptions;
+    if ('speechSynthesis' in window) window.speechSynthesis.onvoiceschanged = fillVoiceOptions;
     voiceSelect.addEventListener('change', function() {
       var name = this.value;
       voiceSettings.voiceName = name;
@@ -5481,7 +5600,7 @@ if (name) {
         var vs = window.speechSynthesis.getVoices() || [];
         for (var vi = 0; vi < vs.length; vi++) if (vs[vi].name === name) { chosen = vs[vi]; break; }
       } catch(e) {}
-      if (name === '__online_google__') Toast.success('已切换为在线自然女声（Google 合成，需网络）');
+      if (name && name.indexOf('__online_') === 0) Toast.success('已切换为' + (onlineStaticLabel ? onlineStaticLabel(name, '在线声音') : '在线声音') + '（需联网，音色统一，手机/网页同样生效）');
       else if (!name) Toast.success('已切换为系统默认（自动选本地语音）');
       else if (chosen && SpeechUtil._isOnlineVoice(chosen)) Toast.success('已选择在线声音（首次朗读需联网加载，可能稍慢）');
       else if (chosen) Toast.success('已选择朗读声音');
@@ -5530,7 +5649,8 @@ if (name) {
   safeBind('btn-voice-test', 'click', function() {
     // 试听：必须用当前所选声音朗读。页面一律经 SpeechUtil.speak（内部最终走
     // TTSManager，切换后立即生效），禁止页面直接调 window.TTSManager.speak()
-    SpeechUtil.speak('This is a voice test.', 'en-US');
+    // 注意不能用含 "test" 的句子：有道 dictvoice 对含 test 的词组会拒绝（500）。
+    SpeechUtil.speak('Hello, nice to meet you.', 'en-US');
   });
   // 自定义发音：上传录音（文件名即单词名），朗读该单词时优先播放
   var cvFileInput = document.getElementById('cv-file');
