@@ -8,6 +8,8 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -29,6 +31,10 @@ jobs:
 
       - name: 确认 Java 版本
         run: java -version 2>&1 | head -1
+
+      # 失败时把 Gradle 错误摘要推送到 build-error-dump 分支，便于自动化读取
+      - name: 打印 JDK 位置
+        run: echo "JAVA_HOME=$JAVA_HOME"
 
       - name: 安装依赖 (terser + Capacitor)
         run: |
@@ -66,8 +72,22 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
-          test ${PIPESTATUS[0]} -eq 0
+          ./gradlew assembleDebug --no-daemon --stacktrace > gradle-build.log 2>&1
+          exit_code=$?
+          if [ $exit_code -ne 0 ]; then
+            tail -120 gradle-build.log | sed 's/\x1b\[[0-9;]*m//g' > /tmp/gradle-err.txt
+            cd "$GITHUB_WORKSPACE"
+            git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git" 2>/dev/null
+            git config user.email "build-bot@users.noreply.github.com"
+            git config user.name "build-bot"
+            git checkout --orphan build-error-dump 2>/dev/null
+            cp /tmp/gradle-err.txt build-error.txt
+            git add build-error.txt
+            git commit -m "gradle build error dump" --allow-empty
+            git push origin build-error-dump --force 2>/dev/null
+            echo "已推送错误摘要到 build-error-dump 分支"
+            exit $exit_code
+          fi
 
       - name: 上传 APK 作为工作流产物
         uses: actions/upload-artifact@v4
