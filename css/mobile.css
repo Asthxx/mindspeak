@@ -287,11 +287,11 @@
 @media (prefers-color-scheme:dark){
   :root{
     --ivory:#0F1419;--ivory-warm:#141A20;--ivory-deep:#0A0E12;--ivory-card:#1A2028;
-    --sage:#6BA88A;--sage-deep:#8CC4A4;--sage-muted:#4A8A6A;--sage-light:#1A2820;--sage-surface:#152018;
+    --sage:#6BA88A;--sage-deep:#8CC4A4;--sage-muted:#4A8A6A;--sage-light:#182433;--sage-surface:#152018;
     --coral:#FF9A78;--coral-deep:#FF8A65;--coral-light:#2A1A15;--coral-surface:#201510;
     --ink:#F0F0F0;--ink-soft:#E0E0E0;--text:#D0D0D0;--text-secondary:#9A9A9A;--text-tertiary:#6A6A6A;--text-ghost:#4A4A4A;
     --border:#2A3038;--border-light:#1E2428;--border-focus:#3A4048;
-    --success:#6BC48A;--success-light:#1A2820;--success-dark:#8AE4A8;
+    --success:#6BC48A;--success-light:#182433;--success-dark:#8AE4A8;
     --warning:#D4B85A;--warning-light:#2A2518;
     --danger:#E87878;--danger-light:#2A1A1A;--danger-dark:#F89898;
     --shadow-xs:0 1px 2px rgba(0,0,0,0.2);--shadow-sm:0 2px 4px rgba(0,0,0,0.25);

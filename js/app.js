@@ -1595,8 +1595,8 @@ var ThemeColor = {
   PRESETS: ['sage', 'blue', 'purple', 'rose', 'amber'],
   // 默认 sage 全套（用于 reset 与 HSL 派生的参照）
   DEFAULT_LIGHT: {
-    sage:'#547A67', sageDeep:'#3D5C4D', sageMuted:'#7A9E8A',
-    sageLight:'#E8F0EC', sageSurface:'#F2F7F4', sageHover:'#4A6B59'
+    sage:'#5B82A6', sageDeep:'#3E5F7F', sageMuted:'#7FB6D9',
+    sageLight:'#E3ECF4', sageSurface:'#EEF4F9', sageHover:'#4A6F93'
   },
   DEFAULT_DARK: {
     sage:'#6BAF8B', sageDeep:'#8BC9A5', sageMuted:'#5A9A78',
@@ -1651,7 +1651,7 @@ var ThemeColor = {
 
     // “应用自定义颜色”
     safeBind('btn-apply-custom-color', 'click', function() {
-      var hex = colorInput ? colorInput.value : '#547A67';
+      var hex = colorInput ? colorInput.value : '#5B82A6';
       self.applyCustom(hex);
       self.setActiveButton('custom');
       Toast.success('自定义颜色已应用');
@@ -1668,7 +1668,7 @@ var ThemeColor = {
     // 启动时还原上次选择
     var saved = Storage.get('theme_color', 'sage') || 'sage';
     if (saved === 'custom') {
-      var savedHex = Storage.get('custom_theme_color', '#547A67') || '#547A67';
+      var savedHex = Storage.get('custom_theme_color', '#5B82A6') || '#5B82A6';
       this.applyCustom(savedHex);
       if (colorInput) colorInput.value = savedHex;
       if (hexLabel) hexLabel.textContent = savedHex.toUpperCase();
@@ -1717,7 +1717,7 @@ var ThemeColor = {
   reapply: function() {
     var saved = Storage.get('theme_color', 'sage') || 'sage';
     if (saved === 'custom') {
-      var hex = Storage.get('custom_theme_color', '#547A67') || '#547A67';
+      var hex = Storage.get('custom_theme_color', '#5B82A6') || '#5B82A6';
       this.applyCustom(hex);
     } else {
       this.applyPreset(saved);
@@ -4877,8 +4877,8 @@ var ChartModule = (function() {
     // 主题色：跟随亮/暗主题和自定义主题色
     var cs = getComputedStyle(document.documentElement);
     function color(name, fallback) { var v = cs.getPropertyValue(name).trim(); return v || fallback; }
-    var sage = color('--sage', '#547A67');
-    var sageDeep = color('--sage-deep', '#3D5C4D');
+    var sage = color('--sage', '#5B82A6');
+    var sageDeep = color('--sage-deep', '#3E5F7F');
     var accent = color('--coral', '#FF8A65');
     var accentDeep = color('--coral-deep', '#E67A58');
     var textColor = color('--text', '#444');
@@ -6548,8 +6548,8 @@ App.prototype.generateShareCard = function() {
   
   // 背景渐变
   var grad = ctx.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, "#547A67");
-  grad.addColorStop(1, "#3d5a4a");
+  grad.addColorStop(0, "#5B82A6");
+  grad.addColorStop(1, "#3E5F7F");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   

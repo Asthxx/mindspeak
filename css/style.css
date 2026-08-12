@@ -1933,9 +1933,9 @@ h2{
 
 /* 自定义主题色 */
 [data-theme-color="blue"]{
-  --sage:#3B82F6;--sage-deep:#2563EB;--sage-muted:#60A5FA;
-  --sage-light:#DBEAFE;--sage-surface:#EFF6FF;--sage-hover:#2563EB;
-  --sidebar-bg:linear-gradient(180deg,#1E3A5F 0%,#1E4D8C 100%);
+  --sage:#5B82A6;--sage-deep:#3E5F7F;--sage-muted:#7FB6D9;
+  --sage-light:#E3ECF4;--sage-surface:#EEF4F9;--sage-hover:#4A6F93;
+  --sidebar-bg:linear-gradient(180deg,#2A3B4E 0%,#3E5F7F 100%);
   --sidebar-text:#fff;--sidebar-active:rgba(255,255,255,0.25);--sidebar-hover:rgba(255,255,255,0.12);
 }
 [data-theme-color="purple"]{
@@ -1959,8 +1959,8 @@ h2{
 
 /* 深色主题下，预设色包的 sage 变量覆盖 */
 [data-theme="dark"][data-theme-color="blue"]{
-  --sage:#60A5FA;--sage-deep:#93C5FD;--sage-muted:#3B82F6;
-  --sage-light:#1E2F4D;--sage-surface:#172545;--sage-hover:#93C5FD;
+  --sage:#7BA9CE;--sage-deep:#9FC5E4;--sage-muted:#5E8FB8;
+  --sage-light:#1C2B3D;--sage-surface:#182433;--sage-hover:#9FC5E4;
 }
 [data-theme="dark"][data-theme-color="purple"]{
   --sage:#A78BFA;--sage-deep:#C4B5FD;--sage-muted:#8B5CF6;
@@ -1976,7 +1976,7 @@ h2{
 }
 /* 深色主题下，预设色包的 sidebar 渐变同步更新 */
 [data-theme="dark"][data-theme-color="blue"]{
-  --sidebar-bg:linear-gradient(180deg,#0B1A30 0%,#1E4D8C 100%);
+  --sidebar-bg:linear-gradient(180deg,#0F1A26 0%,#1C2B3D 100%);
 }
 [data-theme="dark"][data-theme-color="purple"]{
   --sidebar-bg:linear-gradient(180deg,#100825 0%,#2D1B5E 100%);

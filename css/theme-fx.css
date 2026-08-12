@@ -103,7 +103,7 @@
 }
 [data-theme-id="liquid"] h2,
 [data-theme-id="liquid"] h3 {
-  background: linear-gradient(120deg, #547A67 0%, #FF8A65 55%, #B45309 100%);
+  background: linear-gradient(120deg, #5B82A6 0%, #7FB6D9 55%, #5E8FB8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

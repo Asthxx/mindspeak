@@ -13,20 +13,20 @@
      1. COLOR SYSTEM — 60-30-10 Principle
      ============================================================ */
 
-  /* ── 60% Primary: Warm Ivory ── */
-  --ivory:           #F8F6F1;
-  --ivory-warm:      #FAF8F4;
-  --ivory-deep:      #F0EDE6;
+  /* ── 60% Primary: Cool Ivory (冷米白, 与雾霾蓝协调) ── */
+  --ivory:           #F4F6F8;
+  --ivory-warm:      #F7F9FB;
+  --ivory-deep:      #E9EDF1;
   --ivory-card:      #FFFFFF;
-  --ivory-surface:   #FDFCFA;
+  --ivory-surface:   #FBFCFD;
 
-  /* ── 30% Secondary: Deep Sage Green ── */
-  --sage:            #547A67;
-  --sage-deep:       #3D5C4D;
-  --sage-muted:      #7A9E8A;
-  --sage-light:      #E8F0EC;
-  --sage-surface:    #F2F7F4;
-  --sage-hover:      #4A6B59;
+  /* ── 30% Secondary: Misty Blue (雾霾蓝) ── */
+  --sage:            #5B82A6;
+  --sage-deep:       #3E5F7F;
+  --sage-muted:      #7FB6D9;
+  --sage-light:      #E3ECF4;
+  --sage-surface:    #EEF4F9;
+  --sage-hover:      #4A6F93;
 
   /* ── 10% Accent: Warm Coral Orange ── */
   --coral:           #FF8A65;
@@ -72,7 +72,7 @@
   --border-sage:     var(--sage-light);
 
   /* ── Sidebar ── */
-  --sidebar-bg:      linear-gradient(180deg, #2D3B36 0%, #3D5C4D 100%);
+  --sidebar-bg:      linear-gradient(180deg, #2A3B4E 0%, #3E5F7F 100%);
   --sidebar-text:    rgba(255,255,255,0.9);
   --sidebar-active:  rgba(255,255,255,0.2);
   --sidebar-hover:   rgba(255,255,255,0.1);
@@ -148,7 +148,7 @@
   --shadow-2xl:   0 25px 50px -12px rgba(0,0,0,0.15);
 
   /* Colored Shadows */
-  --shadow-sage:  0 4px 14px rgba(84,122,103,0.2);
+  --shadow-sage:  0 4px 14px rgba(91,130,166,0.25);
   --shadow-coral: 0 4px 14px rgba(255,138,101,0.25);
 
   /* ============================================================
@@ -195,13 +195,13 @@
   --ivory-card:      #252629;
   --ivory-surface:   #2C2D31;
 
-  /* ── 30% Secondary: Muted Sage ── */
-  --sage:            #6BAF8B;
-  --sage-deep:       #8BC9A5;
-  --sage-muted:      #5A9A78;
-  --sage-light:      #1E2E25;
-  --sage-surface:    #1A2820;
-  --sage-hover:      #7AC09A;
+  /* ── 30% Secondary: Muted Misty Blue ── */
+  --sage:            #7BA9CE;
+  --sage-deep:       #9FC5E4;
+  --sage-muted:      #5E8FB8;
+  --sage-light:      #1C2B3D;
+  --sage-surface:    #182433;
+  --sage-hover:      #87B4D8;
 
   /* ── 10% Accent: Soft Coral ── */
   --coral:           #FF9A76;
@@ -245,9 +245,9 @@
   --border-sage:     var(--sage-light);
 
   /* ── Sidebar ── */
-  --sidebar-bg:      linear-gradient(180deg, #141517 0%, #1A2820 100%);
+  --sidebar-bg:      linear-gradient(180deg, #141A22 0%, #1C2B3D 100%);
   --sidebar-text:    rgba(255,255,255,0.6);
-  --sidebar-active:  rgba(107,175,139,0.2);
+  --sidebar-active:  rgba(123,169,206,0.25);
   --sidebar-hover:   rgba(255,255,255,0.06);
 
   /* ── Shadows ── */
@@ -256,7 +256,7 @@
   --shadow-md:    0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2);
   --shadow-lg:    0 10px 15px -3px rgba(0,0,0,0.3), 0 4px 6px -2px rgba(0,0,0,0.2);
   --shadow-xl:    0 20px 25px -5px rgba(0,0,0,0.4), 0 10px 10px -5px rgba(0,0,0,0.2);
-  --shadow-sage:  0 4px 14px rgba(107,175,139,0.15);
+  --shadow-sage:  0 4px 14px rgba(123,169,206,0.15);
   --shadow-coral: 0 4px 14px rgba(255,154,118,0.15);
 }
 

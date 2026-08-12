@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>闻道 MindSpeak · 界面设计方案稿</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:"Inter","SF Pro Display",-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif; background:#f3f2ee; color:#1f2328; line-height:1.5; }
+.wrap { max-width:980px; margin:0 auto; padding:24px 20px 80px; }
+h1 { font-size:1.6rem; text-align:center; margin:16px 0 4px; }
+.sub { text-align:center; color:#7a7f85; font-size:.92rem; margin-bottom:26px; }
+.tabs { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:26px; }
+.tab { padding:10px 18px; border-radius:999px; border:1.5px solid #d8d6d0; background:#fff; cursor:pointer; font-size:.9rem; font-weight:600; transition:.2s; }
+.tab.active { background:#1f2328; color:#fff; border-color:#1f2328; }
+.ctab { padding:8px 14px; border-radius:999px; border:1.5px solid #ccc; background:#fff; cursor:pointer; font-size:.82rem; font-weight:600; transition:.2s; }
+.ctab.active { background:#1f2328; color:#fff; border-color:#1f2328; }
+.ct-sage { box-shadow:inset 4px 0 0 #547A67, inset -4px 0 0 #FF8A65; }
+.ct-blue { box-shadow:inset 4px 0 0 #5B82A6, inset -4px 0 0 #7FB6D9; }
+.ct-violet { box-shadow:inset 4px 0 0 #8E7A9E, inset -4px 0 0 #C9A7C4; }
+.ct-amber { box-shadow:inset 4px 0 0 #B47A3A, inset -4px 0 0 #E8B04B; }
+.ct-navy { box-shadow:inset 4px 0 0 #48688F, inset -4px 0 0 #5D8BBE; }
+.panel { display:none; }
+.panel.active { display:block; animation:fade .3s; }
+@keyframes fade { from{opacity:0; transform:translateY(6px);} to{opacity:1;} }
+.mt { margin-top:20px; }
+h2.tag { font-size:1.15rem; margin:26px 0 8px; padding-bottom:8px; border-bottom:2px solid #e4e2dc; }
+.desc { font-size:.9rem; color:#5b6068; background:#fff; border:1px solid #e4e2dc; border-radius:12px; padding:14px 18px; margin-bottom:18px; }
+.desc b { color:#1f2328; }
+.vote { background:#fff4e5; border:1px solid #ffd9a0; color:#8a5a00; border-radius:12px; padding:12px 16px; font-size:.9rem; margin-top:14px; }
+/* ====== 手机壳容器 ====== */
+.shell { position:relative; width:320px; max-width:92vw; margin:0 auto; background:#fff; border-radius:34px; box-shadow:0 25px 60px -12px rgba(31,35,40,.35), inset 0 0 0 2px #eceae5; padding:18px 14px 22px; }
+.shell:before { content:""; position:absolute; top:10px; left:50%; width:90px; height:16px; transform:translateX(-50%); background:#eee; border-radius:8px; }
+.shell-row { display:flex; gap:24px; justify-content:center; flex-wrap:wrap; }
+.statusbar { font-size:11px; color:#555; display:flex; justify-content:space-between; padding:2px 4px 10px; font-weight:600; }
+/* 通用练习元素 */
+.caps div { font-size:11px; letter-spacing:.06em; opacity:.6; font-weight:600; }
+/* ========================================================= */
+/*                 方案 A · Duolingo 活力学习               */
+/* ========================================================= */
+.theme-a { background:#f7f7f7; color:#1cb0f6; }
+.theme-a .av { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#58cc02,#46a302); display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; font-weight:800; }
+.theme-a .hs { display:flex; gap:8px; font-size:13px; font-weight:700; color:#ff9600; }
+.ring { width:150px; height:150px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:conic-gradient(#58cc02 0 72%, #e5e5e5 72% 100%); margin:12px auto; }
+.ring i { width:120px; height:120px; border-radius:50%; background:#f7f7f7; display:flex; flex-direction:column; align-items:center; justify-content:center; font-style:normal; }
+.ring b { font-size:26px; color:#4b4b4b; }
+.ring span { font-size:11px; color:#afafaf; }
+.a-learning { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+.al-item { display:flex; align-items:center; gap:10px; background:#fff; border:2px solid #e5e5e5; border-radius:14px; padding:10px 12px; }
+.al-item .ic { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+.al-item .t { flex:1; font-weight:700; font-size:13px; color:#4b4b4b; }
+.al-item .p { font-size:11px; color:#afafaf; }
+.a-cta { display:block; text-align:center; margin-top:16px; padding:14px; border-radius:16px; background:#58cc02; color:#fff; font-weight:800; font-size:15px; box-shadow:0 4px 0 #46a302; }
+/* ========================================================= */
+/*                 方案 B · 百词斩 清爽大卡片                */
+/* ========================================================= */
+.theme-b { background:#f2f5f7; }
+.theme-b .bg-top { position:absolute; top:0; left:0; right:0; height:150px; background:linear-gradient(180deg,#3a7bd5,#74b7f0); border-radius:34px 34px 0 0; }
+.theme-b .gr { position:relative; }
+.theme-b .h { display:flex; justify-content:space-between; align-items:center; color:#fff; font-weight:700; font-size:13px; padding:16px 6px 8px; position:relative; }
+.theme-b .word-card { background:#fff; border-radius:20px; box-shadow:0 10px 25px -8px rgba(40,80,140,.3); margin-top:18px; text-align:center; padding:28px 18px 22px; position:relative; }
+.theme-b .word-card .w { font-size:34px; font-weight:800; color:#1f2430; letter-spacing:.5px; }
+.theme-b .word-card .ph { font-size:12px; color:#8a94a6; margin-top:4px; }
+.theme-b .word-card .mean { margin-top:14px; display:inline-flex; gap:8px; }
+.theme-b .chip { background:#eef3fa; color:#3a7bd5; border-radius:8px; padding:6px 12px; font-size:13px; font-weight:600; }
+.theme-b .actions { display:flex; gap:10px; margin-top:18px; }
+.theme-b .act { flex:1; padding:12px; border-radius:12px; font-size:13px; font-weight:700; text-align:center; }
+.theme-b .act.ghost { background:#fff; color:#ff6b6b; border:2px solid #ff6b6b; }
+.theme-b .act.solid { background:#3a7bd5; color:#fff; box-shadow:0 4px 0 #2a5ca6; }
+.theme-b .streak { display:flex; justify-content:space-around; background:#fff; border-radius:16px; margin-top:16px; padding:12px 6px; }
+.theme-b .streak div { text-align:center; }
+.theme-b .streak b { display:block; font-size:15px; color:#3a7bd5; }
+.theme-b .streak span { font-size:10px; color:#9aa5b5; }
+/* ========================================================= */
+/*         方案 C · 保持现有鼠尾草体系 · 精致化升级        */
+/* ========================================================= */
+.theme-c { background:var(--cbg,#F8F6F1); font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+.theme-c .c-head { display:flex; justify-content:space-between; align-items:center; padding:4px 2px 14px; }
+.theme-c .c-logo { display:flex; align-items:center; gap:8px; font-weight:700; color:var(--cdeep,#3D5C4D); }
+.theme-c .c-logo i { width:26px; height:26px; border-radius:8px; background:var(--cdeep,#3D5C4D); color:#fff; display:flex; align-items:center; justify-content:center; font-style:normal; font-size:14px; }
+.theme-c .c-hello { font-size:17px; font-weight:800; color:#1A1A1A; }
+.theme-c .c-hello small { display:block; font-size:12px; font-weight:400; color:#8A8A8A; margin-top:2px; }
+.theme-c .c-stats { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px; }
+.theme-c .c-stat { background:#fff; border:1px solid #EDEAE5; border-radius:14px; padding:12px 14px; }
+.theme-c .c-stat b { font-size:22px; color:var(--cdeep,#3D5C4D); }
+.theme-c .c-stat span { font-size:11px; color:#8A8A8A; display:block; }
+.theme-c .c-rings { display:flex; gap:10px; margin-top:10px; }
+.theme-c .c-mod { flex:1; background:#fff; border:1px solid #EDEAE5; border-radius:14px; padding:12px; text-align:center; }
+.theme-c .c-mod i { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; margin:0 auto 8px; font-style:normal; font-size:18px; }
+.theme-c .c-mod b { font-size:13px; color:#1A1A1A; }
+.theme-c .c-mod span { font-size:10px; color:#8A8A8A; display:block; margin-top:2px; }
+.theme-c .c-cta { margin-top:14px; padding:13px; border-radius:14px; background:linear-gradient(135deg,var(--c1,#547A67),var(--cdeep,#3D5C4D)); color:#fff; text-align:center; font-weight:700; font-size:14px; box-shadow:0 6px 16px -6px var(--cshadow,rgba(61,92,77,.5)); }
+.theme-c .c-progress { margin-top:14px; background:#fff; border:1px solid #EDEAE5; border-radius:14px; padding:12px 14px; }
+.theme-c .c-progress .j { font-size:13px; font-weight:700; color:#1A1A1A; }
+.theme-c .c-bar { height:8px; background:#F0EDE6; border-radius:999px; margin-top:8px; overflow:hidden; }
+.theme-c .c-bar i { display:block; height:100%; width:68%; border-radius:999px; background:linear-gradient(90deg,var(--c2,#FF9A76),var(--c3,#FF8A65)); }
+.note { text-align:center; font-size:.85rem; color:#9a9ea4; margin-top:16px; }
+.swatch { display:flex; gap:8px; justify-content:center; margin:12px 0 4px; }
+.swatch i { width:30px; height:30px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>闻道 MindSpeak · 界面设计方案稿</h1>
+  <p class="sub">参考主流学习应用（Duolingo / 百词斩 / 极简清理）提炼的 3 套首页视觉方向 · 点击查看</p>
+
+  <div class="tabs">
+    <button class="tab active" data-p="a">方案 A · 活力学习（Duolingo 风）</button>
+    <button class="tab" data-p="b">方案 B · 清爽大卡片（百词斩风）</button>
+    <button class="tab" data-p="c">方案 C · 精致鼠尾草（升级现有）</button>
+  </div>
+
+  <!-- A -->
+  <div class="panel active" id="p-a" data-theme="theme-a">
+    <div class="desc"><b>定位：游戏化、动力感。借鉴 Duolingo「大圆环 + 彩色关卡 + 明快图标」。</b>顶栏为金币/火焰激励，中部圆形学习进度环，下方"继续学习"模块列表，底部醒目的绿色开始按钮。色彩：经典 Duolingo 绿 + 蓝 + 橙。</div>
+    <div class="shell-row">
+      <div class="shell theme-a">
+        <div class="statusbar"><span>9:41</span><span>▮▮▯</span></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="av">学</div>
+          <div style="flex:1"><div style="font-weight:800;color:#4b4b4b;font-size:14px;">今天也来背词吧!</div><div style="font-size:11px;color:#afafaf;">连续打卡 12 天</div></div>
+          <div class="hs">🔥 320</div>
+        </div>
+        <div class="ring"><i><b>280</b><span>总词汇</span></i></div>
+        <div class="caps" style="text-align:center">LV 8 · 本周目标 5/7 天</div>
+        <div class="a-learning">
+          <div class="al-item"><div class="ic" style="background:#d2efff;color:#1899d6;">📖</div><div class="t">每日新词 15 个</div><div class="p">▶ 继续</div></div>
+          <div class="al-item"><div class="ic" style="background:#d7ffb8;color:#58a700;">🔁</div><div class="t">复习 32 个</div><div class="p">▶ 继续</div></div>
+          <div class="al-item"><div class="ic" style="background:#ffe2d9;color:#ff9600;">🎧</div><div class="t">听力挑战</div><div class="p">▶ 开始</div></div>
+        </div>
+        <div class="a-cta">继续学习 ➡</div>
+      </div>
+    </div>
+    <div class="swatch"><i style="background:#58cc02"></i><i style="background:#46a302"></i><i style="background:#1cb0f6"></i><i style="background:#ff9600"></i><i style="background:#ffffff"></i></div>
+  </div>
+
+  <!-- B -->
+  <div class="panel" id="p-b" data-theme="theme-b">
+    <div class="desc"><b>定位：沉浸感、主次分明。借鉴百词斩「全屏词卡 + 记忆按钮」。</b>顶部蓝白渐变当日心情，主角是一张超大单词卡，词义/释义居中，底部分"认识/忘记"两枚大按钮；下方为连续打卡等细信息条。</div>
+    <div class="shell theme-b">
+      <div class="bg-top"></div>
+      <div class="gr">
+        <div class="h"><span>▤ 单词卡片</span><span>🔥 12</span></div>
+        <div class="word-card">
+          <div class="w">serendipity</div>
+          <div class="ph">/ˌserənˈdɪpəti/</div>
+          <div class="mean"><span class="chip">n.</span><span class="chip">意外之喜</span></div>
+        </div>
+        <div class="actions">
+          <div class="act ghost">✗ 不认识</div>
+          <div class="act solid">✓ 认识</div>
+        </div>
+        <div class="streak">
+          <div><b>280</b><span>词库量</span></div>
+          <div><b>12</b><span>连续天数</span></div>
+          <div><b>67%</b><span>掌握率</span></div>
+          <div><b>85</b><span>本周积分</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="swatch"><i style="background:#3a7bd5"></i><i style="background:#74b7f0"></i><i style="background:#ffffff"></i><i style="background:#ff6b6b"></i></div>
+  </div>
+
+  <!-- C -->
+  <div class="panel" id="p-c" data-theme="theme-c">
+    <div class="desc"><b>定位：延续现有"暖米白 + 鼠尾草绿"体系，做精致化升级。</b>改大字号层级、卡片圆角与留白、渐变进度条与按钮光晕，整体更柔和现代。点缀色可任意换——点击下方色系实时切换看效果。</div>
+
+    <div class="tabs" style="margin-bottom:18px;">
+      <button class="ctab active ct-sage" data-c="sage">🌿 鼠尾草绿</button>
+      <button class="ctab ct-blue" data-c="blue">🌀 雾霾蓝</button>
+      <button class="ctab ct-violet" data-c="violet">🍇 干枯玫瑰紫</button>
+      <button class="ctab ct-amber" data-c="amber">🍯 焦糖暖橘</button>
+      <button class="ctab ct-navy" data-c="navy">🦋 雾岚靛蓝</button>
+    </div>
+
+    <div class="shell theme-c" id="c-shell">
+      <div class="statusbar" style="color:#3D5C4D"><span>9:41</span><span>▮▮▯</span></div>
+      <div class="c-head">
+        <div class="c-logo"><i>文</i>闻道 MindSpeak</div>
+        <div style="font-size:12px;color:#8A8A8A;">● 设置</div>
+      </div>
+      <div class="c-hello">下午好，继续今天的学习<small>周一 · 已连续学习 12 天</small></div>
+      <div class="c-stats">
+        <div class="c-stat"><b>280</b><span>总词汇</span></div>
+        <div class="c-stat"><b>15</b><span>今日计划</span></div>
+      </div>
+      <div class="c-rings">
+        <div class="c-mod"><i style="background:#E8F0EC;">📖</i><b>背单词</b><span>15/15</span></div>
+        <div class="c-mod"><i style="background:#FFF0EB;">🎧</i><b>听力</b><span>完成</span></div>
+        <div class="c-mod"><i style="background:#E3F2FD;">📝</i><b>拼写</b><span>进行中</span></div>
+      </div>
+      <div class="c-progress">
+        <div class="j" style="display:flex;justify-content:space-between"><span>今日任务</span><span>68%</span></div>
+        <div class="c-bar"><i></i></div>
+      </div>
+      <div class="c-cta">继续学习 →</div>
+    </div>
+    <div class="swatch"><i style="background:#F8F6F1"></i><i style="background:#547A67"></i><i style="background:#3D5C4D"></i><i style="background:#FF8A65"></i></div>
+  </div>
+
+  <div class="vote">💡 <b>怎么选：</b>A 适合主打"上瘾、打卡"的年轻用户；B 适合"每天专注一张词卡"的沉浸式体验；C 改动最小、最稳妥，与现有学习体系融合度最高。选定风格后，我可以把整套界面（首页/背单词/听力/拼写/设置等所有页面）按该风格重做。</div>
+  <div class="note">本页为纯静态预览稿，可在浏览器直接打开对比。</div>
+</div>
+
+<script>
+var tabs=document.querySelectorAll('.tab'),panels=document.querySelectorAll('.panel');
+tabs.forEach(function(t){
+  t.addEventListener('click',function(){
+    tabs.forEach(function(x){x.classList.remove('active');});
+    t.classList.add('active');
+    panels.forEach(function(p){p.classList.toggle('active',p.id==='p-'+t.dataset.p);});
+  });
+});
+// 方案 C 配色切换
+var palettes={
+  sage:{ cb:'#F8F6F1', c1:'#547A67', cdeep:'#3D5C4D', c2:'#FF9A76', c3:'#FF8A65', cs:'rgba(61,92,77,.5)' },
+  blue:{ cb:'#F2F6FA', c1:'#5B82A6', cdeep:'#3E5F7F', c2:'#7FB6D9', c3:'#5E9BC7', cs:'rgba(62,95,127,.5)' },
+  violet:{ cb:'#F7F3F8', c1:'#8E7A9E', cdeep:'#6B5683', c2:'#C9A7C4', c3:'#B08BB4', cs:'rgba(107,86,131,.5)' },
+  amber:{ cb:'#FAF6EF', c1:'#B47A3A', cdeep:'#8F5E2A', c2:'#E8B04B', c3:'#D9933A', cs:'rgba(143,94,42,.5)' },
+  navy:{ cb:'#F0F3F7', c1:'#48688F', cdeep:'#2F4A6E', c2:'#5D8BBE', c3:'#48739F', cs:'rgba(47,74,110,.5)' }
+};
+var cTabs=document.querySelectorAll('[data-c]');
+cTabs.forEach(function(bt){
+  bt.addEventListener('click',function(){
+    cTabs.forEach(function(x){x.classList.remove('active');});
+    bt.classList.add('active');
+    var p=palettes[bt.dataset.c],el=document.getElementById('c-shell');
+    Object.keys(p).forEach(function(k){ el.style.setProperty('--'+k,p[k]); });
+  });
+});
+</script>
+</body>
+</html>
