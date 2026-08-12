@@ -90,30 +90,28 @@ jobs:
         run: |
           set -e
           echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > android/app/mindspeak-keystore.p12
-          file android/app/mindspeak-keystore.p12 || true
           ls -la android/app/mindspeak-keystore.p12
           test -s android/app/mindspeak-keystore.p12
-          "$JAVA_HOME/bin/keytool" -list -storetype PKCS12 -v -keystore android/app/mindspeak-keystore.p12 -storepass "$ANDROID_KEYSTORE_PASS" 2>&1 | head -12
           cat >> android/app/build.gradle <<'EOF'
-
-android {
-    signingConfigs {
-        release {
-            storeFile file("mindspeak-keystore.p12")
-            storePassword System.getenv('ANDROID_KEYSTORE_PASS')
-            storeType "PKCS12"
-            keyAlias System.getenv('ANDROID_KEY_ALIAS')
-            keyPassword System.getenv('ANDROID_KEY_PASS')
-        }
-    }
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-            minifyEnabled false
-        }
-    }
-}
-EOF
+          
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("mindspeak-keystore.p12")
+                      storePassword System.getenv('ANDROID_KEYSTORE_PASS')
+                      storeType "PKCS12"
+                      keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                      keyPassword System.getenv('ANDROID_KEY_PASS')
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                  }
+              }
+          }
+          EOF
         env:
           ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
 
