@@ -61,16 +61,16 @@ jobs:
       - name: 修复 Android 构建配置
         run: |
           echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
-          cat >> android/app/build.gradle <<'EOF'
-
-configurations.all {
-    resolutionStrategy {
-        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-    }
-}
-EOF
+          {
+            echo ""
+            echo "configurations.all {"
+            echo "    resolutionStrategy {"
+            echo "        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'"
+            echo "        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'"
+            echo "        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'"
+            echo "    }"
+            echo "}"
+          } >> android/app/build.gradle
           echo "--- 已修复, 确认 JAVA_HOME ---"
           echo "org.gradle.java.home=$JAVA_HOME"
 
