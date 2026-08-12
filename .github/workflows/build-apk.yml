@@ -56,6 +56,24 @@ jobs:
       - name: 同步 web 产物到 Android
         run: npx cap sync android
 
+      # 修复1: 强制 Gradle 使用 JDK21 (否则 gradle 可能用系统 JDK17 报 invalid source release: 21)
+      # 修复2: 统一 Kotlin 版本到 1.8.22, 消除 kotlin-stdlib 与 kotlin-stdlib-jdk7/8 的重复类
+      - name: 修复 Android 构建配置
+        run: |
+          echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
+          cat >> android/app/build.gradle <<'EOF'
+
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+    }
+}
+EOF
+          echo "--- 已修复, 确认 JAVA_HOME ---"
+          echo "org.gradle.java.home=$JAVA_HOME"
+
       - name: 把品牌图标放进 Android (从 Web PWA 图标生成各分辨率)
         run: |
           pipx run --spec pillow python - <<'EOF'
