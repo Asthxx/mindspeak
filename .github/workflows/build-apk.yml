@@ -19,13 +19,16 @@ jobs:
           cache: npm
 
       - name: 安装 Java (Android 构建需要)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
 
       - name: 安装 Android SDK (platform 36 + build-tools)
         uses: android-actions/setup-android@v3
+
+      - name: 确认 Java 版本
+        run: java -version 2>&1 | head -1
 
       - name: 安装依赖 (terser + Capacitor)
         run: |
