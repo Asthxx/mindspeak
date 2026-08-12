@@ -88,8 +88,12 @@ jobs:
 
       - name: 配置正式签名 (从 Secrets 还原 keystore)
         run: |
+          set -e
           echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > android/app/mindspeak-keystore.p12
+          file android/app/mindspeak-keystore.p12 || true
           ls -la android/app/mindspeak-keystore.p12
+          test -s android/app/mindspeak-keystore.p12
+          "$JAVA_HOME/bin/keytool" -list -storetype PKCS12 -v -keystore android/app/mindspeak-keystore.p12 -storepass "$ANDROID_KEYSTORE_PASS" 2>&1 | head -12
           cat >> android/app/build.gradle <<'EOF'
 
 android {
@@ -97,6 +101,7 @@ android {
         release {
             storeFile file("mindspeak-keystore.p12")
             storePassword System.getenv('ANDROID_KEYSTORE_PASS')
+            storeType "PKCS12"
             keyAlias System.getenv('ANDROID_KEY_ALIAS')
             keyPassword System.getenv('ANDROID_KEY_PASS')
         }
@@ -109,6 +114,8 @@ android {
     }
 }
 EOF
+        env:
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
 
       - name: 打出正式签名 Release APK
         working-directory: android
