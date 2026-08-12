@@ -13,9 +13,9 @@
 
 <div align="center">
 
-**[⬇️ 下载最新版 APK（v1.1.0）](https://github.com/Asthxx/mindspeak/releases/download/v1.1.0/app-debug.apk)**
+[![下载 APK](https://img.shields.io/badge/⬇️_下载最新版_APK_v1.1.0-brightgreen?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Asthxx/mindspeak/releases/download/v1.1.0/app-debug.apk)
 
-[查看全部版本 / Release 页面](https://github.com/Asthxx/mindspeak/releases)
+[![查看全部版本](https://img.shields.io/badge/查看全部版本-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Asthxx/mindspeak/releases)
 
 </div>
 
