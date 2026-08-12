@@ -993,11 +993,18 @@ _markOnlineBroken: function() {
     var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
     var done = false, fireStartFired = false, anyPlayed = false;
-    var ci = 0, src = 0; // ci=当前块下标，src=当前块内 0=有道 1=谷歌
+    var ci = 0, src = 0; // ci=当前块下标，src=当前块内 0=百度 1=有道 2=谷歌
+    // 发音源顺序：百度翻译（国内直连可达、免费、长短文/中文都稳）→ 有道 → 谷歌（墙内兜底）
+    var SRC_COUNT = 3;
+    var remoteUrl = function(text) {
+      if (src === 0) return 'https://fanyi.baidu.com/gettts?lan=' + tl + '&text=' + encodeURIComponent(text) + '&spd=3&source=web';
+      if (src === 1) return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=1';
+      return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + tl + '&q=' + encodeURIComponent(text);
+    };
     var playChunk = function() {
       if (seq !== self._waSeq || done) return;
-      // 当前块两种源都用尽 → 该块失败，跳到下一块继续（网络波动不中断整篇）
-      while (ci < chunks.length && src >= 2) {
+      // 当前块所有源都用尽 → 该块失败，跳到下一块继续（网络波动不中断整篇）
+      while (ci < chunks.length && src >= SRC_COUNT) {
         self._diag('remote-chunk-skip', 'chunk=' + ci);
         ci++;
         src = 0;
@@ -1009,11 +1016,13 @@ _markOnlineBroken: function() {
         self._deviceFail(opts); return;
       }
       var currentStarted = false; // 仅当前 Audio 的“已出声”标志：超时守护按块独立，跨块不误伤
-      var url = src === 0
-        ? 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(chunks[ci]) + '&type=1'
-        : 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + tl + '&q=' + encodeURIComponent(chunks[ci]);
+      var url = remoteUrl(chunks[ci]);
       var audio;
       try { audio = new Audio(url); } catch(e) { self._diag('remote-ctr', String(e)); src++; playChunk(); return; }
+      // 百度源校验 Referer（非 fanyi.baidu.com 会返回空 HTML → 错误码4）。
+      // <audio> 默认带页面来源 Referer（github.io），会被拒播；设 no-referrer 绕过。
+      // 有道源不受 Referer 限制，设此属性也无副作用。
+      try { audio.referrerPolicy = 'no-referrer'; } catch(e) {}
       self._localAudio = audio;
       // 超时兜底：手机网络对部分发音源（如谷歌被墙）会有既不报错也不可播放的挂起，
       // 不给超时的话整条链会永远卡住，连设备语音兜底都不会触发。8s 内没出声即判失败换下一个。
