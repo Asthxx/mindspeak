@@ -17,3 +17,9 @@ server/cloudflared.exe
 # 系统文件
 Thumbs.db
 .DS_Store
+
+# 安卓签名密钥（安全：只存 GitHub Secrets，勿提交）
+*.keystore
+*.jks
+*.p12
+mindspeak-keystore.p12
