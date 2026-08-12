@@ -7,6 +7,18 @@
 
 ---
 
+## 📲 下载安卓 App（APK）
+
+| 渠道 | 说明 |
+|---|---|
+| **最新 APK** | ▶️ [GitHub Releases 下载](https://github.com/Asthxx/mindspeak/releases/latest)（含自动打包的安卓安装包，直接传到手机安装即可） |
+| 手动触发打包 | 在仓库 **Actions → 打包安卓安装包 APK → Run workflow**，跑完到 **Artifacts** 下载  |
+
+> 每次发布版本时在 GitHub 创建 `v1.x.x` 标签，Actions 会自动把 APK 挂到 Releases 页面。
+> 安装新 APK 需在手机设置中允许「安装未知来源应用」。
+
+---
+
 ## 为什么用它
 
 - **零账号**：不需要邮箱、不使用云数据库，所有学习进度保存到**浏览器本地**（localStorage），任何人任何设备打开即用。
@@ -64,14 +76,14 @@ node build.js       # 生成 dist/
 
 ### 方式三：打包成安卓安装包（APK）
 
-用 [PWABuilder](https://www.pwabuilder.com)（免费、无需本地 SDK）把在线版 PWA 打成 APK：
+本仓库已配置 **GitHub Actions 云端自动打包**（无需本地 SDK）：
 
-1. 打开 <https://www.pwabuilder.com>，输入在线地址（如 `https://asthxx.github.io/mindspeak/`）→ **Start**；
-2. 检查通过后点 **Package for stores** → **Android**；
-3. 勾选 **Minifest/APK** → **Download** 下载 APK；
-4. 将 APK 传入手机直接安装（需允许安装未知来源应用）。
+1. 打开仓库 **Actions** 页 → 选中 **「打包安卓安装包 APK」**；
+2. 点 **Run workflow**（或在仓库创建 `v1.x.x` 标签自动触发）；
+3. 构建完成后：打标签的版本会出现在 **Releases** 下载页；手动触发的在 **Artifacts** 里下载；
+4. 把 APK 传入手机直接安装（需允许安装未知来源应用）。
 
-> 也支持商店分包（Trusted Web Activity / Chrome Web Store / Play Store），详情见 PWABuilder 文档。
+APK 由 Capacitor 打包，内置全部词库与离线缓存，**断网也能背单词**。也可以在线用 PWA：`https://asthxx.github.io/mindspeak/` 添加到主屏幕。
 
 ### 方式四：自建本地服务（完整发音 + 日志）
 

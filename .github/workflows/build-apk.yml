@@ -1,0 +1,80 @@
+name: 打包安卓安装包 APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安装 Java (Android 构建需要)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 安装依赖 (terser + Capacitor)
+        run: |
+          npm install --no-audit --no-fund
+          npm install --save-dev @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: 构建 web 产物 (dist)
+        run: node build.js
+
+      - name: 初始化 Capacitor 工程
+        run: |
+          npx cap init "闻道 MindSpeak" com.mindspeak.app --web-dir=dist
+          npx cap add android
+
+      - name: 添加麦克风/音频权限 (跟读练习)
+        run: |
+          sed -i 's|<!-- Permissions -->|<uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <!-- Permissions -->|' android/app/src/main/AndroidManifest.xml
+
+      - name: 同步 web 产物到 Android
+        run: npx cap sync android
+
+      - name: 把品牌图标放进 Android (从 Web PWA 图标生成各分辨率)
+        run: |
+          pipx run --spec pillow python - <<'EOF'
+          from PIL import Image
+          src = Image.open('dist/assets/pwa/icon-512.png').convert('RGBA')
+          sizes = {'mipmap-mdpi':48,'mipmap-hdpi':72,'mipmap-xhdpi':96,'mipmap-xxhdpi':144,'mipmap-xxxhdpi':192}
+          for folder, size in sizes.items():
+              img = src.resize((size,size), Image.LANCZOS)
+              img.save(f'android/app/src/main/res/{folder}/ic_launcher.png')
+              img.save(f'android/app/src/main/res/{folder}/ic_launcher_round.png')
+          EOF
+
+      - name: 打出 Debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: 上传 APK 作为工作流产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mindspeak-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: 打 tag 时发布到 Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          name: 闻道 MindSpeak ${{ github.ref_name }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
