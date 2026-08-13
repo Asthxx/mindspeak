@@ -1,1 +1,16 @@
-{"name":"yuan-dao","version":"1.0.0","private":true,"scripts":{"build":"node build.js"},"devDependencies":{"terser":"^5.49.2"}}
+{
+  "name": "yuan-dao",
+  "version": "1.1.0",
+  "private": true,
+  "description": "闻道 MindSpeak 英语学习软件（Web + PWA + Android + 桌面版）",
+  "scripts": {
+    "build": "node build.js",
+    "desktop:pack": "node scripts/desktop-pack.js",
+    "desktop:build": "npm run build && npm run desktop:pack && tauri build",
+    "desktop:dev": "node server/server.js & tauri dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.4.0",
+    "terser": "^5.49.2"
+  }
+}

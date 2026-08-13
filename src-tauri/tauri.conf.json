@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "闻道 MindSpeak",
+  "version": "1.1.0",
+  "identifier": "com.mindspeak.app",
+  "build": {
+    "beforeDevCommand": "",
+    "devUrl": "http://127.0.0.1:3000/",
+    "beforeBuildCommand": "node scripts/desktop-pack.js",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "闻道 MindSpeak",
+        "label": "main",
+        "url": "http://127.0.0.1:3000/",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "resources": {
+      "resources/node/**": "node/",
+      "resources/server/**": "server/",
+      "resources/static/**": "static/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "languages": ["SimpChinese", "English"]
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": "entitlements.plist",
+      "hardenedRuntime": true
+    }
+  }
+}

@@ -320,6 +320,9 @@ app.post('/api/logs/open', (req, res) => {
 });
 
 // 静态资源（index.html、css/js/data）
+// 桌面版（Tauri 内嵌）由环境变量 MINISPEAK_STATIC_ROOT 指定前端根目录；
+// 浏览器版默认取项目根目录。
+const STATIC_ROOT = process.env.MINISPEAK_STATIC_ROOT || ROOT;
 // favicon：页面已用 <link> 指向 assets/favicon.svg；老请求/直接输入 /favicon.ico 空响应即可
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 // 本地开发服务器：禁用浏览器缓存，避免用户长期加载到旧版 js/css 而"功能失效"
@@ -336,7 +339,7 @@ app.use((req, res, next) => {
   if (p === '/' || p === '/index.html' || STATIC_PUBLIC.some((a) => p.startsWith(a))) return next();
   return res.status(404).json({ ok: false, message: 'Not Found' });
 });
-app.use(express.static(ROOT, {
+app.use(express.static(STATIC_ROOT, {
   index: 'index.html',
   etag: false,
   setHeaders: (res) => {

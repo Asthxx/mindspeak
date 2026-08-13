@@ -23,3 +23,14 @@ Thumbs.db
 *.jks
 *.p12
 mindspeak-keystore.p12
+
+# Tauri 桌面版构建产物
+src-tauri/target/
+src-tauri/gen/
+src-tauri/resources/
+src-tauri/node-runtime/
+*.msi
+*.exe
+*.app
+*.dmg
+*.AppImage
