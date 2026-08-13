@@ -43,13 +43,13 @@ jobs:
       - name: 构建 web 产物 (dist)
         run: node build.js
 
-      - name: 编译 + 打包 NSIS/MSI (Tauri)
+      - name: 编译 + 打包 NSIS (Tauri)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd src-tauri
-          npx @tauri-apps/cli@2 build
+          npx @tauri-apps/cli@2 build --bundles nsis
 
       - name: 定位安装包
         shell: pwsh
@@ -114,7 +114,7 @@ jobs:
         shell: bash
         run: |
           cd src-tauri
-          npx @tauri-apps/cli@2 build
+          npx @tauri-apps/cli@2 build --bundles dmg
 
       - name: 定位安装包
         run: |
