@@ -39,8 +39,15 @@ function cp(src, dest, filter) {
     if (filter && !filter(e.name)) continue;
     const s = path.join(src, e.name);
     const d = path.join(dest, e.name);
-    if (e.isDirectory()) cp(s, d, filter);
-    else fs.copyFileSync(s, d);
+    if (e.isDirectory()) {
+      cp(s, d, filter);
+    } else if (e.isSymbolicLink()) {
+      // npm 会在 node_modules 里放指向包自身的环回符号链接（如 yuan-dao -> .），
+      // 直接复制会 EPERM/死循环，这里跳过 symlink。
+      continue;
+    } else {
+      fs.copyFileSync(s, d);
+    }
   }
 }
 
