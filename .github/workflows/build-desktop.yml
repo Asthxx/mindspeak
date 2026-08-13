@@ -43,6 +43,11 @@ jobs:
       - name: 构建 web 产物 (dist)
         run: node build.js
 
+      - name: 调试-列出 resources 树
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Depth 2 "src-tauri/resources" -ErrorAction SilentlyContinue | Select-Object -First 20 @{n='rel';e={$_.FullName.Replace((Get-Location).Path,'')}} | Format-Table -AutoSize
+
       - name: 编译 + 打包 NSIS/MSI (Tauri)
         shell: bash
         env:
