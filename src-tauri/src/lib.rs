@@ -24,12 +24,15 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                let state = window.state::<NodeProcess>();
-                if let Ok(mut guard) = state.0.lock() {
-                    if let Some(mut child) = guard.take() {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                    }
+                let child = window
+                    .state::<NodeProcess>()
+                    .0
+                    .lock()
+                    .ok()
+                    .and_then(|mut g| g.take());
+                if let Some(mut child) = child {
+                    let _ = child.kill();
+                    let _ = child.wait();
                 }
             }
         })
@@ -37,12 +40,15 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                let state = app_handle.state::<NodeProcess>();
-                if let Ok(mut guard) = state.0.lock() {
-                    if let Some(mut child) = guard.take() {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                    }
+                let child = app_handle
+                    .state::<NodeProcess>()
+                    .0
+                    .lock()
+                    .ok()
+                    .and_then(|mut g| g.take());
+                if let Some(mut child) = child {
+                    let _ = child.kill();
+                    let _ = child.wait();
                 }
             }
         });
