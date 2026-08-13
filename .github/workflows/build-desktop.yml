@@ -20,6 +20,8 @@ jobs:
     name: Windows 桌面版
     runs-on: windows-latest
     if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'both' || inputs.platforms == 'windows')) || github.event_name == 'push' }}
+    env:
+      WIN_SIGN_AVAILABLE: ${{ secrets.WIN_CODE_SIGN_BASE64 != '' }}
     # dispatch 与 tag 均可触发；签名步骤内部再按 secrets 是否配置决定
     permissions:
       contents: write
@@ -56,7 +58,7 @@ jobs:
 
       # 仅当 secrets 存在且 signtool 可用时签名（证书未购买前此步骤自动跳过）
       - name: 代码签名 (Windows Authenticode + 时间戳)
-        if: ${{ secrets.WIN_CODE_SIGN_BASE64 != '' }}
+        if: env.WIN_SIGN_AVAILABLE == 'true'
         shell: pwsh
         env:
           SIGNCERT_BASE64: ${{ secrets.WIN_CODE_SIGN_BASE64 }}
@@ -85,6 +87,9 @@ jobs:
     name: macOS 桌面版
     runs-on: macos-latest
     if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'both' || inputs.platforms == 'macos')) || github.event_name == 'push' }}
+    env:
+      MAC_SIGN_AVAILABLE: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
+      MAC_NOTARIZE_AVAILABLE: ${{ secrets.MAC_APPLE_ID != '' }}
     permissions:
       contents: write
     steps:
@@ -117,7 +122,7 @@ jobs:
 
       # macOS 签名 + 公证（未配置 secrets 时自动跳过，仅打印不遮挡构建结果）
       - name: 签名 (Developer ID + hardened runtime)
-        if: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
+        if: env.MAC_SIGN_AVAILABLE == 'true'
         env:
           MAC_DEVELOPER_ID_APPLICATION: ${{ secrets.MAC_DEVELOPER_ID_APP }}
           MAC_DEVELOPER_ID_INSTALLER: ${{ secrets.MAC_DEVELOPER_ID_INSTALLER }}
@@ -137,7 +142,7 @@ jobs:
           codesign --verify --deep --strict "$APP" || true
 
       - name: 公证 (notarization) + 装订 (staple)
-        if: ${{ secrets.MAC_APPLE_ID != '' }}
+        if: env.MAC_NOTARIZE_AVAILABLE == 'true'
         env:
           MAC_APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
           MAC_APPLE_PASSWORD: ${{ secrets.MAC_APPLE_PASSWORD }}
