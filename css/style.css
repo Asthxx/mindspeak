@@ -10,7 +10,7 @@
   --primary-light: var(--sage-muted);
   --primary-dark: var(--sage-deep);
   --primary-surface: var(--sage-surface);
-  --primary-ghost: rgba(84,122,103,0.08);
+  --primary-ghost: rgba(91,130,166,0.08);
 
   --accent: var(--coral);
   --accent-light: var(--coral-light);
@@ -194,7 +194,7 @@ h2{
 }
 .btn-primary:hover{
   transform:translateY(-2px);
-  box-shadow:0 8px 24px rgba(99,102,241,0.35);
+  box-shadow:0 8px 24px var(--shadow-sage);
 }
 .btn-secondary{color:var(--text-secondary)}
 .btn-secondary:hover{
@@ -243,7 +243,7 @@ h2{
 }
 .btn-speak:hover{
   transform:scale(1.08);
-  box-shadow:0 8px 24px rgba(99,102,241,0.35);
+  box-shadow:0 8px 24px var(--shadow-sage);
 }
 
 /* ============ STAT CARDS ============ */
@@ -516,7 +516,7 @@ h2{
 }
 .option-btn:hover{
   border-color:var(--sage-light);
-  background:rgba(84,122,103,0.08);
+  background:rgba(91,130,166,0.08);
 }
 .option-btn.correct{
   border-color:var(--success);
@@ -609,7 +609,7 @@ h2{
 }
 .r-option:hover{
   border-color:var(--sage-light);
-  background:rgba(84,122,103,0.08);
+  background:rgba(91,130,166,0.08);
 }
 .r-option.correct{background:var(--success-light);border-color:var(--success)}
 .r-option.wrong{background:var(--danger-light);border-color:var(--danger)}
@@ -1249,7 +1249,7 @@ h2{
 }
 .spelling-option-btn:hover{
   border-color:var(--sage-light);
-  background:rgba(84,122,103,0.08);
+  background:rgba(91,130,166,0.08);
 }
 .spelling-option-btn.correct{
   border-color:var(--success);background:var(--success-light);
@@ -1340,7 +1340,7 @@ h2{
   align-items:center;justify-content:center;
   margin:0 auto var(--sp-4);
   position:relative;
-  box-shadow:0 8px 32px rgba(99,102,241,0.35);
+  box-shadow:0 8px 32px var(--shadow-sage);
 }
 .score-circle::before{
   content:'';position:absolute;inset:-6px;
@@ -1590,7 +1590,7 @@ h2{
   background:linear-gradient(135deg,var(--sage),var(--sage-deep));
   color:#fff;padding:14px 24px;border-radius:var(--r-lg);
   font-weight:600;font-size:0.95rem;
-  box-shadow:0 8px 32px rgba(99,102,241,0.35);
+  box-shadow:0 8px 32px var(--shadow-sage);
   transform:translateX(120%);transition:transform 0.3s var(--ease);
 }
 .game-toast.show{transform:translateX(0)}
@@ -1882,8 +1882,8 @@ h2{
 .toast-error .toast-icon{color:#ef4444}
 .toast-warning{border-left-color:#f59e0b}
 .toast-warning .toast-icon{color:#f59e0b}
-.toast-info{border-left-color:#3b82f6}
-.toast-info .toast-icon{color:#3b82f6}
+.toast-info{border-left-color:#5E8FB8}
+.toast-info .toast-icon{color:#5E8FB8}
 .toast-message{flex:1;line-height:1.4}
 
 /* ============ 深色模式特殊处理 ============ */

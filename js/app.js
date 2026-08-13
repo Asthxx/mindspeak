@@ -1599,8 +1599,8 @@ var ThemeColor = {
     sageLight:'#E3ECF4', sageSurface:'#EEF4F9', sageHover:'#4A6F93'
   },
   DEFAULT_DARK: {
-    sage:'#6BAF8B', sageDeep:'#8BC9A5', sageMuted:'#5A9A78',
-    sageLight:'#1E2E25', sageSurface:'#1A2820', sageHover:'#7AC09A'
+    sage:'#7BA9CE', sageDeep:'#9FC5E4', sageMuted:'#5E8FB8',
+    sageLight:'#1C2B3D', sageSurface:'#182433', sageHover:'#87B4D8'
   },
   styleEl: null,
 

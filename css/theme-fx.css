@@ -43,7 +43,7 @@
 [data-theme-id="liquid"] body::before {
   background:
     radial-gradient(900px 600px at 12% 8%,  rgba(255,138,101,0.42), transparent 60%),
-    radial-gradient(1000px 700px at 88% 20%, rgba(84,122,103,0.38), transparent 62%),
+    radial-gradient(1000px 700px at 88% 20%, rgba(91,130,166,0.42), transparent 62%),
     radial-gradient(800px 600px at 50% 95%, rgba(255,200,150,0.36), transparent 60%),
     #F8F6F1;
 }
@@ -81,7 +81,7 @@
 [data-theme-id="liquid"] .modal-content {
   background: rgba(255,255,255,0.66);
   border: 1px solid rgba(255,138,101,0.35);
-  box-shadow: 0 8px 30px rgba(255,138,101,0.14), 0 4px 12px rgba(84,122,103,0.08);
+  box-shadow: 0 8px 30px rgba(255,138,101,0.14), 0 4px 12px rgba(91,130,166,0.08);
 }
 [data-theme-id="liquid"][data-theme="dark"] .settings-group,
 [data-theme-id="liquid"][data-theme="dark"] .theme-card,
