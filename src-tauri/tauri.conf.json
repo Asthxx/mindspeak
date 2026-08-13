@@ -41,9 +41,9 @@
       "icons/icon.png"
     ],
     "resources": {
-      "resources/node/**": "node/",
-      "resources/server/**": "server/",
-      "resources/static/**": "static/"
+      "resources/node": "node/",
+      "resources/server": "server/",
+      "resources/static": "static/"
     },
     "windows": {
       "nsis": {
