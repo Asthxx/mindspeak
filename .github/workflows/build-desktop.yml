@@ -2,6 +2,16 @@ name: 打包桌面版 (Windows/macOS)
 
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: 构建平台（windows / macos / both）
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - windows
+          - macos
   push:
     tags: ['v*']
 
@@ -9,6 +19,7 @@ jobs:
   desktop-windows:
     name: Windows 桌面版
     runs-on: windows-latest
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'both' || inputs.platforms == 'windows')) || github.event_name == 'push' }}
     # dispatch 与 tag 均可触发；签名步骤内部再按 secrets 是否配置决定
     permissions:
       contents: write
@@ -73,7 +84,7 @@ jobs:
   desktop-macos:
     name: macOS 桌面版
     runs-on: macos-latest
-    # dispatch 与 tag 均可触发；签名步骤内部再按 secrets 是否配置决定
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'both' || inputs.platforms == 'macos')) || github.event_name == 'push' }}
     permissions:
       contents: write
     steps:
