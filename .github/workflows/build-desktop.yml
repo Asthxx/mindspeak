@@ -9,7 +9,7 @@ jobs:
   desktop-windows:
     name: Windows 桌面版
     runs-on: windows-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # dispatch 与 tag 均可触发；签名步骤内部再按 secrets 是否配置决定
     permissions:
       contents: write
     steps:
@@ -73,7 +73,7 @@ jobs:
   desktop-macos:
     name: macOS 桌面版
     runs-on: macos-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # dispatch 与 tag 均可触发；签名步骤内部再按 secrets 是否配置决定
     permissions:
       contents: write
     steps:
