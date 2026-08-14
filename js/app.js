@@ -184,6 +184,22 @@ getSettings: function() {
   _probeServer: function() {
     if (this._probedServer) return;
     this._probedServer = true;
+    // Android WebView / Capacitor 打包环境：页面加载于 https://localhost，
+    // 对 /api/health 的请求会被 Capacitor 本地 server 以 SPA 回退返回 HTML（200），
+    // 而不会被判定为"后端存在"→ 误走在线 TTS 卡住无声。APK 内没有本地 server，
+    // 直接标记 _serverDown=true，发音走远程 MP3/系统语音/本地 wav 兜底链。
+    try {
+      var _ua = (navigator.userAgent || '').toLowerCase();
+      var _hc = document.documentElement.className || '';
+      var _isAndroid = /android/.test(_ua) || /platform-android/.test(_hc);
+      var _isCap = /capacitor|bridge\.capacitor|\(([^)]*net\.js\.[^)]*)/.test(navigator.userAgent || '');
+      if (_isAndroid || _isCap) {
+        this._serverDown = true;
+        this._diag('probe', 'android/capacitor => serverDown=true (APK 内无后端)');
+        this._syncInstantDefault();
+        return;
+      }
+    } catch(e) {}
     var self = this;
     var base = window.API_BASE || '';
     this._diag('probe', 'base=' + base + ' href=' + location.href);
@@ -303,6 +319,16 @@ TTSManager.cancel();
     try { if (TTSManager && TTSManager.voice) picked = true; } catch(e) {}
     if (!picked) {
       try { if (this.getSettings().voiceName) picked = true; } catch(e) {}
+    }
+    // Android APK 无后端 server（_serverDown=true）时，系统 speechSynthesis 通常没有
+    // 可用的英文语音（国产机无 Google TTS），自动选声会选到无声引擎 → 点击没声音。
+    // 此时字母发音直接优先本地 wav 资源（assets/letters/A.wav，随 APK 打包、不依赖网络），
+    // 保证点击必出声；wav 不存在/播放失败再落 TTS。桌面端保持原逻辑（有系统英文语音）。
+    if (this._serverDown === true) {
+      try {
+        var hc = document.documentElement.className || '';
+        if (/platform-android/.test(hc)) picked = false;
+      } catch(e) {}
     }
     if (picked) { this._speakLetterTTS(up, opts); return; }
     // ②未选声音（默认场景）：存在 assets/letters/A.wav（标准字母音，A→/eɪ/、W→/ˈdʌbəljuː/）
@@ -4941,37 +4967,8 @@ var CalendarModule = (function() {
 var ChartModule = (function() {
   function ChartModule() { this.render(); }
   ChartModule.prototype.render = function() {
-    var canvas = document.getElementById('learning-chart');
-    if (!canvas) return;
-    // DPR 适配 + 按容器实际宽度绘制，避免拉伸模糊
-    var dpr = window.devicePixelRatio || 1;
-    var cssW = canvas.clientWidth || 600;
-    var cssH = Math.round(cssW * 250 / 600);
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    var ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
-
-    // 主题色：跟随亮/暗主题和自定义主题色
-    var cs = getComputedStyle(document.documentElement);
-    function color(name, fallback) { var v = cs.getPropertyValue(name).trim(); return v || fallback; }
-    var sage = color('--sage', '#5B82A6');
-    var sageDeep = color('--sage-deep', '#3E5F7F');
-    var accent = color('--coral', '#FF8A65');
-    var accentDeep = color('--coral-deep', '#E67A58');
-    var textColor = color('--text', '#444');
-    var textTertiary = color('--text-tertiary', '#8A8A8A');
-    var gridColor = color('--border', '#E5E2DC');
-    // 使用应用字体，文字更清晰；x 坐标取整避免半像素模糊
-    var fontFamily = color('--font-primary', "'Inter', 'Microsoft YaHei', sans-serif");
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    function drawText(text, x, y, css, style) {
-      ctx.font = css + ' ' + fontFamily;
-      ctx.fillStyle = style;
-      ctx.fillText(text, Math.round(x), Math.round(y));
-    }
+    var listEl = document.getElementById('week-days-list');
+    if (!listEl) return;
 
     var checkins = DataStore.getProgress('checkins', {});
     var days = [];
@@ -4980,62 +4977,40 @@ var ChartModule = (function() {
       var d = new Date(today);
       d.setDate(d.getDate() - i);
       var dateStr = getLocalDateStr(d);
-      days.push({ label: ['日','一','二','三','四','五','六'][d.getDay()], date: dateStr.slice(5), count: checkins[dateStr] || 0, isToday: i === 0 });
+      days.push({ label: ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()], date: dateStr.slice(5), count: checkins[dateStr] || 0, isToday: i === 0 });
     }
     var total = days.reduce(function(s, x) { return s + x.count; }, 0);
     var totalEl = document.getElementById('chart-week-total');
     if (totalEl) totalEl.textContent = '近 7 天共 ' + total + ' 词';
 
-    var padTop = 28, padBottom = 40;
-    var chartTop = padTop, chartBottom = cssH - padBottom;
-    var slotW = cssW / 7;
-    var barW = Math.min(slotW * 0.42, 34);
+    var cs = getComputedStyle(document.documentElement);
+    function color(name, fallback) { var v = cs.getPropertyValue(name).trim(); return v || fallback; }
+    var sage = color('--sage', '#5B82A6');
+    var accent = color('--coral', '#FF8A65');
+    var textColor = color('--text', '#444');
+    var textTertiary = color('--text-tertiary', '#8A8A8A');
     var maxCount = Math.max.apply(null, days.map(function(d) { return d.count; })) || 1;
-    var maxBarH = chartBottom - chartTop - 4;
 
-    // 圆角顶部柱体（兼容不支持 roundRect 的浏览器）
-    function roundedTopBar(x, y, w, h, r) {
-      if (h <= 0) return;
-      r = Math.min(r, w / 2, h);
-      ctx.beginPath();
-      ctx.moveTo(x, y + h);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h);
-      ctx.closePath();
-    }
-
-    days.forEach(function(d, i) {
-      var cx = slotW * i + slotW / 2;
-      var barH = d.count > 0 ? Math.max(4, (d.count / maxCount) * maxBarH) : 0;
-      var y = chartBottom - barH;
-      if (barH > 0) {
-        var g = ctx.createLinearGradient(0, y, 0, chartBottom);
-        if (d.isToday) { g.addColorStop(0, accent); g.addColorStop(1, accentDeep); }
-        else { g.addColorStop(0, sage); g.addColorStop(1, sageDeep); }
-        ctx.fillStyle = g;
-        roundedTopBar(cx - barW / 2, y, barW, barH, 5);
-        ctx.fill();
-      } else {
-        // 没学习的日子画一条浅色基线
-        ctx.fillStyle = gridColor;
-        roundedTopBar(cx - barW / 2, chartBottom - 3, barW, 3, 1.5);
-        ctx.fill();
-      }
-      // 数值（0 不画，避免和基线挤在一起）
-      if (d.count > 0) drawText(d.count, cx, y - 8, 'bold 16px', d.isToday ? accent : sage);
-      // 星期（今天高亮）
-      drawText(d.label, cx, cssH - 22, '14px', d.isToday ? accent : textTertiary);
-      // 日期（今天显示"今天"）
-      drawText(d.isToday ? '今天' : d.date, cx, cssH - 6, '13px', d.isToday ? accent : textColor);
+    // 每日数据列表：每行 = 星期/日期 + 进度条（长度按学习量占比）+ 词数
+    var html = '';
+    days.forEach(function(d) {
+      var pct = d.count > 0 ? Math.max(4, Math.round(d.count / maxCount * 100)) : 0;
+      var rowCls = 'week-row' + (d.isToday ? ' week-row-today' : '');
+      html += '<div class="' + rowCls + '">'
+        + '<div class="week-row-left"><span class="week-row-label">' + (d.isToday ? '今天' : d.label) + '</span>'
+        + '<span class="week-row-date">' + d.date + '</span></div>'
+        + '<div class="week-row-bar"><div class="week-row-fill" style="width:' + pct + '%"></div></div>'
+        + '<span class="week-row-count' + (d.isToday ? ' week-row-count-today' : '') + '">' + d.count + ' 词</span>'
+        + '</div>';
     });
+    listEl.innerHTML = html;
 
-    // 空状态提示
-    if (total === 0) {
-      drawText('本周还没有学习记录，去背几个单词吧', cssW / 2, (chartTop + chartBottom) / 2, '16px', textTertiary);
-    }
+    // 进度条主题色跟随当前主题变量
+    var style = listEl.ownerDocument.getElementById('week-days-list-theme');
+    if (style) style.textContent = ''
+      + '.week-row-fill{background:linear-gradient(90deg,' + sage + ',' + sage + 'cc);}'
+      + '.week-row-today .week-row-fill{background:linear-gradient(90deg,' + accent + ',' + accent + 'cc);}'
+      + '.week-row-count-today{color:' + accent + ';}';
   };
   return ChartModule;
 })();
