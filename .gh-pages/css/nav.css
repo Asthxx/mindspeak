@@ -1,0 +1,243 @@
+/* ==================== 导航分组（任务三） ==================== */
+/* 侧边栏按 首页 / 学习 / 训练 / 成长 / 工具 / AI助手 / 设置 分区，支持折叠 */
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+/* 分组标题 */
+.nav-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--sidebar-text);
+  opacity: 0.55;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-normal) var(--ease);
+}
+.nav-group-title:hover {
+  opacity: 0.9;
+  background: var(--sidebar-hover);
+}
+.nav-group-title .icon {
+  width: 16px;
+  height: 16px;
+}
+.nav-chevron {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  opacity: 0.8;
+  transition: transform var(--duration-normal) var(--ease);
+}
+/* 折叠态：收起成员 + 旋转箭头 */
+.nav-group.collapsed .nav-btn { display: none; }
+.nav-group.collapsed .nav-chevron { transform: rotate(-90deg); }
+.nav-group.collapsed .nav-group-title { opacity: 0.8; }
+
+/* 分组 / 独立按钮之间的分隔 */
+.sidebar > .nav-group + .nav-group,
+.sidebar > .nav-group + .nav-btn,
+.sidebar > .nav-btn + .nav-group {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 移动端（图标栏）：隐藏分组标题，强制展开所有成员 */
+@media (max-width: 768px) {
+  .nav-group-title { display: none; }
+  .nav-group.collapsed .nav-btn { display: flex; }
+  .sidebar > .nav-group + .nav-group,
+  .sidebar > .nav-group + .nav-btn,
+  .sidebar > .nav-btn + .nav-group {
+    margin-top: 0;
+    padding-top: var(--sp-3);
+    border-top: none;
+  }
+}
+
+/* ==================== AI 助手页（page-ai） ==================== */
+#page-ai .ai-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--sage-deep), var(--sage-muted));
+  color: #fff;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 16px;
+}
+#page-ai .ai-hero h2 {
+  margin: 0 0 2px;
+  font-size: 1.3rem;
+  color: #fff;
+}
+#page-ai .ai-hero p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--text-sm);
+}
+.ai-hero-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ai-hero-icon svg { width: 24px; height: 24px; }
+#page-ai .ai-hero .btn { margin-left: auto; flex-shrink: 0; }
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.ai-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-xs);
+}
+.ai-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: var(--weight-semibold);
+}
+
+/* 学习概况 */
+.ai-ov-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.ai-ov-item {
+  background: var(--surface-hover);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ai-ov-num {
+  font-size: 1.3rem;
+  font-weight: var(--weight-bold);
+  color: var(--sage-deep);
+  line-height: 1.2;
+}
+.ai-ov-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* 能力诊断（按错题来源的横向条形） */
+.ai-weak { display: flex; flex-direction: column; gap: 10px; }
+.ai-weak-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  padding: 8px 0;
+}
+.ai-weak-row { display: flex; flex-direction: column; gap: 4px; }
+.ai-weak-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.ai-weak-head b { color: var(--text); font-weight: var(--weight-semibold); }
+.ai-weak-bar {
+  height: 8px;
+  background: var(--surface-hover);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.ai-weak-fill {
+  height: 100%;
+  background: var(--coral);
+  border-radius: var(--radius-full);
+  transition: width var(--duration-normal) var(--ease-out);
+}
+
+/* AI 建议 */
+.ai-tips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ai-tips li {
+  display: flex;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-base);
+  line-height: 1.6;
+}
+.ai-tips li::before {
+  content: '•';
+  color: var(--sage);
+  font-weight: var(--weight-bold);
+}
+
+/* 今日行动 */
+.ai-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.ai-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease);
+}
+.ai-action-btn:hover {
+  background: var(--sage-light);
+  border-color: var(--sage);
+  color: var(--sage-deep);
+}
+.ai-action-btn .icon { width: 16px; height: 16px; color: var(--sage); }
+
+/* AI 页移动端适配 */
+@media (max-width: 900px) {
+  .ai-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .ai-actions { grid-template-columns: 1fr; }
+}
