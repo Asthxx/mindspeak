@@ -136,6 +136,7 @@ jobs:
                   <item name="android:windowDrawsSystemBarBackgrounds">true</item>
               </style>
               <style name="AppTheme.NoActionBar" parent="AppTheme"/>
+              <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar"/>
           </resources>
           EOF
           # 允许明文流量（本地 http / file 资源加载声音）
