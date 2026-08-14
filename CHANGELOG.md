@@ -12,6 +12,23 @@
 
 ---
 
+## [1.1.1] - 2026-08-14
+
+### 新增
+- **iOS / Android 平台区分**：检测手机系统（`platform-ios` / `platform-android`），分别适配安全区、触控、沉浸式、底部导航高度（iOS 58px / Android 62px）；
+- **Releases 资产平台标注**：安装包文件名明确区分平台（`MindSpeak-Android-*.apk` / Windows NSIS `.exe` / macOS `.dmg`），桌面版打 tag 时自动发布到 Release。
+
+### 修复
+- **手机端图标不显示**：SVG `<use>` 补 `xlink:href` 兜底、sprite 改用 0 尺寸隐藏，兼容旧 Android WebView / 部分 Tauri WebView；
+- **在线版（GitHub Pages）未同步**：gh-pages 分支更新至最新构建。
+
+### 优化
+- 触控目标统一 ≥44px（按钮/下拉框/图标按钮），拇指更易点；
+- 底部导航选中态胶囊高亮（含暗色模式）；
+- README 明确说明 iOS 无安装包、请用 PWA 在线版。
+
+---
+
 ## [1.1.0] - 2026-08-12
 
 ### 新增
