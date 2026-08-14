@@ -1090,6 +1090,10 @@ _markOnlineBroken: function() {
     // 并行抢播源集合：首选源（用户选的音色）+ 国内直连兜底（百度/有道美音），
     // 最多 3 个同时发起（并发过多会触发百度/有道反爬返回空 HTML），谁先出声用谁。
     var pickSrcs = function() {
+      // 快跳过：本块当前的 src 已在健康表里（连续失败过），直接推进到下一个候选，
+      // 避免"选一个已知失败的源再等 3.2s 超时"——真机全部源被墙时几十秒才报错，
+      // 表现成"点击后完全没声音也没提示"。
+      while (src < SRC_COUNT && self._srcHealth && (self._srcHealth[order[src].id] || 0) >= 2) src++;
       var first = order[src] || order[0];
       var ids = [first.id];
       var fb = ['baidu', 'youdao_us', 'youdao_uk'];
@@ -1102,7 +1106,9 @@ _markOnlineBroken: function() {
           if (SRC_ALL[aj2].id === ids[oi2]) { out.push(SRC_ALL[aj2]); break; }
         }
       }
-      return out.length ? out : [order[0]];
+      // 所有候选源都已在健康失败表（本会话全源不可达）→ 返回空，调用方立即判失败，
+      // 不再 fallback 回已失败的 order[0] 造成"每源 3.2s 串行空等"。
+      return out.length ? out : [];
     };
     var playChunk = function() {
       if (seq !== self._waSeq || done) return;
@@ -1127,6 +1133,13 @@ _markOnlineBroken: function() {
         self._deviceFail(opts); return;
       }
       var srcs = pickSrcs();
+      // 没有可用源（本会话所有源都失败过）：不空等，直接判该块失败
+      if (!srcs.length) {
+        self._diag('remote-no-src', 'chunk=' + ci);
+        src++;
+        playChunk();
+        return;
+      }
       // 块级兜底窗口：并行源里没有一个在 3.2s 内出声（全部连不上/被墙挂起）→ 判该块失败。
       // 相比旧的"每源 8s 串行换源"，手机网络下首选源不可达时不再干等，最多 ~3s 就换块/降级。
       var win = null, resolved = false;
@@ -1186,12 +1199,23 @@ _markOnlineBroken: function() {
             // 单个源失败不立即换源：并行其它源可能正在出声，交给块级窗口兜底
           };
           var pr;
-          try { pr = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!resolved) markSrcFail(srcObj.id); }
-          if (pr && pr.catch) pr.catch(function(e) {
-            self._diag('remote-play-rej', e && e.name ? e.name : String(e));
-            if (e && e.name === 'AbortError') return;
-            if (!resolved) markSrcFail(srcObj.id);
-          });
+          var attemptPlay = function(retries) {
+            var p;
+            try { p = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!resolved) markSrcFail(srcObj.id); return; }
+            if (p && p.catch) p.catch(function(e) {
+              self._diag('remote-play-rej', e && e.name ? e.name : String(e));
+              // 自动播放策略拒绝（NotAllowedError）：Android WebView 首次远程播放常被拦，
+              // 解锁后重试通常可过。重试 ≤2 次，间隔 250ms，仍失败才按源失败处理。
+              if (e && e.name === 'NotAllowedError' && retries > 0 && !resolved) {
+                try { self._unlockAudio(); } catch(_e) {}
+                setTimeout(function() { if (!resolved) attemptPlay(retries - 1); }, 250);
+                return;
+              }
+              if (e && e.name === 'AbortError') return;
+              if (!resolved) markSrcFail(srcObj.id);
+            });
+          };
+          attemptPlay(2);
         })(srcs[si]);
       }
     };
@@ -5647,8 +5671,13 @@ function fillVoiceOptions() {
         { v: '__online_google_in__', label: '谷歌·印度口音（需网络）' }
       ];
       var html = '<option value="">系统默认（自动选本地语音）</option>';
-      html += '<option value="__local_david__">本地男声（David · 离线 SAPI，需 server 运行）</option>';
-      html += '<option value="__local_zira__">本地女声（Zira · 离线 SAPI，需 server 运行）</option>';
+      // Android 打包版无本地 server：本地男女声（David/Zira）依赖 Windows server 的 SAPI
+      // 合成，手机上选了也不会响（会走远程兜底）。标注"需电脑"，避免误导用户。
+      var isAndroid = false;
+      try { isAndroid = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase()); } catch(e) {}
+      var localHint = isAndroid ? '（手机版不可用，需电脑 + server 运行）' : '（离线 SAPI，需 server 运行）';
+      html += '<option value="__local_david__">本地男声（David · ' + localHint + '</option>';
+      html += '<option value="__local_zira__">本地女声（Zira · ' + localHint + '</option>';
       for (var vi2 = 0; vi2 < ONLINE_STATIC.length; vi2++) {
         html += '<option value="' + ONLINE_STATIC[vi2].v + '">' + onlineStaticLabel(ONLINE_STATIC[vi2].v, ONLINE_STATIC[vi2].label) + '</option>';
       }
