@@ -1183,6 +1183,24 @@ _markOnlineBroken: function() {
             self._pendingAudio = [];
           markSrcOk(srcObj.id);
             if (!fireStartFired) { fireStartFired = true; fireStart(); }
+            // 空/损坏音频判定：部分源（如百度 gettts 在安卓 WebView 被 Referer 拒）会返回
+            // 空 MP3 或空 HTML，<audio> 能 onplay 但极短时间（<400ms）就 ended 且没真实声音。
+            // 此时若把它当"成功"，会停掉并行发起的其他可用源（有道等）→ 表现成"选了这个
+            // 音色没声音"。判定为空音频 → 释放胜者状态，立即用下一个可用源兜底出声。
+            var claimAt = Date.now();
+            setTimeout(function() {
+              if (seq !== self._waSeq || done) return;
+              if (win === audio && (audio.ended || audio.currentTime === 0) && (Date.now() - claimAt) < 400) {
+                self._diag('remote-empty', 'chunk=' + ci + ' src=' + srcObj.id + ' (空/损坏音频，换源)');
+                resolved = false;
+                win = null;
+                if (self._localAudio === audio) self._localAudio = null;
+                try { audio.pause(); audio.src = ''; } catch(e) {}
+                markSrcFail(srcObj.id);
+                src++;
+                playChunk();
+              }
+            }, 400);
           };
           audio.oncanplaythrough = function() { if (!resolved) { try { audio.play(); } catch(e) {} } };
           audio.onplay = claim;
