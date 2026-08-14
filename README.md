@@ -17,17 +17,29 @@
 
 <div align="center">
 
-[![下载 APK](https://img.shields.io/badge/⬇️_下载最新版_APK_v1.1.0-brightgreen?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Asthxx/mindspeak/releases/download/v1.1.0/app-release.apk)
+[![下载 APK](https://img.shields.io/badge/⬇️_下载最新版_APK_v1.1.1-brightgreen?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Asthxx/mindspeak/releases/download/v1.1.1/MindSpeak-Android-v1.1.1.apk)
 
 [![查看全部版本](https://img.shields.io/badge/查看全部版本-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Asthxx/mindspeak/releases)
 
 </div>
 
-1. 点击上方绿色按钮下载 `app-release.apk` 到手机；
+1. 点击上方绿色按钮下载 `MindSpeak-Android-v1.1.1.apk` 到手机；
 2. 打开文件安装（首次需在手机设置中允许「安装未知来源应用」）；
 3. 安装完成，打开「闻道 MindSpeak」即可开始背词学习。
 
 > 每次发布版本时在 GitHub 创建 `v1.x.x` 标签，Actions 会自动把 APK 挂到 Releases 页面。也可以到仓库 **Actions → 打包安卓安装包 APK → Run workflow** 手动触发打包，完成后在 **Artifacts** 下载。
+
+### 💻 Windows / macOS（桌面）→ 下载桌面安装包
+
+桌面安装包在 **[Releases 页面](https://github.com/Asthxx/mindspeak/releases)**，文件名为 `MindSpeak-Windows-*.exe`（Windows）或 `MindSpeak-macOS-*.dmg`（macOS），请按文件名认准平台下载。
+
+| 文件名前缀 | 平台 | 说明 |
+|---|---|---|
+| `MindSpeak-Android-*.apk` | 🤖 安卓 | 手机安装包 |
+| `MindSpeak-Windows-*.exe` | 🖥️ Windows | 桌面安装包（NSIS 安装向导） |
+| `MindSpeak-macOS-*.dmg` | 🍏 macOS | 桌面安装包（Apple Silicon） |
+
+> 若在 Releases 页面看到 `MindSpeak_1.x.x_*` 旧命名文件，请忽略，以下载 `MindSpeak-平台-版本` 命名的新文件为准。
 
 ### 🍎 iOS（苹果）→ 无安装包，请用 PWA 在线版
 
