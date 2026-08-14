@@ -12,6 +12,19 @@
 
 ---
 
+## [1.0.0] - 2026-08-14
+
+### 新增
+- **正式版第一版发布**：全新起步版本号 v1.0.0，清理历史预览版（v1.1.0 / v1.1.1 / v1.1.2）的 Releases 与标签，统一以 v1.0.0 作为唯一正式版本分发（安卓 APK / Windows exe / macOS dmg）。
+
+### 修复
+- **安卓 APK 全部没声音**：WebView 默认"必须用户手势后才允许播放音频"导致 TTS/字母发音全无声。原生 `MainActivity` 关闭 `setMediaPlaybackRequiresUserGesture(false)`、请求音频焦点、允许 file/http 资源访问；JS 端 Android 首触时预加载语音列表（`getVoices()` + voiceschanged）并静音预热，激活系统语音通道。
+- **安卓顶部"一条杠"**（系统状态栏/ActionBar 可见）：覆盖沉浸式全屏主题（`Theme.AppCompat.Light.NoActionBar` + `windowFullscreen` + 状态栏/导航栏透明）+ `onWindowFocusChanged` 沉浸模式，消除顶部系统栏。
+- **APK 桌面图标异常观感**：确认 launcher 图标由品牌 icon-512 正确生成（48-192px 全尺寸校验一致）；重装 v1.0.0 后桌面图标即为品牌图标。
+- **APK 部分机型显示成桌面版**（宽视口）：三层通用兜底（viewport 加固 + JS 视口自检 + forced-mobile CSS）+ WebView 原生关闭宽视口。
+
+---
+
 ## [1.1.2] - 2026-08-14
 
 ### 修复

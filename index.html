@@ -97,6 +97,27 @@
     var html=document.documentElement;
     if(isIOS){html.classList.add('platform-ios');html.setAttribute('data-platform','ios');}
     else if(isAndroid){html.classList.add('platform-android');html.setAttribute('data-platform','android');}
+    // Android WebView 声音预热：Android 的 speechSynthesis 必须"加载语音列表"才可出声
+    //（getVoices 首次返回空，要等 voiceschanged），且首次点击会激活音频输出通道。
+    // 这里提前注册一次 voiceschanged + 首次手势触发一次加载，保证后续 TTS 立即有声。
+    if (isAndroid && 'speechSynthesis' in window) {
+      var _warm = function() {
+        try {
+          var v = window.speechSynthesis.getVoices() || [];
+          if (v && v.length) {
+            document.removeEventListener('touchstart', _warm, true);
+            document.removeEventListener('click', _warm, true);
+            try { window.speechSynthesis.cancel(); } catch(e) {}
+            var u = new SpeechSynthesisUtterance(' ');
+            u.volume = 0; u.rate = 0.5;
+            try { window.speechSynthesis.speak(u); } catch(e) {}
+          }
+        } catch(e) {}
+      };
+      document.addEventListener('touchstart', _warm, true);
+      document.addEventListener('click', _warm, true);
+      try { window.speechSynthesis.getVoices(); } catch(e) {}
+    }
   })();
   </script>
     <!-- SVG Icon Sprite（兼容 WebView：用 0 尺寸 + aria-hidden 而非 display:none，保证 <use> 引用可渲染） -->
