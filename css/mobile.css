@@ -120,22 +120,28 @@
     border:none;background:none;cursor:pointer;
     color:var(--text-tertiary);
     font-family:var(--font);font-size:0.68rem;font-weight:500;
-    transition:color var(--duration-normal) var(--ease);
+    transition:color var(--duration-normal) var(--ease),background var(--duration-normal) var(--ease);
     -webkit-tap-highlight-color:transparent;
   }
   .bottom-nav-btn .icon{width:22px;height:22px}
-  .bottom-nav-btn.active{color:var(--sage-deep)}
+  /* 选中态：浅色胶囊背景 + 主色图标 + 字号微增，iOS/Android 原生式导航反馈 */
+  .bottom-nav-btn.active{
+    color:var(--sage-deep);
+    background:var(--sage-surface);
+  }
+  .bottom-nav-btn.active .icon{color:var(--sage-deep)}
   .bottom-nav-btn:active{opacity:0.7}
   h2{font-size:1.15rem;margin-bottom:var(--sp-4)}
   h3{font-size:1rem}
 
   /* ================= 首页 控制面板 ================= */
   .dash-greeting{flex-direction:column;align-items:stretch;gap:var(--sp-3)}
-  .dash-greeting .btn{width:100%}
-  .dash-stat-card{padding:12px 14px;gap:10px}
-  .dash-stat-num{font-size:1.2rem}
-  .dash-stat-label{font-size:0.7rem}
-  .dash-card{padding:14px 14px}
+  .dash-greeting .btn{width:100%;min-height:48px}
+  .dash-stat-card{padding:14px 14px;gap:10px;border-radius:var(--radius-lg)}
+  .dash-stat-icon{width:40px;height:40px;border-radius:12px}
+  .dash-stat-num{font-size:1.35rem}
+  .dash-stat-label{font-size:0.7rem;line-height:1.4}
+  .dash-card{padding:16px 16px;border-radius:var(--radius-xl)}
 
   /* ================= 学习卡片 ================= */
   .card-area{max-width:100%;padding:0 var(--sp-1)}
@@ -323,6 +329,19 @@
   .sidebar.open .nav-btn:focus-visible,
   .btn-menu:focus-visible,.nav-group-title:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
 
+  /* 触控目标统一 ≥44px（iOS HIG / Android Material 建议）：
+     主按钮、小按钮、图标按钮、下拉框、开关均放大到拇指可点 */
+  .content .btn,.content .btn-sm,.content .btn-primary,.content .btn-accent,.content .btn-ghost,
+  .content .btn-lg,.content .btn-icon,.content .view-btn,.content .filter-btn,
+  .content .collapse-toggle,.content select,.content .nav-arrow{
+    min-height:44px;
+  }
+  .content .btn-sm{padding:12px 16px}
+  .content .btn-icon{width:44px;height:44px}
+  /* 主 CTA（开始学习等）加大 */
+  .content .btn-primary{padding:14px 24px}
+  .content .btn-lg{padding:14px 28px}
+
   /* 弹窗内文本与按钮不因字号放大而溢出 */
   .modal-content,.modal-content *{max-width:100%}
   .modal-content table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -390,6 +409,9 @@
   .nav-btn{color:var(--sidebar-text)}
   .nav-btn:hover{background:var(--sidebar-hover)}
   .nav-btn.active{background:var(--sidebar-active)}
+  .bottom-nav{background:rgba(20,26,34,0.92);border-top-color:var(--border)}
+  .bottom-nav-btn.active{background:var(--sage-surface);color:var(--sage-deep)}
+  .bottom-nav-btn.active .icon{color:var(--sage-deep)}
   .content{background:linear-gradient(180deg,var(--ivory) 0%,var(--ivory-deep) 100%)}
   select,input[type="text"],input[type="number"]{background:var(--ivory-card);border-color:var(--border);color:var(--text)}
   .mistake-item,.fav-item,.stat-card,.report-card{background:var(--ivory-card);border-color:var(--border)}
