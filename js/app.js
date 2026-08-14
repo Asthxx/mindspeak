@@ -1064,7 +1064,10 @@ _markOnlineBroken: function() {
       '__online_google_au__': 'google_au',
       '__online_google_in__': 'google_in'
     };
-    var DEFAULT_ORDER = ['baidu', 'youdao_us', 'youdao_uk', 'google_us', 'google_uk', 'google_au', 'google_in'];
+    // 默认兜底顺序：有道优先（国内直连稳定，用户实测可达）。
+    // 百度 gettts 有 Referer 校验（安卓 WebView 里 no-referrer 常失效 → 返回错误码 4 空音频），
+    // 谷歌源墙内不可达。故系统默认/本地声音/未匹配音色的兜底顺序为：有道美音 → 有道英音 → 百度 → 谷歌系。
+    var DEFAULT_ORDER = ['youdao_us', 'youdao_uk', 'baidu', 'google_us', 'google_uk', 'google_au', 'google_in'];
     var vn = '';
     try { if (self.getSettings) vn = self.getSettings().voiceName || ''; } catch(e) {}
     var firstId = VOICE_FIRST[vn] || '';
@@ -1096,7 +1099,7 @@ _markOnlineBroken: function() {
       while (src < SRC_COUNT && self._srcHealth && (self._srcHealth[order[src].id] || 0) >= 2) src++;
       var first = order[src] || order[0];
       var ids = [first.id];
-      var fb = ['baidu', 'youdao_us', 'youdao_uk'];
+      var fb = ['youdao_us', 'youdao_uk', 'baidu'];
       for (var fi = 0; fi < fb.length; fi++) {
         if (ids.indexOf(fb[fi]) === -1 && !(self._srcHealth && (self._srcHealth[fb[fi]] || 0) >= 2)) ids.push(fb[fi]);
       }
