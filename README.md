@@ -7,7 +7,11 @@
 
 ---
 
-## 📲 立即下载安卓 App（APK）
+## 📲 手机端安装方式（请按系统选择）
+
+> **重要说明**：本软件在手机端有两种形态——**安卓有独立安装包（APK）**，**iOS 没有安装包（受苹果政策限制，只能使用在线 PWA 版）**。请先看清你的手机系统再选择，避免误以为 iOS 少了东西。
+
+### 🤖 安卓（Android）→ 下载 APK 安装包
 
 > **免费 · 免注册 · 离线可用**，安装到手机即可开启学习之旅。
 
@@ -19,20 +23,31 @@
 
 </div>
 
-### 安装方法
-
 1. 点击上方绿色按钮下载 `app-release.apk` 到手机；
 2. 打开文件安装（首次需在手机设置中允许「安装未知来源应用」）；
 3. 安装完成，打开「闻道 MindSpeak」即可开始背词学习。
 
-### 其他方式
+> 每次发布版本时在 GitHub 创建 `v1.x.x` 标签，Actions 会自动把 APK 挂到 Releases 页面。也可以到仓库 **Actions → 打包安卓安装包 APK → Run workflow** 手动触发打包，完成后在 **Artifacts** 下载。
+
+### 🍎 iOS（苹果）→ 无安装包，请用 PWA 在线版
+
+> iOS **无法下载 APK**（苹果不允许侧载应用），因此没有 iOS 安装包。请在 **Safari** 中使用 **PWA 在线版**，功能与 APK 完全一致，可"添加到主屏幕"获得接近 App 的体验（全屏、离线缓存、应用图标）。
+
+**iOS 添加到主屏幕步骤**：
+
+1. 用 **Safari** 打开 [https://asthxx.github.io/mindspeak/](https://asthxx.github.io/mindspeak/)
+2. 点击底部 **分享** 按钮（方框+箭头图标）；
+3. 选择 **「添加到主屏幕」**；
+4. 桌面出现「闻道 MindSpeak」图标，点击即可全屏使用。
+
+> 首次打开请等待页面完全加载（离线缓存建立），之后断网也能用。
+
+### 🌐 通用（任意系统）→ 在线版
 
 | 渠道 | 说明 |
 |---|---|
-| **在线版（无需安装）** | [打开 GitHub Pages 在线版](https://asthxx.github.io/mindspeak/)（PWA，可"添加到主屏幕"当 App 用，覆盖全部功能） |
-| 手动触发打包 | 仓库 **Actions → 打包安卓安装包 APK → Run workflow**，跑完到 **Artifacts** 下载  |
-
-> 每次发布版本时在 GitHub 创建 `v1.x.x` 标签，Actions 会自动把 APK 挂到 Releases 页面。
+| **在线版（无需安装）** | [打开 GitHub Pages 在线版](https://asthxx.github.io/mindspeak/)（PWA，覆盖全部功能） |
+| 桌面版（Windows / macOS） | 见下方「快速开始」章节，支持本地服务完整发音 |
 
 ---
 
