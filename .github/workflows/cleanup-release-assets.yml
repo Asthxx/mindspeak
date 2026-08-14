@@ -1,0 +1,33 @@
+name: 清理旧版发布资产
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: 清理旧命名资产（保留新平台命名）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # 列出所有 Release，删除旧命名资产（不含 "MindSpeak-Android/Windows/macOS-v" 前缀的新文件）
+          for tag in $(gh release list --limit 10 --json tagName -q '.[].tagName'); do
+            echo "== Release: $tag =="
+            # 获取该 release 的所有资产，删除旧命名（MindSpeak_1.x.x 开头 或 app-release.apk）
+            gh release view "$tag" --json assets -q '.assets[].name' | while read -r name; do
+              case "$name" in
+                MindSpeak_1.*|app-release.apk|*.msi)
+                  echo "  删除旧资产: $name"
+                  gh release delete-asset "$tag" "$name" -y
+                  ;;
+                *)
+                  echo "  保留: $name"
+                  ;;
+              esac
+            done
+          done
+          echo "=== 清理完成 ==="
