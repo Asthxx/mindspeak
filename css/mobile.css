@@ -441,3 +441,74 @@
 .content::-webkit-scrollbar{width:0}
 .sidebar::-webkit-scrollbar{width:0}
 @media print{.sidebar,.app-header,.btn,.modal{display:none!important}.content{margin:0;padding:0}}
+
+/* ============================================================
+   平台专属适配（js/app.js App.detectPlatform 给 <html> 加 platform-ios / platform-android）
+   ============================================================ */
+
+/* ---------- iOS（Safari / WKWebView） ---------- */
+html.platform-ios{
+  /* 禁长按弹出系统菜单（复制/保存图片/打开链接），App 更沉浸 */
+  -webkit-touch-callout:none;
+}
+html.platform-ios body{
+  /* iOS 键盘弹起时视口收缩为可用高度，保证输入框不被键盘遮挡 */
+  height:100dvh;
+  min-height:-webkit-fill-available;
+}
+/* iOS 滚动容器带回弹惯性，列表手感更原生 */
+html.platform-ios .content,
+html.platform-ios .sidebar,
+html.platform-ios .modal-content,
+html.platform-ios .ai-chat-msgs,
+html.platform-ios .ai-chat-chips{
+  -webkit-overflow-scrolling:touch;
+}
+/* iOS 底部 home indicator（横条）区域更精细：底部导航高度微调 */
+html.platform-ios .bottom-nav{
+  height:calc(58px + env(safe-area-inset-bottom,0px));
+}
+/* iOS 顶部状态栏偏置：刘海屏安全区留白 */
+html.platform-ios .app-header{
+  padding-top:env(safe-area-inset-top,0px);
+}
+/* iOS 下长按单词卡/卡片不触发文本选择，避免误选中 */
+html.platform-ios .word-card,
+html.platform-ios .dash-card,
+html.platform-ios .stat-card,
+html.platform-ios .fav-item{
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+}
+/* iOS 输入框：字号≥16 防聚焦缩放 + 无圆角阴影干扰 */
+html.platform-ios input,html.platform-ios select,html.platform-ios textarea{
+  border-radius:var(--radius-md);
+}
+
+/* ---------- Android（Chrome / WebView） ---------- */
+html.platform-android body{
+  /* Android 地址栏/底部导航栏会动态伸缩视口，用 dvh 跟随 */
+  height:100dvh;
+  min-height:100dvh;
+}
+/* Android 沉浸式：顶栏贴状态栏，系统状态栏用主题色 */
+html.platform-android .app-header{
+  padding-top:0;
+}
+/* Android 手势条区：底部导航加一点留白避免与手势条重叠 */
+html.platform-android .bottom-nav{
+  height:calc(62px + env(safe-area-inset-bottom,0px));
+  padding-bottom:max(env(safe-area-inset-bottom,0px),4px);
+}
+/* Android 键盘弹出：输入聚焦时内容区不跳动，固定定位元素自动上移 */
+html.platform-android .content{
+  overscroll-behavior-y:contain;
+}
+/* Android 下拉滚动时隐藏地址栏，全屏沉浸 */
+html.platform-android{
+  -webkit-tap-highlight-color:transparent;
+}
+/* Android 部分 WebView 不支持 backdrop-filter：给底部导航一个实体底 */
+@supports not ((-webkit-backdrop-filter:blur(20px)) or (backdrop-filter:blur(20px))){
+  html.platform-android .bottom-nav{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+}

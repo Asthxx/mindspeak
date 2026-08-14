@@ -62,6 +62,18 @@
   <script src="js/api-config.js?v=20260810-2"></script>
 </head>
 <body>
+  <script>
+  // 平台检测（首帧前执行）：iOS / Android 分别加 class，供 CSS 针对性适配。
+  // 与 js/app.js App.detectPlatform 一致；此处提前执行避免 platform CSS 延迟生效闪屏。
+  (function(){
+    var ua=(navigator.userAgent||'').toLowerCase();
+    var isIOS=/iphone|ipad|ipod/.test(ua)||(/macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+    var isAndroid=/android/.test(ua);
+    var html=document.documentElement;
+    if(isIOS){html.classList.add('platform-ios');html.setAttribute('data-platform','ios');}
+    else if(isAndroid){html.classList.add('platform-android');html.setAttribute('data-platform','android');}
+  })();
+  </script>
     <!-- SVG Icon Sprite（兼容 WebView：用 0 尺寸 + aria-hidden 而非 display:none，保证 <use> 引用可渲染） -->
   <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
     <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>

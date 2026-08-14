@@ -5178,11 +5178,28 @@ function App() {
   this.aiChatModule = init('AiChatModule', function() { return new AiChatModule(); });
   this.assessmentModule = init('AssessmentModule', function() { return new AssessmentModule(); });
   this.onboardingModule = init('OnboardingModule', function() { return new OnboardingModule(); });
+  App.detectPlatform();
   this.initNav();
   this.currentTab = 'home';
   this.updateGlobalStats();
   this.bindSettings();
 }
+App.detectPlatform = function() {
+  var ua = (navigator.userAgent || '').toLowerCase();
+  var html = document.documentElement;
+  var isIOS = /iphone|ipad|ipod/.test(ua) || (/macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  var isAndroid = /android/.test(ua);
+  html.classList.remove('platform-ios', 'platform-android');
+  if (isIOS) {
+    html.classList.add('platform-ios');
+    html.setAttribute('data-platform', 'ios');
+  } else if (isAndroid) {
+    html.classList.add('platform-android');
+    html.setAttribute('data-platform', 'android');
+  }
+  return isIOS ? 'ios' : isAndroid ? 'android' : 'desktop';
+};
+
 App.prototype.initNav = function() {
   var self = this;
   document.querySelectorAll('.nav-btn').forEach(function(btn) {
