@@ -778,6 +778,10 @@ var AssessmentModule = (function() {
     if (hist.length > 10) hist.length = 10;
     DataStore.setProgress('assessment_history', hist);
     DataStore.setProgress('assessment', res);
+    // P0-04 事件通知：测评完成（订阅方可刷新 AI 建议等）
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      window.EventBus.emit(window.MS.EVENTS.ASSESSMENT_COMPLETED, { score: res.score, level: res.level, date: res.date });
+    }
     this._route('result', res);
     if (this._onComplete) { var cb = this._onComplete; this._onComplete = null; cb(res); }
   };

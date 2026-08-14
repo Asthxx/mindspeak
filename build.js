@@ -9,8 +9,10 @@ const DIST = path.join(SRC, 'dist');
 require('./merge-data.js').mergeData();
 
 const jsOrder = [
-  'js/api-config.js', // 后端地址统一配置（window.API_BASE）必须先加载
   'js/logger.js', // 前端错误日志必须最先加载：捕获其他所有脚本的错误
+  'js/core/errors.js', // 统一错误处理（依赖 logger 的 window.Log）
+  'js/core/events.js', // EventBus 事件总线（模块解耦）
+  'js/core/store.js', // UserState 统一状态访问层（含幂等 migration）
   'js/tts-manager.js', // 全局统一 TTS 服务必须最先加载（其他文件都依赖 window.TTSManager）
   'js/app.js',
   'js/badges.js',
@@ -114,7 +116,9 @@ async function build() {
 
   // ---- 1. index.html 复制并更新路径 ----
   let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
-  html = html.replace(/<script src="js\/[^"]+\.js(?:\?[^"']*)?"><\/script>\s*/gi, '');
+  // 移除 body 末尾所有业务 script 标签、收敛为 bundle.js；但保留 head 中独立加载的
+  // js/api-config.js（API 配置必须在任何逻辑执行前就位，且不参与混淆）。
+  html = html.replace(/<script src="js\/(?!api-config\.js)[^"]+\.js(?:\?[^"']*)?"><\/script>\s*/gi, '');
   // 全量源码 version 注入（版本分离）：dist/index.html 始终带当前 VERSION
   html = html.replace(/(<meta name="app-version" content=")[^"]*(")/i, '$1' + VER_TAG + '$2');
   const bStamp = buildStamp(BUILD_TIME);
@@ -122,6 +126,10 @@ async function build() {
     '<!-- MindSpeak dist 构建时间: ' + BUILD_TIME + ' 版本: ' + VER_TAG + ' -->\n<script src="js/bundle.js?v=' + bStamp + '"></script>\n</body>');
   fs.writeFileSync(path.join(DIST, 'index.html'), html, 'utf8');
   console.log('[ok] index.html -> dist/ (version: ' + VER_TAG + ')');
+
+  // ---- 1.5 api-config（独立加载不进 bundle）：head 已引用，保持真实路径即可被 SW/PWA 缓存 ----
+  copyFile(path.join(SRC, 'js', 'api-config.js'), path.join(DIST, 'js', 'api-config.js'));
+  console.log('[ok] js/api-config.js -> dist/js/（独立加载，不进 bundle）');
 
   // ---- 2. 复制 CSS ----
   const cssSrc = path.join(SRC, 'css');

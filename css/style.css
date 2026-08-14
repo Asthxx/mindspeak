@@ -203,6 +203,25 @@ h2{
   color:var(--sage-deep);
 }
 .btn-sm{padding:6px 12px;font-size:0.78rem}
+/* 日志弹窗头部幽灵按钮（原内联样式收敛，值保持逐字一致） */
+.log-act-btn{
+  padding:6px 14px;border:none;border-radius:6px;
+  background:rgba(255,255,255,0.18);color:#fff;
+  cursor:pointer;font-size:0.8rem;
+}
+.log-act-btn-strong{background:rgba(255,255,255,0.22)}
+/* 日志表格单元格（原内联样式收敛，值逐字一致；行背景/展开行 display 为动态值保持内联） */
+.log-row{cursor:pointer;border-top:1px solid #f0f3f1}
+.log-cell-time{padding:10px 14px;white-space:nowrap;color:#8a938e}
+.log-cell-lv{padding:10px 6px}
+.log-cell-tag{display:inline-block;padding:2px 9px;border-radius:10px;font-weight:700;font-size:0.72rem;min-width:38px;text-align:center}
+.log-cell-src{padding:10px 8px;color:#5a6560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-cell-mod{padding:10px 8px;color:#5a6560;word-break:break-all}
+.log-cell-msg{padding:10px 14px;word-break:break-all;line-height:1.6}
+.log-cell-detail{color:#3f7d5a;font-size:0.72rem;margin-left:10px}
+.log-cell-exp{padding:12px 14px 16px 14px;border-bottom:1px solid #eef1ef}
+.log-empty{padding:56px;text-align:center;color:#a2ab5}
+.log-detail-box{margin-top:6px;padding:8px 10px;background:#eef4f1;border-left:3px solid #3f7d5a;border-radius:4px;white-space:pre-wrap;word-break:break-all;line-height:1.55}
 .btn-danger{
   background:var(--danger-light);color:var(--danger);
   border-color:transparent;
@@ -1583,17 +1602,6 @@ h2{
   outline:none;border-color:var(--sage);
   box-shadow:0 0 0 3px var(--sage-surface);
 }
-
-/* ============ GAME TOAST ============ */
-.game-toast{
-  position:fixed;top:80px;right:20px;z-index:300;
-  background:linear-gradient(135deg,var(--sage),var(--sage-deep));
-  color:#fff;padding:14px 24px;border-radius:var(--r-lg);
-  font-weight:600;font-size:0.95rem;
-  box-shadow:0 8px 32px var(--shadow-sage);
-  transform:translateX(120%);transition:transform 0.3s var(--ease);
-}
-.game-toast.show{transform:translateX(0)}
 
 /* ============ POMODORO ============ */
 #page-pomodoro{

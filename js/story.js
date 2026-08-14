@@ -59,9 +59,11 @@ var StoryModule = (function() {
     var curIdx = window.app && window.app.wordModule ? window.app.wordModule.currentCategoryIndex : 0;
     var newToday = [], due = [], fresh = [];
     // 懒建「词库序号+单词 → 词对象」索引：后续新增/待复习词直接按 key 反查，
-    // 避免每次都完整遍历 12 万词库
-    if (!this._wIndex) {
-      var idx = {};
+    // 避免每次都完整遍历 12 万词库。idx 必须声明在函数作用域：首次调用时建好，
+    // 再次调用（换一批）直接复用 _wIndex，否则索引存在时 idx 为 undefined → 反查崩溃
+    var idx = this._wIndex;
+    if (!idx) {
+      idx = {};
       cats.forEach(function(c, ci) {
         if (!c || !c.words) return;
         c.words.forEach(function(w) { if (w && w.word) idx[ci + '\u0001' + String(w.word).toLowerCase()] = w; });

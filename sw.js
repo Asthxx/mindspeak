@@ -16,6 +16,7 @@ const APP_SHELL = [
   'css/ai-chat.css',
   'css/mobile.css',
   'js/bundle.js',
+  'js/api-config.js',
   'assets/favicon.svg',
   'pwa-manifest.json'
 ];

@@ -29,8 +29,8 @@ var TTSManager = (function() {
 
       let savedRate = '', savedPitch = '';
       try {
-        savedRate = localStorage.getItem('voice_rate');
-        savedPitch = localStorage.getItem('voice_pitch');
+        savedRate = window.UserState ? window.UserState.getRaw('voice_rate', '') : localStorage.getItem('voice_rate');
+        savedPitch = window.UserState ? window.UserState.getRaw('voice_pitch', '') : localStorage.getItem('voice_pitch');
       } catch (e) {}
       const r = parseFloat(savedRate || '');
       if (!isNaN(r)) this.rate = r;
@@ -71,9 +71,9 @@ var TTSManager = (function() {
     // 都没有则按优先级自动选（Microsoft → Google → en-US 女声 → voices[0]）。
     restoreVoice() {
       let saved = null;
-      try { saved = localStorage.getItem('tts_voice'); } catch (e) {}
-      if (!saved) { try { saved = localStorage.getItem('selectedVoice'); } catch (e) {} }
-      if (!saved) { try { saved = localStorage.getItem('voice_name'); } catch (e) {} }
+      try { saved = window.UserState ? window.UserState.getRaw('tts_voice', '') : localStorage.getItem('tts_voice'); } catch (e) {}
+      if (!saved) { try { saved = window.UserState ? window.UserState.getRaw('selectedVoice', '') : localStorage.getItem('selectedVoice'); } catch (e) {} }
+      if (!saved) { try { saved = window.UserState ? window.UserState.getRaw('voice_name', '') : localStorage.getItem('voice_name'); } catch (e) {} }
       if (saved && saved !== '__online_google__' && saved.indexOf('__online_') !== 0) {
         const v = this._pickByName(saved);
         if (v) { this.voice = v; return; }
@@ -89,7 +89,7 @@ var TTSManager = (function() {
       return null;
     }
 
-    // 自动选声优先级：Microsoft → Google → en-US 女声 → voices[0]
+    // 自动选声优先级：en-US 女声 → Microsoft → Google → voices[0]
     _autoPick() {
       if (!this.voices.length) return null;
       const en = [];
@@ -97,18 +97,18 @@ var TTSManager = (function() {
         if ((this.voices[i].lang || '').toLowerCase().indexOf('en') === 0) en.push(this.voices[i]);
       }
       const pool = en.length ? en : this.voices;
-      for (let j = 0; j < pool.length; j++) {
-        if ((pool[j].name || '').toLowerCase().indexOf('microsoft') !== -1) return pool[j];
-      }
-      for (let k = 0; k < pool.length; k++) {
-        if ((pool[k].name || '').toLowerCase().indexOf('google') !== -1) return pool[k];
-      }
       const FEMALE = ['aria','jenny','samantha','susan','hazel','zira','female','laura','linda','lisa','michelle','natasha','nicole','rachel','rebecca','sally','libby','priya','heather','hayley','sonia','joanna','kimberly','serena','tessa'];
       for (let m = 0; m < en.length; m++) {
         const n = (en[m].name || '').toLowerCase();
         if (/^en[-_]?us/i.test(String(en[m].lang || ''))) {
           for (let f = 0; f < FEMALE.length; f++) if (n.indexOf(FEMALE[f]) !== -1) return en[m];
         }
+      }
+      for (let j = 0; j < pool.length; j++) {
+        if ((pool[j].name || '').toLowerCase().indexOf('microsoft') !== -1) return pool[j];
+      }
+      for (let k = 0; k < pool.length; k++) {
+        if ((pool[k].name || '').toLowerCase().indexOf('google') !== -1) return pool[k];
       }
       return this.voices[0];
     }
@@ -121,8 +121,13 @@ var TTSManager = (function() {
       if (!name || (typeof name === 'string' && name.indexOf('__online_') === 0)) {
         this.voice = null;
         try {
-          localStorage.removeItem('tts_voice');
-          localStorage.removeItem('selectedVoice');
+          if (window.UserState) {
+            window.UserState.remove('tts_voice');
+            window.UserState.remove('selectedVoice');
+          } else {
+            localStorage.removeItem('tts_voice');
+            localStorage.removeItem('selectedVoice');
+          }
         } catch (e) {}
         console.log('[TTS] selected cleared:', name);
         return false;
@@ -131,8 +136,13 @@ var TTSManager = (function() {
       if (v) {
         this.voice = v;
         try {
-          localStorage.setItem('tts_voice', v.name);
-          localStorage.setItem('selectedVoice', v.name);
+          if (window.UserState) {
+            window.UserState.setRaw('tts_voice', v.name);
+            window.UserState.setRaw('selectedVoice', v.name);
+          } else {
+            localStorage.setItem('tts_voice', v.name);
+            localStorage.setItem('selectedVoice', v.name);
+          }
         } catch (e) {}
         console.log('[TTS] selected:', v.name, '| lang:', v.lang);
         return true;

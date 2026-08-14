@@ -1,3 +1,7 @@
+/* 桌面端隐藏底部导航（仅 ≤768px 由媒体查询显示）——此规则必须位于
+   下方 @media(max-width:768px) 之前，否则同优先级下靠后的 display:none 会误伤手机端 */
+.bottom-nav{display:none}
+
 /* AI English Growth Companion - Mobile Responsive (App级适配)
    适配目标：PWA / WebView 打包成手机软件——
    全屏沉浸、安全区(刘海/底部手势条)、动态视口(dvh)、
@@ -92,11 +96,36 @@
   .content{
     margin-left:0;margin-top:var(--header);
     padding:var(--sp-4) var(--sp-4);
-    padding-bottom:calc(var(--sp-6) + env(safe-area-inset-bottom,0px));
+    padding-bottom:calc(var(--sp-6) + 76px + env(safe-area-inset-bottom,0px));
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;
   }
+
+  /* ---- 移动端底部导航（App 级） ---- */
+  .bottom-nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:95;
+    display:flex;align-items:stretch;justify-content:space-around;
+    height:calc(60px + env(safe-area-inset-bottom,0px));
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    background:var(--surface);
+    border-top:1px solid var(--border);
+    box-shadow:0 -4px 16px rgba(0,0,0,0.06);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  }
+  .bottom-nav-btn{
+    flex:1;min-width:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;padding:6px 2px;
+    border:none;background:none;cursor:pointer;
+    color:var(--text-tertiary);
+    font-family:var(--font);font-size:0.68rem;font-weight:500;
+    transition:color var(--duration-normal) var(--ease);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .bottom-nav-btn .icon{width:22px;height:22px}
+  .bottom-nav-btn.active{color:var(--sage-deep)}
+  .bottom-nav-btn:active{opacity:0.7}
   h2{font-size:1.15rem;margin-bottom:var(--sp-4)}
   h3{font-size:1rem}
 
@@ -167,7 +196,9 @@
   /* ================= 艾宾浩斯 ================= */
   .ebbinghaus-plan{overflow-x:auto;padding:var(--sp-3) var(--sp-4);-webkit-overflow-scrolling:touch}
   .ebbinghaus-plan h3{font-size:0.85rem}
-  .plan-table{min-width:320px;font-size:0.8rem}
+  .plan-table{min-width:max(100%,280px);font-size:0.8rem}
+  .plan-table th,.plan-table td{padding:6px 6px}
+  .plan-table th,.plan-table td{white-space:nowrap}
   .calendar-grid{gap:2px}
   .cal-day{font-size:0.72rem;min-height:36px}
   .cal-day.has-data{min-height:36px}
@@ -200,6 +231,10 @@
   .view-btn{flex:1;padding:8px 6px;font-size:0.9rem}
   .wl-row{flex-wrap:wrap;gap:var(--sp-1);padding:var(--sp-2) var(--sp-3)}
   .wl-action .btn{padding:8px 12px;min-height:40px}
+  /* 列表分页栏：窄屏换行，避免“上一页/页码/下一页/跳页/跳转”挤爆一行 */
+  .word-list-pagination{flex-wrap:wrap;row-gap:var(--sp-2)}
+  .word-list-pagination .btn{min-height:40px;padding:8px 12px}
+  #wl-jump-input{min-width:0}
 
   /* ================= 道具店 ================= */
   .item-shop-grid,.theme-shop-grid{grid-template-columns:repeat(2,1fr);gap:var(--sp-3)}
@@ -259,6 +294,51 @@
   .settings-group input[type="number"]{font-size:1rem}
   .score-circle{width:100px;height:100px}
   .score-num{font-size:1.6rem}
+
+  /* ================= 移动端增强（仅 ≤768px，不影响桌面） ================= */
+  /* 全局防横向溢出兜底：图片/卡片/长单词不撑破屏幕 */
+  img{max-width:100%;height:auto}
+  .page,.page > *,.card-area,.word-card,.ai-chat-card,.dash-card,.stat-card{min-width:0;max-width:100%}
+  .content{overflow-x:hidden}
+  html,body{overflow-x:hidden}
+
+  /* 输入控件字号 ≥16px：避免 iOS Safari 聚焦自动放大页面 */
+  .content input[type="text"],.content input[type="number"],.content input[type="search"],
+  .content input[type="password"],.content input[type="email"],.content select,.content textarea{
+    font-size:16px;
+  }
+  /* 覆盖行内小号 input（跳转/页码等），聚焦不再触发 iOS 缩放 */
+  .content input[type="number"]{font-size:16px!important}
+
+  /* AI 对话：输入区字号 ≥16px + 底部安全区，键盘弹出不遮挡 */
+  .ai-chat-input-row input{font-size:16px}
+  .ai-chat-card{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .ai-chat-msgs{max-height:45dvh}
+  /* 快捷提问 Chips：横向滚动，不换行撑高，拇指可横向滑动 */
+  .ai-chat-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px;padding:2px;scrollbar-width:none}
+  .ai-chat-chips::-webkit-scrollbar{display:none}
+  .ai-chip{flex-shrink:0;white-space:nowrap;min-height:40px;display:inline-flex;align-items:center}
+
+  /* 抽屉/汉堡按钮：键盘可达时显示清晰焦点环 */
+  .sidebar.open .nav-btn:focus-visible,
+  .btn-menu:focus-visible,.nav-group-title:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+
+  /* 弹窗内文本与按钮不因字号放大而溢出 */
+  .modal-content,.modal-content *{max-width:100%}
+  .modal-content table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .modal-content img{max-width:100%}
+
+  /* 跟读/录音：按钮纵向排列，触控目标 ≥44px */
+  .speak-btn-area .btn,.btn-speak-record,.btn-speak-play{min-height:48px}
+
+  /* 搜索框：输入框允许收缩，避免按钮被挤爆（flex 子项缺 min-width:0） */
+  .search-box input{min-width:0}
+  /* 打卡日历：格子允许收缩到 0 基准，防止日期/徽标撑宽整行 */
+  .calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .analysis-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  /* 设置：下拉选择全宽换行，覆盖行内 min-width:260px 的 voice-select */
+  .settings-group select{width:100%;min-width:0;max-width:100%}
+  #voice-select{min-width:0!important}
 }
 
 @media (max-width:480px){
@@ -274,6 +354,12 @@
   .ob-goal-options{grid-template-columns:1fr}
   .story-toolbar .btn{flex:1;padding:10px 8px;font-size:0.82rem}
   .spelling-prompt .prompt-word{font-size:1.7rem}
+
+  /* 背单词：核心按钮换行排布，保证拇指点击区域 */
+  .word-actions{flex-wrap:wrap}
+  .word-actions .btn{flex:1 1 30%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .word-nav{flex-wrap:wrap;justify-content:center;row-gap:var(--sp-2)}
+  .word-nav .btn-sm,#word-progress{flex-shrink:0}
 }
 
 /* 安全区兜底：不支持 env() 的旧 Android WebView 也能正常显示 */

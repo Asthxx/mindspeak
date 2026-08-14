@@ -8,18 +8,6 @@ var BadgeSystem = (function() {
   function getProgress() { return DataStore.getProgress('word_progress', {}); }
   function getCheckins() { return DataStore.getProgress('checkins', {}); }
 
-  // 连续打卡天数（今天未打卡则从昨天起算，与 AnalysisModule 一致）
-  function computeStreak(checkins) {
-    var d = new Date();
-    if (!(checkins[today()] > 0)) d.setDate(d.getDate() - 1);
-    var streak = 0;
-    while (checkins[getLocalDateStr(d)] > 0 && streak < 3660) {
-      streak++;
-      d.setDate(d.getDate() - 1);
-    }
-    return streak;
-  }
-
   // 徽章配置：id / name / icon / desc / reward / check / progress
   var BADGES = [
     {
@@ -71,14 +59,14 @@ var BadgeSystem = (function() {
     {
       id: 'streak7', name: '七日坚持', icon: 'i-fire',
       desc: '连续打卡 7 天', reward: REWARD,
-      check: function() { return computeStreak(getCheckins()) >= 7; },
-      progress: function() { return { cur: computeStreak(getCheckins()), max: 7 }; }
+      check: function() { return calculateStreak(getCheckins()) >= 7; },
+      progress: function() { return { cur: calculateStreak(getCheckins()), max: 7 }; }
     },
     {
       id: 'streak30', name: '月度达人', icon: 'i-calendar',
       desc: '连续打卡 30 天', reward: REWARD,
-      check: function() { return computeStreak(getCheckins()) >= 30; },
-      progress: function() { return { cur: computeStreak(getCheckins()), max: 30 }; }
+      check: function() { return calculateStreak(getCheckins()) >= 30; },
+      progress: function() { return { cur: calculateStreak(getCheckins()), max: 30 }; }
     },
     {
       id: 'days30', name: '学海无涯', icon: 'i-chart',
@@ -198,6 +186,10 @@ var BadgeSystem = (function() {
         changed = true;
         if (window.app && window.app.gamification) {
           window.app.gamification.addPoints(b.reward);
+        }
+        // P0-04 事件通知：解锁成就（addPoints 内部已广播 POINTS_CHANGED）
+        if (window.EventBus && window.MS && window.MS.EVENTS) {
+          window.EventBus.emit(window.MS.EVENTS.ACHIEVEMENT_UNLOCKED, { id: b.id, name: b.name, reward: b.reward });
         }
         Toast.success('🏅 获得成就「' + b.name + '」，奖励 ' + b.reward + ' 积分');
       }

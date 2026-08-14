@@ -16,7 +16,10 @@ var DashboardModule = (function() {
     safeBind('btn-dash-review', 'click', function() {
       var a = window.app;
       if (!a) return;
-      var tab = (DataStore.getProgress('mistakes', []).length) ? 'mistake-train' : 'word';
+      // P1-07：以"未掌握错题"数量判断路由——错题全部已掌握时直接去背单词，避免跳到空训练页
+      var mistakes = DataStore.getProgress('mistakes', []) || [];
+      var hasUnreviewed = mistakes.some(function(m) { return m && !m.reviewed; });
+      var tab = hasUnreviewed ? 'mistake-train' : 'word';
       a.showTab(tab);
     });
     var quick = this._el('dash-quick');
@@ -35,6 +38,14 @@ var DashboardModule = (function() {
     this.render();
     // 其他 tab 写进度时刷新首页统计；切回本 tab 由 showTab('home') 渲染
     window.addEventListener('storage', function() { self.render(); });
+    // P0-04 事件驱动刷新：学习/积分/错题等数据变化时即时刷新首页统计
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      var EVT = window.MS.EVENTS;
+      var onStatChange = function() { self.render(); };
+      [EVT.WORD_LEARNED, EVT.WORD_REVIEWED, EVT.WORD_MASTERED, EVT.POINTS_CHANGED,
+       EVT.MISTAKE_ADDED, EVT.MISTAKE_RESOLVED, EVT.STREAK_CHANGED, EVT.DAILY_PLAN_CHANGED]
+        .forEach(function(name) { window.EventBus.on(name, onStatChange); });
+    }
   }
 
   DashboardModule.prototype.render = function() {
@@ -53,7 +64,8 @@ var DashboardModule = (function() {
   };
 
   DashboardModule.prototype._getProgress = function() {
-    return DataStore.getProgress('word_progress', {});
+    // P0-03：优先内存进度（写入有 300ms 节流，事件驱动的即时刷新用内存态避免读到过期存储）
+    return (window.UserState && window.UserState.getWordProgress()) || DataStore.getProgress('word_progress', {});
   };
 
   // 统计三卡：连续打卡 / 已掌握词汇 / 今日学习

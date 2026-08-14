@@ -13,12 +13,22 @@ var DailyPlanModule = (function() {
     this.render();
     // 其他 tab 写进度时刷新卡片；切回本 tab 由 showTab('word') 渲染
     window.addEventListener('storage', function() { self.render(); });
+    // P0-04 事件驱动刷新：背单词模块状态变化后广播事件，本模块订阅刷新，
+    // 不再由背词模块直接调用 render()
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      var EVT = window.MS.EVENTS;
+      window.EventBus.on(EVT.WORD_LEARNED, function() { self.render(); });
+      window.EventBus.on(EVT.WORD_REVIEWED, function() { self.render(); });
+      window.EventBus.on(EVT.WORD_MASTERED, function() { self.render(); });
+      window.EventBus.on(EVT.DAILY_PLAN_CHANGED, function() { self.render(); });
+    }
   }
 
   DailyPlanModule.prototype.render = function() {
     var card = document.getElementById('daily-plan-card');
     if (!card) return;
-    var progress = DataStore.getProgress('word_progress', {});
+    // P0-03：优先内存进度（写入有 300ms 节流，事件驱动的即时刷新用内存态避免读到过期存储）
+    var progress = (window.UserState && window.UserState.getWordProgress()) || DataStore.getProgress('word_progress', {});
     var t = today();
     var newCount = 0, dueCount = 0, doneCount = 0;
     Object.keys(progress).forEach(function(k) {

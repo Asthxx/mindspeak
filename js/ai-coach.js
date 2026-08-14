@@ -18,6 +18,17 @@ var AiCoachModule = (function() {
   function AiCoachModule() {
     this._el = function(id) { return document.getElementById(id); };
     this.render();
+    // P0-04 事件驱动刷新：学习数据变化时若当前正显示 AI 页则重新生成概况/建议
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      var self = this;
+      var EVT = window.MS.EVENTS;
+      var refresh = function() {
+        try { if (window.app && window.app.currentTab === 'ai') self.render(); } catch (e) {}
+      };
+      [EVT.WORD_LEARNED, EVT.WORD_REVIEWED, EVT.WORD_MASTERED, EVT.POINTS_CHANGED,
+       EVT.MISTAKE_ADDED, EVT.MISTAKE_RESOLVED, EVT.STREAK_CHANGED, EVT.ASSESSMENT_COMPLETED]
+        .forEach(function(name) { window.EventBus.on(name, refresh); });
+    }
   }
 
   AiCoachModule.prototype.render = function() {
@@ -28,7 +39,8 @@ var AiCoachModule = (function() {
   };
 
   AiCoachModule.prototype._progress = function() {
-    return DataStore.getProgress('word_progress', {});
+    // P0-03：优先内存进度（写入有 300ms 节流，事件驱动的即时刷新用内存态避免读到过期存储）
+    return (window.UserState && window.UserState.getWordProgress()) || DataStore.getProgress('word_progress', {});
   };
 
   AiCoachModule.prototype.renderOverview = function() {

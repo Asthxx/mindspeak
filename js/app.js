@@ -3,10 +3,6 @@ function safeBind(id, event, handler) {
   var el = document.getElementById(id);
   if (el) el.addEventListener(event, handler);
 }
-function safeQuery(selector, event, handler) {
-  var el = document.querySelector(selector);
-  if (el) el.addEventListener(event, handler);
-}
 function escapeHtml(str) {
   if (str == null) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -241,7 +237,8 @@ getSettings: function() {
     if (el) el.checked = target;
     if (this._serverDown === true && !this._probeNotifyShown) {
       this._probeNotifyShown = true;
-      if (window.Toast) Toast.warning('未检测到本地发音服务（localhost:3000），已自动切换为浏览器语音朗读');
+      var localBase = window.Env.getLocalBase();
+      if (window.Toast) Toast.warning('未检测到本地发音服务（' + localBase + '），已自动切换为浏览器语音朗读');
     }
   },
   // 自定义发音映射（单词 → dataURL 音频），文件名即单词名；读一次后缓存
@@ -392,6 +389,15 @@ _speakLetterTTS: function(up, opts) {
     // 选中「在线自然女声（Google 合成）」或其它虚拟在线音色时，字母同样走对应在线合成，
     // 与单词朗读行为一致：选了什么声音，字母就听到什么声音。
     var settings = this.getSettings();
+    // 「本地男声/女声（David/Zira）」：字母同样走本地 SAPI
+    if (settings.voiceName === '__local_david__' || settings.voiceName === '__local_zira__') {
+      console.log('[TTS LETTER] ' + up);
+      console.log('[TTS LETTER] Voice: ' + settings.voiceName);
+      var lv2 = {};
+      lv2.voice = settings.voiceName === '__local_zira__' ? 'zira' : 'david';
+      this._speakLocal(text, 'en-US', lv2);
+      return;
+    }
     if (settings.voiceName && settings.voiceName.indexOf('__online_') === 0) {
       console.log('[TTS LETTER] ' + up);
       console.log('[TTS LETTER] Voice: ' + settings.voiceName);
@@ -462,6 +468,15 @@ _speakTTS: function(text, lang, opts) {
     // 该选项改用 HTTPS 合成（translate.googleapis.com，实测可达、天然女声）。
     // 其它虚拟在线音色（__online_baidu__/__online_youdao_*__/__online_google_*__）：
     // 一律走远程发音兜底链（_speakServerless），选中的音色源会排到最前。
+    // 「本地男声/女声（David/Zira）」：强制走 server SAPI（完全离线），不经过在线语音
+    if (settings.voiceName === '__local_david__' || settings.voiceName === '__local_zira__') {
+      this._stopLocalAudio();
+      var lvo = {};
+      if (opts) for (var lk in opts) lvo[lk] = opts[lk];
+      lvo.voice = settings.voiceName === '__local_zira__' ? 'zira' : 'david';
+      this._speakLocal(text, lang, lvo);
+      return;
+    }
     if (settings.voiceName && settings.voiceName.indexOf('__online_') === 0) {
       this._stopLocalAudio();
       if (settings.voiceName === '__online_google__' && !(this._serverDown === true)) {
@@ -516,7 +531,6 @@ var attempt = function() {
       if (self._speakSeq !== mySeq) return;
       // 网页部署（无 server）：voices 加载失败/没有英文声/在线声连不通时，
       // 一律交给远程发音/系统默认语音（_speakServerless），不再请求 /api/*（那必然 404）。
-      // 先判定：手机/网页版无本地英文语音，等 voices 也是白等，直接短路出声。
       var useDeviceVoice = (self._serverDown === true);
       if (useDeviceVoice) {
         self._burstMode = 'device';
@@ -703,7 +717,8 @@ _speakLocal: function(text, lang, opts) {
     var base = window.API_BASE || '';
     var url = base + '/api/tts?text=' + encodeURIComponent(text)
       + '&lang=' + encodeURIComponent(lang || 'en-US')
-      + '&rate=' + encodeURIComponent(rate);
+      + '&rate=' + encodeURIComponent(rate)
+      + (opts && opts.voice ? '&voice=' + encodeURIComponent(opts.voice) : '');
     // file:// 页面下 Edge/Chrome 会拒绝 <audio> 加载 http://localhost 的音频
     // （MEDIA_ELEMENT_ERROR: Media load rejected by URL safety check），但 fetch()
     // 正常。改用 Web Audio（fetch → decodeAudioData → 播放）绕过该安全检查。
@@ -1324,14 +1339,23 @@ _markOnlineBroken: function() {
     if (local) return local;
     return this._pickAnyENVoice(skipName);
   },
-  // 任一英文声音（不要求离线）：语音列表里全是在线声时兜底用，保证选到英文音色
+  // 任一英文声音（不要求离线）：语音列表里全是在线声时兜底用，保证选到英文音色；
+  // 优先选女声（默认读出来是女声），没有女声再任意英文声
   _pickAnyENVoice: function(skipName) {
     var voices;
     try { voices = window.speechSynthesis.getVoices() || []; } catch(e) { return null; }
     var skip = this._skipSet(skipName);
+    var FEMALE = ['aria','jenny','samantha','susan','hazel','zira','female','laura','linda','lisa','michelle','natasha','nicole','rachel','rebecca','sally','libby','priya','heather','hayley','sonia','joanna','kimberly','serena','tessa','molly','niamh','piper','amy','kate','karen','sarah','anna','megan','julia','lily','grace','lucy','wendy','hannah','emma','olivia','ava','sophia','mia','charlotte','amelia','jessica','victoria','ruby'];
     for (var i = 0; i < voices.length; i++) {
       if ((voices[i].lang || '').toLowerCase().indexOf('en') === 0
-          && !(skip && skip[voices[i].name])) return voices[i];
+          && !(skip && skip[voices[i].name])) {
+        var n = (voices[i].name || '').toLowerCase();
+        for (var f = 0; f < FEMALE.length; f++) if (n.indexOf(FEMALE[f]) !== -1) return voices[i];
+      }
+    }
+    for (var j = 0; j < voices.length; j++) {
+      if ((voices[j].lang || '').toLowerCase().indexOf('en') === 0
+          && !(skip && skip[voices[j].name])) return voices[j];
     }
     return null;
   },
@@ -1538,9 +1562,12 @@ var DataStore = {
     return typeof READING_DATA !== 'undefined' ? READING_DATA : [];
   },
   getProgress: function(key, defaultVal) {
+    // P0-03：统一经 UserState 读取（与旧 Storage.getJSON 语义一致，完全兼容旧数据）
+    if (window.UserState) return window.UserState.get(key, defaultVal);
     return Storage.getJSON(key, defaultVal);
   },
   setProgress: function(key, val) {
+    if (window.UserState) return window.UserState.set(key, val);
     return Storage.setJSON(key, val);
   },
   // 艾宾浩斯遗忘曲线：复习次数 → 间隔天数 / 记忆保持率（与背单词页表格、复习环共用同一份数据）
@@ -1880,12 +1907,6 @@ var LearningReminder = {
       }
     }, 60000);
     if (!silent) Toast.success('提醒已开启，每天 ' + time);
-  },
-  disable: function(silent) {
-    if (this.timer) clearInterval(this.timer);
-    this.timer = null;
-    DataStore.setProgress('reminder_enabled', false);
-    if (!silent) Toast.info('提醒已关闭');
   }
 };
 // ==================== 背单词模块 ====================
@@ -2391,16 +2412,28 @@ prog.lastReviewed = today; // 供每日学习计划统计"今日已复习"
       cb.valid = false;
     }
 this.renderStats();
-    // 桥接游戏化系统 + 每日挑战 + 签到
+    // 首次建档（今日新学）透传 isNewWord，供每日挑战"学习新单词"任务按新词去重计数，
+    // 防止仅靠复习旧词刷满"学习 N 个新单词"
+    var isFirstSeenToday = !oldProg || prog.firstSeen === today;
+    // 桥接游戏化系统 + 每日挑战 + 错题本 + 签到（统一集中入口，业务模块间不互相直接调用）
     if (window.app) {
-      // 首次建档（今日新学）透传 isNewWord，供每日挑战"学习新单词"任务按新词去重计数，
-      // 防止仅靠复习旧词刷满"学习 N 个新单词"
-      var isFirstSeenToday = !oldProg || prog.firstSeen === today;
       if (action === 'known' || action === 'hesitate') window.app.recordActivity('word', 1, isFirstSeenToday, key);
       if (action === 'known') window.app.markCheckin(1);
       else if (action === 'forgot') window.app.addMistake(w, 'word');
-      // 每日学习计划卡片即时刷新
-      if (window.app.dailyPlanModule) window.app.dailyPlanModule.render();
+    }
+    // P0-04 事件通知：单词状态变化由 EventBus 广播，下游（每日计划/Dashboard/AI/词库）订阅刷新，
+    // 不再要求背词模块逐个调用这些模块
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      var EVT = window.MS.EVENTS;
+      var evtData = { word: w.word, key: key, action: action, status: prog.status, categoryIndex: this.currentCategoryIndex };
+      if (isFirstSeenToday && (action === 'known' || action === 'hesitate')) {
+        window.EventBus.emit(EVT.WORD_LEARNED, evtData);
+      }
+      if (!oldMastered && prog.status === 'mastered') {
+        window.EventBus.emit(EVT.WORD_MASTERED, evtData);
+      }
+      window.EventBus.emit(EVT.WORD_REVIEWED, evtData);
+      window.EventBus.emit(EVT.DAILY_PLAN_CHANGED, { today: today });
     }
     this.nextWord();
   };
@@ -4090,6 +4123,37 @@ FavoritesModule.prototype.clearAll = function() {
   return FavoritesModule;
 })();
 
+// 错题解决后同步背单词进度（P1-07）：wordProgress 的 key 是 word-分类，错题只存了 word，
+// 所以扫描所有 status==='failed' 且前缀匹配该词的条目，统一置为 mastered，
+// 避免"错题本已掌握但背单词进度仍显示不认识"的状态分裂。
+// 与背单词 mastered 口径一致（reviewCount>=8）。返回被改动条目的快照（供撤销使用）。
+function syncWordMasteredToProgress(word) {
+  var wpTouched = [];
+  try {
+    var wp = (window.UserState && window.UserState.getWordProgress()) || DataStore.getProgress('word_progress', {});
+    // key 形如 "word-分类序号"：精确匹配末尾数字，避免 "run" 误伤 "run-on"
+    var wordRe = new RegExp('^' + String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-\\d+$');
+    Object.keys(wp).forEach(function(k) {
+      if (wordRe.test(k) && wp[k].status === 'failed') {
+        wpTouched.push({ key: k, snapshot: JSON.parse(JSON.stringify(wp[k])) });
+        wp[k].status = 'mastered';
+        wp[k].reviewCount = Math.max(wp[k].reviewCount || 0, 8);
+        if (!wp[k].nextReview) wp[k].nextReview = getLocalDateStr();
+      }
+    });
+    if (wpTouched.length && window.app && window.app.wordModule) {
+      window.app.wordModule.wordProgress = wp;
+      window.app.wordModule.saveProgress();
+      window.app.wordModule.renderStats();
+    }
+  } catch (e) {
+    if (window.Log && window.Log.error) {
+      try { window.Log.error('mistakes', 'syncWordMasteredToProgress 失败', String(word), e && e.stack); } catch (_e) {}
+    }
+  }
+  return wpTouched;
+}
+
 // ==================== 错题本模块 ====================
 var MistakeModule = (function() {
   function MistakeModule() { this.initUI(); }
@@ -4167,27 +4231,8 @@ MistakeModule.prototype.markKnown = function() {
       if (mistakes[i].word === m.word && mistakes[i].date === m.date) { mistakes[i].reviewed = true; mi = i; break; }
     }
     DataStore.setProgress('mistakes', mistakes);
-    // 同步背单词的数据：wordProgress 的 key 是 word-分类，错题只存了 word
-    // 所以扫描所有 status==='failed' 且前缀匹配该词的条目，统一置为 mastered，避免错题本判掌握后背单词那边还显示"不认识"
-    var wpTouched = [];
-    try {
-      var wp = DataStore.getProgress('word_progress', {});
-      // key 形如 "word-分类序号"：精确匹配末尾数字，避免 "run" 误伤 "run-on"
-      var wordRe = new RegExp('^' + String(m.word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-\\d+$');
-      Object.keys(wp).forEach(function(k) {
-        if (wordRe.test(k) && wp[k].status === 'failed') {
-          wpTouched.push({ key: k, snapshot: JSON.parse(JSON.stringify(wp[k])) });
-          wp[k].status = 'mastered';
-          wp[k].reviewCount = Math.max(wp[k].reviewCount || 0, 8); // 与背单词 mastered 口径一致（reviewCount>=8）
-          if (!wp[k].nextReview) wp[k].nextReview = getLocalDateStr();
-        }
-      });
-      if (wpTouched.length && window.app && window.app.wordModule) {
-        window.app.wordModule.wordProgress = wp;
-        window.app.wordModule.saveProgress();
-        window.app.wordModule.renderStats();
-      }
-    } catch(e) {}
+    // 同步背单词进度（P1-07）：failed → mastered，与错词强化路径共用同一实现
+    var wpTouched = syncWordMasteredToProgress(m.word);
     // 撤销快照：仅记录本次真正改动的条目（mi>=0），undo 时完整还原
     if (mi >= 0) {
       this._lastMarked = {
@@ -4195,6 +4240,10 @@ MistakeModule.prototype.markKnown = function() {
         date: mistakes[mi].date,
         wpSnapshots: wpTouched
       };
+      // P0-04 事件通知：错题已解决
+      if (window.EventBus && window.MS && window.MS.EVENTS) {
+        window.EventBus.emit(window.MS.EVENTS.MISTAKE_RESOLVED, { word: mistakes[mi].word, source: mistakes[mi].source || m.source || '' });
+      }
     }
     this._reviewIdx++;
     this.showReviewItem();
@@ -4584,8 +4633,24 @@ var MistakeTrainModule = (function() {
           changed = true;
         }
       }
-      if (changed) DataStore.setProgress('mistakes', mistakes);
-    } catch(e) {}
+      if (changed) {
+        DataStore.setProgress('mistakes', mistakes);
+        // P1-07：与错题本 markKnown 对齐 —— 同步背单词进度 + 广播 MISTAKE_RESOLVED
+        // （否则经"错词强化"答对掌握的词在背单词进度里仍是 failed，且 Dashboard/AI 不即时刷新）
+        syncWordMasteredToProgress(w.word);
+        if (window.EventBus && window.MS && window.MS.EVENTS) {
+          window.EventBus.emit(window.MS.EVENTS.MISTAKE_RESOLVED, { word: w.word, source: w.source || '' });
+        }
+        // 错题本列表/统计即时刷新，避免"已答对仍显示待复习"的视图分裂
+        if (window.app && window.app.mistakesModule && window.app.mistakesModule.renderList) {
+          try { window.app.mistakesModule.renderList(); } catch (e) {}
+        }
+      }
+    } catch (e) {
+      if (window.Log && window.Log.error) {
+        try { window.Log.error('mistakes', 'markReviewed 失败', String(w && w.word), e && e.stack); } catch (_e) {}
+      }
+    }
   };
   MistakeTrainModule.prototype.speak = function() {
     if (this.words.length === 0) return;
@@ -4618,20 +4683,29 @@ var GamificationSystem = (function() {
       totalWords: 0, totalExercises: 0, achievements: []
     });
   }
-GamificationSystem.prototype.addPoints = function(amount) {
+  GamificationSystem.prototype.addPoints = function(amount) {
     this.data.points += amount;
     // 注意：不要在加积分时把 lastActiveDate 置为今天 —— 购买道具/领取奖励扣加分
     // 会先把当天"激活"，导致当天第一次 recordActivity 判 lastActiveDate===today
     // 而跳过 streak 累计。lastActiveDate 只由 recordActivity（有实际学习活动）统一维护。
     // 每 100 分升一级
+    var oldLevel = this.data.level || 1;
     var newLevel = Math.floor(this.data.points / 100) + 1;
-    if (newLevel > (this.data.level || 1)) {
+    var leveledUp = newLevel > oldLevel;
+    if (leveledUp) {
       this.data.level = newLevel;
       Toast.success('🎉 升级到 Lv.' + newLevel + '！');
     }
     this.save();
     // 同步顶栏统计
     if (window.app) window.app.updateGlobalStats();
+    // P0-04 事件通知：积分/等级变化由事件广播（业务模块不再轮询/互调）
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      window.EventBus.emit(window.MS.EVENTS.POINTS_CHANGED, {
+        points: this.data.points, level: this.data.level || 1, change: amount
+      });
+      if (leveledUp) window.EventBus.emit(window.MS.EVENTS.LEVEL_UP, { level: newLevel, from: oldLevel });
+    }
   };
   GamificationSystem.prototype.recordActivity = function(type) {
     // 兼容各模块上报的 type 字符串，统一归到两条总计数上
@@ -4642,6 +4716,7 @@ GamificationSystem.prototype.addPoints = function(amount) {
     }
 // 累计 streak：当天第一次有活动就把当天记作 active，与昨天比较是否连续
     var today = getLocalDateStr();
+    var prevStreak = this.data.streak || 0;
     if (this.data.lastActiveDate !== today) {
       var y = new Date();
       y.setDate(y.getDate() - 1);
@@ -4655,6 +4730,10 @@ GamificationSystem.prototype.addPoints = function(amount) {
       Toast.info('🎉 连续打卡 ' + this.data.streak + ' 天！');
     }
     this.addPoints(type === 'word' ? 5 : 10);
+    // P0-04 事件通知：连续打卡变化
+    if (window.EventBus && window.MS && window.MS.EVENTS && this.data.streak !== prevStreak) {
+      window.EventBus.emit(window.MS.EVENTS.STREAK_CHANGED, { streak: this.data.streak || 0 });
+    }
   };
   GamificationSystem.prototype.save = function() { DataStore.setProgress('gamification', this.data); };
   GamificationSystem.prototype.getStats = function() { return this.data; };
@@ -5111,6 +5190,11 @@ App.prototype.initNav = function() {
       self.showTab(btn.dataset.tab);
     });
   });
+  document.querySelectorAll('.bottom-nav-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      self.showTab(btn.dataset.tab);
+    });
+  });
   document.querySelectorAll('.stat-items-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       self.showTab('items');
@@ -5153,33 +5237,81 @@ App.prototype._initMobileDrawer = function() {
   var menuBtn = document.getElementById('btn-menu');
   this._drawerEls = { sidebar: sidebar, scrim: scrim, btn: menuBtn };
   if (!sidebar) return;
-  var close = function() {
+  var lastFocus = null;
+  var drawerSeq = 0;
+  var isMobile = function() {
+    return window.matchMedia && window.matchMedia('(max-width:768px)').matches;
+  };
+  // Android 返回键：打开抽屉时压入一个状态，返回时优先关抽屉而不是退出页面
+  var pushBack = function() {
+    if (!isMobile() || !window.history || !window.history.pushState) return;
+    try { window.history.pushState({ msDrawer: ++drawerSeq }, ''); } catch (e) {}
+  };
+  var popBack = function() {
+    if (!window.history || !window.history.back) return;
+    try {
+      if (window.history.state && window.history.state.msDrawer) window.history.back();
+    } catch (e) {}
+  };
+  var close = function(restore) {
+    var wasOpen = sidebar.classList.contains('open');
     sidebar.classList.remove('open');
     sidebar.setAttribute('data-open', 'false');
     if (scrim) scrim.classList.remove('show');
     if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+    if (restore && lastFocus && document.contains(lastFocus)) {
+      try { lastFocus.focus(); } catch (e) {}
+    }
+    lastFocus = null;
+    if (restore && wasOpen) popBack();
     if (this && this.completeQ) this.completeQ('.drawer-open');
   };
+  var open = function() {
+    if (lastFocus !== null) return;
+    lastFocus = document.activeElement;
+    sidebar.classList.add('open');
+    sidebar.setAttribute('data-open', 'true');
+    if (scrim) scrim.classList.add('show');
+    if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
+    pushBack();
+    var first = sidebar.querySelector('.nav-btn');
+    if (first && document.activeElement === menuBtn) { try { first.focus(); } catch (e) {} }
+  };
   if (menuBtn) menuBtn.addEventListener('click', function() {
-    var isOpen = sidebar.classList.contains('open');
-    if (isOpen) close();
-    else {
-      sidebar.classList.add('open');
-      sidebar.setAttribute('data-open', 'true');
-      if (scrim) scrim.classList.add('show');
-      if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
+    if (sidebar.classList.contains('open')) close(true);
+    else open();
+  });
+  if (scrim) scrim.addEventListener('click', function() { close(true); });
+  // ESC 关闭 + 焦点圈定在抽屉内
+  document.addEventListener('keydown', function(e) {
+    if (!sidebar.classList.contains('open')) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(true); return; }
+    if (e.key === 'Tab') {
+      var navs = sidebar.querySelectorAll('.nav-btn, .nav-group-title');
+      if (!navs.length) return;
+      var firstEl = navs[0];
+      var lastEl = navs[navs.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) { e.preventDefault(); lastEl.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
     }
   });
-  if (scrim) scrim.addEventListener('click', close);
+  // Android 返回键：抽屉打开时优先关抽屉
+  window.addEventListener('popstate', function() {
+    if (sidebar.classList.contains('open')) close(false);
+  });
 };
 App.prototype.showTab = function(tab) {
   this.currentTab = tab;
-  // 移动端：选中后自动收起抽屉导航
+  // 移动端：选中后自动收起抽屉导航，并回收 Android 返回键占用的 history 状态
   if (this._drawerEls && this._drawerEls.sidebar) {
     this._drawerEls.sidebar.classList.remove('open');
     if (this._drawerEls.scrim) this._drawerEls.scrim.classList.remove('show');
+    try {
+      if (window.history && window.history.state && window.history.state.msDrawer) window.history.back();
+    } catch (e) {}
   }
   document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === tab); });
+  document.querySelectorAll('.bottom-nav-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === tab); });
   document.querySelectorAll('.page').forEach(function(p) { p.classList.toggle('active', p.id === 'page-' + tab); });
   // 目标按钮所在的折叠分组自动展开
   var activeBtn = document.querySelector('.nav-btn[data-tab="' + tab + '"]');
@@ -5199,6 +5331,8 @@ App.prototype.showTab = function(tab) {
   if (tab === 'ai' && this.aiCoachModule) this.aiCoachModule.render();
   // 词文串学：首次进入自动生成一篇短文
   if (tab === 'story' && this.storyModule && !this.storyModule.generated) this.storyModule.generate();
+  // 收藏夹：进入时重新从 storage 渲染（收藏/取消收藏后列表需即时更新）
+  if (tab === 'favorites' && this.favoritesModule) this.favoritesModule.renderList();
 // 成就徽章：进入时先检查有没有新解锁的，再刷新渲染
   if (tab === 'badges' && this.badgeSystem) { this.badgeSystem.checkAll(); this.badgeSystem.render(); }
   // 每日计划：进入背单词页刷新卡片
@@ -5358,6 +5492,10 @@ App.prototype.addMistake = function(w, source) {
       mistakes.push(entry);
       DataStore.setProgress('mistakes', mistakes);
       if (this.mistakesModule) this.mistakesModule.renderList();
+      // P0-04 事件通知：新增错题
+      if (window.EventBus && window.MS && window.MS.EVENTS) {
+        window.EventBus.emit(window.MS.EVENTS.MISTAKE_ADDED, { word: entry.word, source: entry.source });
+      }
     }
   } catch(e) {}
 };
@@ -5517,6 +5655,8 @@ function fillVoiceOptions() {
         { v: '__online_google_in__', label: '谷歌·印度口音（需网络）' }
       ];
       var html = '<option value="">系统默认（自动选本地语音）</option>';
+      html += '<option value="__local_david__">本地男声（David · 离线 SAPI，需 server 运行）</option>';
+      html += '<option value="__local_zira__">本地女声（Zira · 离线 SAPI，需 server 运行）</option>';
       for (var vi2 = 0; vi2 < ONLINE_STATIC.length; vi2++) {
         html += '<option value="' + ONLINE_STATIC[vi2].v + '">' + onlineStaticLabel(ONLINE_STATIC[vi2].v, ONLINE_STATIC[vi2].label) + '</option>';
       }
@@ -5589,7 +5729,7 @@ if (name) {
       // 切换声音后重新预热新的在线声：primeVoices 每会话只预热一次（_primeDone），
       // 换声后必须重置，否则新声音冷连接，首次朗读会慢、甚至被超时降级成别的音色，
       // 表现为"切了声音没变化"。
-      if (name) {
+      if (name && name.indexOf('__local_') !== 0) {
         if (SpeechUtil._primeGuard) { clearTimeout(SpeechUtil._primeGuard); SpeechUtil._primeGuard = null; }
         SpeechUtil._primeDone = false;
         SpeechUtil._primingBusy = false;
@@ -5600,7 +5740,9 @@ if (name) {
         var vs = window.speechSynthesis.getVoices() || [];
         for (var vi = 0; vi < vs.length; vi++) if (vs[vi].name === name) { chosen = vs[vi]; break; }
       } catch(e) {}
-      if (name && name.indexOf('__online_') === 0) Toast.success('已切换为' + (onlineStaticLabel ? onlineStaticLabel(name, '在线声音') : '在线声音') + '（需联网，音色统一，手机/网页同样生效）');
+      if (name === '__local_david__') Toast.success('已切换为本地男声（David · 离线 SAPI）');
+      else if (name === '__local_zira__') Toast.success('已切换为本地女声（Zira · 离线 SAPI）');
+      else if (name && name.indexOf('__online_') === 0) Toast.success('已切换为' + (onlineStaticLabel ? onlineStaticLabel(name, '在线声音') : '在线声音') + '（需联网，音色统一，手机/网页同样生效）');
       else if (!name) Toast.success('已切换为系统默认（自动选本地语音）');
       else if (chosen && SpeechUtil._isOnlineVoice(chosen)) Toast.success('已选择在线声音（首次朗读需联网加载，可能稍慢）');
       else if (chosen) Toast.success('已选择朗读声音');
@@ -5992,7 +6134,34 @@ var base = window.API_BASE || '';
           modal.classList.remove('hidden');
         })
         .catch(function(e) {
-          showErr('读取失败：本地服务未启动，请用启动脚本运行后重试' + (e && e.message ? '（' + e.message + '）' : ''));
+          // server 不可达时降级显示浏览器本地离线缓冲（__ms_logs_v1）里的错误，
+          // 保证离线/无 server 打开错误日志时也能看到本机记录的错误
+          var local = [];
+          try { local = JSON.parse(localStorage.getItem('__ms_logs_v1') || '[]'); } catch (e2) {}
+          if (Array.isArray(local) && local.length) {
+            self._logFileSize = 0;
+            self._logLines = local.map(function(en) {
+              var ts = '';
+              try { ts = new Date(en.ts).toISOString().slice(0, 19).replace('T', ' '); } catch (e3) {}
+              var line = {
+                lvl: en.lvl || 'info',
+                ts: ts,
+                src: 'web',
+                mod: en.mod || 'app',
+                msg: en.msg || '',
+                data: en.data,
+                stack: en.stack
+              };
+              if (en.count && en.count > 1) line.msg = String(line.msg) + '（×' + en.count + '）';
+              return line;
+            });
+            self._renderLogs();
+            modal.classList.remove('hidden');
+            var note = document.getElementById('logs-summary');
+            if (note) note.textContent = '浏览器本地缓存（本地服务未连接）· 共 ' + self._logLines.length + ' 条';
+          } else {
+            showErr('读取失败：本地服务未启动，请用启动脚本运行后重试' + (e && e.message ? '（' + e.message + '）' : ''));
+          }
         });
       if (fetchP && fetchP.catch) fetchP.catch(function() {});
     } catch(e) { showErr('日志打开失败'); }
@@ -6020,11 +6189,12 @@ var base = window.API_BASE || '';
       + '<span id="logs-summary" style="font-weight:400;font-size:0.8rem;color:rgba(255,255,255,0.7)"></span>'
       + '</div>'
       + '<div style="display:flex;gap:8px">'
-      + '<button data-log-act="refresh" style="padding:6px 14px;border:none;border-radius:6px;background:rgba(255,255,255,0.18);color:#fff;cursor:pointer;font-size:0.8rem">刷新</button>'
-      + '<button data-log-act="export" style="padding:6px 14px;border:none;border-radius:6px;background:rgba(255,255,255,0.18);color:#fff;cursor:pointer;font-size:0.8rem">导出日志</button>'
-      + '<button data-log-act="export-json" style="padding:6px 14px;border:none;border-radius:6px;background:rgba(255,255,255,0.18);color:#fff;cursor:pointer;font-size:0.8rem">导出JSON</button>'
-      + '<button data-log-act="copy" id="logs-copy-dyn" style="padding:6px 14px;border:none;border-radius:6px;background:rgba(255,255,255,0.18);color:#fff;cursor:pointer;font-size:0.8rem">复制日志</button>'
-      + '<button data-log-act="close" style="padding:6px 14px;border:none;border-radius:6px;background:rgba(255,255,255,0.22);color:#fff;cursor:pointer;font-size:0.8rem">✕</button>'
+      + '<button data-log-act="refresh" class="log-act-btn">刷新</button>'
+      + '<button data-log-act="export" class="log-act-btn">导出日志</button>'
+      + '<button data-log-act="clear" class="log-act-btn">清空日志</button>'
+      + '<button data-log-act="export-json" class="log-act-btn">导出JSON</button>'
+      + '<button data-log-act="copy" id="logs-copy-dyn" class="log-act-btn">复制日志</button>'
+      + '<button data-log-act="close" class="log-act-btn log-act-btn-strong">✕</button>'
       + '</div></div>'
       // 筛选工具栏
       + '<div style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:#f8faf9;border-bottom:1px solid #e5e9e7;flex:0 0 auto;flex-wrap:wrap">'
@@ -6062,6 +6232,7 @@ var base = window.API_BASE || '';
       if (act === 'copy') { self2._copyLogs(); return; }
       if (act === 'export') { self2._exportLogs(false); return; }
       if (act === 'export-json') { self2._exportLogs(true); return; }
+      if (act === 'clear') { self2._clearLogs(); return; }
       if (act === 'close') { el.classList.add('hidden'); return; }
       var flt = t && t.getAttribute ? t.getAttribute('data-log-filter') : null;
       if (flt) {
@@ -6189,6 +6360,22 @@ var base = window.API_BASE || '';
       }
     } catch(e) { if (window.Toast) Toast.error('复制失败'); }
   };
+  // 清空日志：清 server 端日志文件 + 浏览器本地缓存，然后刷新列表
+  App.prototype._clearLogs = function() {
+    var self = this;
+    var base = window.API_BASE || '';
+    try { localStorage.removeItem('__ms_logs_v1'); } catch (e) {}
+    var finish = function() {
+      self._logLines = [];
+      self._logFileSize = 0;
+      self._renderLogs();
+      var note = document.getElementById('logs-summary');
+      if (note) note.textContent = '已清空';
+    };
+    fetch(base + '/api/logs/clear', { method: 'POST', cache: 'no-store' })
+      .then(function() { finish(); })
+      .catch(function() { finish(); });
+  };
   // 渲染日志表格：级别着色徽标、点击行展开完整 stack/data
   App.prototype._renderLogs = function() {
     var body = document.getElementById('logs-body');
@@ -6223,26 +6410,22 @@ var base = window.API_BASE || '';
       if (l.data !== undefined) {
         var dataJson = '';
         try { dataJson = JSON.stringify(l.data, null, 2); } catch (e) { dataJson = '[不可序列化]'; }
-        detail += (detail ? '<br>' : '') + '<div class="log-detail" style="margin-top:6px;padding:8px 10px;background:#eef4f1;border-left:3px solid #3f7d5a;border-radius:4px;white-space:pre-wrap;word-break:break-all;line-height:1.55">' + escapeHtml(dataJson) + '</div>';
+        detail += (detail ? '<br>' : '') + '<div class="log-detail-box">' + escapeHtml(dataJson) + '</div>';
       }
       var rowId = 'log-det-' + n;
-      out += '<tr data-row="1" data-detail-id="' + rowId + '" style="cursor:pointer;background:' + (lvl === 'error' ? '#fff7f8' : (n % 2 ? '#fbfcfb' : '#fff')) + ';border-top:1px solid #f0f3f1">'
-        + '<td style="padding:10px 14px;white-space:nowrap;color:#8a938e">' + ts + '</td>'
-        + '<td style="padding:10px 6px"><span style="display:inline-block;padding:2px 9px;border-radius:10px;background:' + c[1] + ';color:' + c[0] + ';font-weight:700;font-size:0.72rem;min-width:38px;text-align:center">' + lvl + '</span></td>'
-        + '<td style="padding:10px 8px;color:#5a6560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(src) + '</td>'
-        + '<td style="padding:10px 8px;color:#5a6560;word-break:break-all">' + escapeHtml(mod) + '</td>'
-        + '<td style="padding:10px 14px;word-break:break-all;line-height:1.6">' + escapeHtml(msg)
-        + (detail ? '<span style="color:#3f7d5a;font-size:0.72rem;margin-left:10px">▸ 详情</span>' : '')
+      out += '<tr data-row="1" data-detail-id="' + rowId + '" class="log-row" style="background:' + (lvl === 'error' ? '#fff7f8' : (n % 2 ? '#fbfcfb' : '#fff')) + '">'
+        + '<td class="log-cell-time">' + ts + '</td>'
+        + '<td class="log-cell-lv"><span class="log-cell-tag" style="background:' + c[1] + ';color:' + c[0] + '">' + lvl + '</span></td>'
+        + '<td class="log-cell-src">' + escapeHtml(src) + '</td>'
+        + '<td class="log-cell-mod">' + escapeHtml(mod) + '</td>'
+        + '<td class="log-cell-msg">' + escapeHtml(msg)
+        + (detail ? '<span class="log-cell-detail">▸ 详情</span>' : '')
         + '</td></tr>'
-        + (detail ? '<tr id="' + rowId + '" style="display:none;background:#fff"><td colspan="5" style="padding:12px 14px 16px 14px;border-bottom:1px solid #eef1ef">' + detail + '</td></tr>' : '');
+        + (detail ? '<tr id="' + rowId + '" style="display:none;background:#fff"><td colspan="5" class="log-cell-exp">' + detail + '</td></tr>' : '');
       n++;
     }
-    body.innerHTML = out || '<tr><td colspan="5" style="padding:56px;text-align:center;color:#a2ab5">' + (filter === 'all' ? '暂无日志' : '该级别暂无日志') + '</td></tr>';
+    body.innerHTML = out || '<tr><td colspan="5" class="log-empty">' + (filter === 'all' ? '暂无日志' : '该级别暂无日志') + '</td></tr>';
   };
-  function escapeHtml(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
   App.prototype.importData = function() {
     var self = this;
     var input = document.createElement('input');

@@ -64,7 +64,7 @@ app.use((req, res, next) => {
 // ==================== 保底朗读：Windows SAPI 离线合成 ====================
 // 本机 Edge 英文声几乎全是在线声（Aria/Guy/...），连不上 speech.platform.bing.com
 // 时浏览器朗读会无声。这里用系统自带的 SAPI（System.Speech，离线、必出声，
-// 本机有 Microsoft Zira 英文声 + Huihui 中文声）合成 WAV，作为在线声失败后的保底。
+// 本机有 Microsoft Zira 英文女声（默认）+ David 英文男声 + Huihui 中文声）合成 WAV，作为在线声失败后的保底。
 const TTS_CACHE = path.join(os.tmpdir(), 'mindspeak-tts');
 const TTS_PS = path.join(TTS_CACHE, 'tts.ps1');
 // 启动时清理 30 天前的旧 TTS 缓存（每日大量合成会占用磁盘）
@@ -87,11 +87,18 @@ try {
     "$Rate = [double]$args[1]",
     "$Out  = $args[2]",
     "$Text = $args[3]",
+    "$Voice = $args[4]",
     "Add-Type -AssemblyName System.Speech",
     "$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer",
     "$voices = @($synth.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo })",
     "$wanted = ($Lang -split '-')[0]",
-    "$pick = $voices | Where-Object { $_.Culture.Name -eq $Lang } | Select-Object -First 1",
+    "if ($Voice) { $pick = $voices | Where-Object { $_.Name -match $Voice -and $_.Culture.Name -eq $Lang } | Select-Object -First 1 }",
+    "if (-not $pick -and $Voice) { $pick = $voices | Where-Object { $_.Name -match $Voice } | Select-Object -First 1 }",
+    "if (-not $pick) { $pick = $voices | Where-Object { $_.Name -match 'Zira' -and $_.Culture.Name -eq $Lang } | Select-Object -First 1 }",
+    "if (-not $pick) { $pick = $voices | Where-Object { $_.Name -match 'David' -and $_.Culture.Name -eq $Lang } | Select-Object -First 1 }",
+    "if (-not $pick) { $pick = $voices | Where-Object { $_.Culture.Name -eq $Lang } | Select-Object -First 1 }",
+    "if (-not $pick) { $pick = $voices | Where-Object { $_.Name -match 'Zira' -and $_.Culture.Name -like \"$wanted-*\" } | Select-Object -First 1 }",
+    "if (-not $pick) { $pick = $voices | Where-Object { $_.Name -match 'David' -and $_.Culture.Name -like \"$wanted-*\" } | Select-Object -First 1 }",
     "if (-not $pick) { $pick = $voices | Where-Object { $_.Culture.Name -like \"$wanted-*\" } | Select-Object -First 1 }",
     "if (-not $pick -and $wanted -eq 'en') { $pick = $voices | Where-Object { $_.Name -match 'Zira|David' } | Select-Object -First 1 }",
     "if (-not $pick) { $pick = $voices | Select-Object -First 1 }",
@@ -119,8 +126,9 @@ app.get('/api/tts', (req, res) => {
   const lang = String(req.query.lang || 'en-US').slice(0, 64);
   let rate = parseFloat(req.query.rate);
   if (!(rate >= 0.5 && rate <= 2)) rate = 1;
+  const voice = String(req.query.voice || '').slice(0, 32).replace(/[^a-zA-Z]/g, '');
   if (!text || text.length > 500) return res.status(400).json({ ok: false, message: 'text too long or empty' });
-  const key = crypto.createHash('sha1').update(text + '|' + lang + '|' + rate).digest('hex');
+  const key = crypto.createHash('sha1').update(text + '|' + lang + '|' + rate + '|' + voice).digest('hex');
   const wav = path.join(TTS_CACHE, key + '.wav');
   if (!fs.existsSync(TTS_PS)) {
     logger.error('tts', 'TTS 脚本缺失，本地朗读不可用', { file: TTS_PS });
@@ -141,7 +149,7 @@ app.get('/api/tts', (req, res) => {
   // text 作为参数传给 powershell -File：Node 走 CreateProcess 传 UTF-16，
   // 中文等非 ASCII 不会乱码；也规避了 execFile 管道 stdin 读取在 Windows 上挂起的问题。
   execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-    '-File', TTS_PS, lang, String(rate), temp, text],
+    '-File', TTS_PS, lang, String(rate), temp, text, voice],
     { timeout: 20000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
     (err) => {
       let ok = false;
@@ -300,6 +308,19 @@ app.get('/api/logs/read', (req, res) => {
   }
 });
 
+// 「清空错误日志」：清空 server/logs/app.log，配合前端「清空日志」按钮使用。
+app.post('/api/logs/clear', (req, res) => {
+  const logFile = logger.LOG_FILE;
+  try {
+    fs.mkdirSync(path.dirname(logFile), { recursive: true });
+    fs.writeFileSync(logFile, '', 'utf8');
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error('logs', '清空日志失败', { file: logFile, err: e && e.message });
+    res.status(500).json({ ok: false, message: 'clear log failed' });
+  }
+});
+
 // 「打开错误日志」：在系统资源管理器中定位到 server/logs/app.log（方便查看/发给 AI）。
 app.post('/api/logs/open', (req, res) => {
   const logFile = logger.LOG_FILE;
@@ -330,7 +351,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 // 用户库、node_modules）被 HTTP 直接下载。
 // 注意：必须先 decode+normalize 再匹配——否则 /js/../server/config.js 这类
 // 原始（未归一化）路径能绕过前缀检查直达 express.static 根目录（ROOT 含 server/）。
-const STATIC_PUBLIC = ['/index.html', '/js/', '/css/', '/data/', '/assets/'];
+const STATIC_PUBLIC = ['/index.html', '/js/', '/css/', '/data/', '/assets/', '/sw.js', '/pwa-manifest.json', '/manifest.webmanifest'];
 app.use((req, res, next) => {
   let p = req.path;
   try { p = decodeURIComponent(p); } catch (e) {}

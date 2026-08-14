@@ -85,6 +85,10 @@ var ItemSystem = (function() {
     this.save();
     this.updateGlobalUI();
     this.renderBag();
+    // P0-04 事件通知：道具被使用/消耗
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      window.EventBus.emit(window.MS.EVENTS.ITEM_USED, { id: id, name: ITEMS[id] ? ITEMS[id].name : id, buff: false });
+    }
     return true;
   };
   // 背包页使用：宝箱直接开箱，激活类道具只激活不扣数量，即时类道具跳转对应练习（不消耗，真正点击时才用）
@@ -110,7 +114,6 @@ var ItemSystem = (function() {
   ItemSystem.prototype.openMystery = function() {
     if (this.count('mystery') <= 0) { Toast.warning('没有「神秘宝箱」了'); return; }
     this.data.mystery--;
-    this.save();
     var total = 0;
     MYSTERY_POOL.forEach(function(p) { total += p.weight; });
     var r = Math.random() * total, acc = 0, picked = MYSTERY_POOL[MYSTERY_POOL.length - 1];
@@ -120,12 +123,14 @@ var ItemSystem = (function() {
     }
     var msg;
     if (picked.item) {
-      this.data[picked.item]++;
+      // P1-09：`|| 0` 兜底旧备份缺键导致的 NaN 库存
+      this.data[picked.item] = (this.data[picked.item] || 0) + 1;
       msg = '获得「' + ITEMS[picked.item].name + '」×1';
     } else {
       if (window.app && window.app.gamification) window.app.gamification.addPoints(picked.points);
       msg = '获得 ' + picked.points + ' 积分';
     }
+    // P1-09：一次落盘（宝箱消耗 + 奖励写入合并），消除两次 save 之间的丢失窗口
     this.save();
     Toast.success('🎁 宝箱开启！' + msg);
     this.renderBag();
@@ -178,6 +183,10 @@ var ItemSystem = (function() {
     if (this.count(id) > 0) { this.data[id]--; this.save(); }
     this.renderBag();
     this.updateGlobalUI();
+    // P0-04 事件通知：buff 道具被实际消耗
+    if (window.EventBus && window.MS && window.MS.EVENTS) {
+      window.EventBus.emit(window.MS.EVENTS.ITEM_USED, { id: id, name: ITEMS[id] ? ITEMS[id].name : id, buff: true });
+    }
     return true;
   };
   // 本局未使用：保留激活状态，卡片不消失
@@ -270,7 +279,16 @@ var ItemSystem = (function() {
         }
         if (!self.use(id)) return;
         if (handlers && handlers[id]) handlers[id]();
-        self.renderToolbar(containerId, opts, handlers);
+        // P1-09 防连点烧卡：不再整排重建工具栏——重建会清掉 disabled，导致同一题/同一局内
+        // 重复点击把「护盾/双倍/提示/幸运」等一次生效道具重复扣卡却无额外效果。
+        // 这里只更新当前按钮的库存数量并保持禁用；下一题 showQuestion 会重建工具栏并重新启用。
+        var left = self.count(id);
+        btn.innerHTML = '<svg class="icon"><use href="' + ITEMS[id].icon + '"/></svg> ' + ITEMS[id].name + ' ×' + left;
+        if (left <= 0) {
+          btn.style.display = 'none';
+          var allGone = opts.every(function(o) { return self.count(o.id) <= 0; });
+          if (allGone) el.style.display = 'none';
+        }
       });
     });
   };

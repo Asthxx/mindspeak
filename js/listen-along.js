@@ -257,7 +257,7 @@ var ListenAlongModule = (function() {
     } else {
       this.wrong++;
       fb.innerHTML = '<span style="color:var(--danger)">✗ 正确答案：' + escapeHtml(w.word) + '</span>';
-      if (window.app) window.app.addMistake(w, 'listen');
+      if (window.app) window.app.addMistake(w, 'listening');
     }
     var scoreEl = document.getElementById('la-score');
     if (scoreEl) scoreEl.textContent = '已答对 ' + this.correct + ' · 答错 ' + this.wrong;
