@@ -2,7 +2,32 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, shrink-to-fit=no">
+  <script>
+  // 视口兜底（通用兼容，不依赖手机型号）：部分 Android WebView / Capacitor 打包
+  // 会以"桌面宽视口"（约 980px）渲染页面，导致 @media(max-width:768px) 手机布局不生效。
+  // 检测逻辑：屏幕物理宽度 ÷ 设备像素比 = 设备逻辑宽；若页面布局视口远大于它，
+  // 则判定宽视口异常，重设 viewport meta 并整页重载（仅一次，防死循环）。
+  (function(){
+    try {
+      var dpr = window.devicePixelRatio || 1;
+      var screenCssW = (window.screen.width || 0) / dpr;      // 手机屏幕的逻辑宽度（如 360/375/412）
+      var vw = window.innerWidth;                              // 当前布局视口宽度
+      var isTouch = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0;
+      // 手机触屏设备，但布局视口异常宽（≥2 倍屏幕逻辑宽），判定为宽视口 bug
+      if (isTouch && screenCssW > 200 && screenCssW < 550 && vw > screenCssW * 1.5) {
+        var vp = document.querySelector('meta[name="viewport"]');
+        if (vp && !window.__viewportFixed) {
+          window.__viewportFixed = true;                       // 防死循环
+          vp.setAttribute('content', 'width=' + Math.round(screenCssW) + ', initial-scale=1.0, viewport-fit=cover, shrink-to-fit=no');
+          // 加标记类：即使重载后 CSS 媒体查询仍不生效，也走 forced-mobile 兜底
+          document.documentElement.classList.add('forced-mobile');
+          window.location.reload();
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
 <title>闻道 MindSpeak</title>
   <meta name="app-version" content="v20260808-6">
   <meta name="description" content="闻道 MindSpeak — AI 英语学习成长伴侣">

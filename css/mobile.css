@@ -1,6 +1,21 @@
 /* 桌面端隐藏底部导航（仅 ≤768px 由媒体查询显示）——此规则必须位于
-   下方 @media(max-width:768px) 之前，否则同优先级下靠后的 display:none 会误伤手机端 */
+   下方 @media(max-width:768px) 之前，否则同优先级下靠后的 display:none 会误伤手机端。
+   注：html.forced-mobile 由 index.html 的视口兜底脚本在"宽视口异常"时添加，
+   用于强制走手机布局，即使 WebView 没正确触发媒体查询。 */
 .bottom-nav{display:none}
+html.forced-mobile .bottom-nav{display:flex}
+html.forced-mobile .sidebar{position:fixed;top:var(--header);left:0;width:280px;max-width:80vw;height:calc(100dvh - var(--header));transform:translateX(-110%);transition:transform var(--duration-slower) var(--ease-out);z-index:100;overflow-y:auto}
+html.forced-mobile .sidebar.open{transform:translateX(0)}
+html.forced-mobile .content{margin-left:0;margin-top:var(--header);padding-bottom:calc(var(--sp-6) + 76px + env(safe-area-inset-bottom,0px));overflow-x:hidden}
+html.forced-mobile .app-header{height:var(--header);padding-top:env(safe-area-inset-top,0px)}
+html.forced-mobile .btn-menu{display:flex;width:44px;height:44px}
+html.forced-mobile .sidebar-scrim{position:fixed;inset:0;background:rgba(0,0,0,0.35);opacity:0;visibility:hidden;z-index:90}
+html.forced-mobile .sidebar-scrim.show{opacity:1;visibility:visible}
+html.forced-mobile .modal{align-items:flex-end}
+html.forced-mobile .modal-content{width:100%;max-width:100%;max-height:88dvh;overflow-y:auto;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+html.forced-mobile body{height:100dvh;overflow:hidden;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+html.forced-mobile img{max-width:100%;height:auto}
+html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-card,html.forced-mobile .dash-card,html.forced-mobile .stat-card{min-width:0;max-width:100%}
 
 /* AI English Growth Companion - Mobile Responsive (App级适配)
    适配目标：PWA / WebView 打包成手机软件——

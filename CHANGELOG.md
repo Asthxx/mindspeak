@@ -12,6 +12,17 @@
 
 ---
 
+## [1.1.2] - 2026-08-14
+
+### 修复
+- **安卓 APK 部分机型显示成"桌面版"**（宽视口问题）：某些 Android WebView 以约 980px 宽视口渲染页面，导致手机媒体查询不生效、页面像网页不像 App。三层通用兜底（不依赖手机型号）：
+  1. **viewport 加固**：去掉 `user-scalable=no` / `maximum-scale=1.0`（已知 Android 宽视口雷区），改用 `shrink-to-fit=no`；
+  2. **JS 视口自检**：页面加载即检测"布局视口远大于手机屏幕逻辑宽"，异常时重设 viewport 并整页重载（仅一次），同时加 `forced-mobile` 类；
+  3. **CSS 兜底**：`html.forced-mobile` 下强制手机布局（底部导航、抽屉侧边栏、内容全宽、安全区），即使媒体查询完全失效也保证手机版。
+- **WebView 原生加固**：APK 构建时在 `MainActivity` 关闭宽视口/概览模式（`setUseWideViewPort(false)` / `setLoadWithOverviewMode(false)`），从源头让所有安卓机型按手机宽度渲染。
+
+---
+
 ## [1.1.1] - 2026-08-14
 
 ### 新增

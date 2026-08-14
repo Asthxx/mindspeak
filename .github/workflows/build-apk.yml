@@ -49,6 +49,37 @@ jobs:
           npx cap init "闻道 MindSpeak" com.mindspeak.app --web-dir=dist
           npx cap add android
 
+      - name: 加固 WebView 视口 (通用兼容所有安卓机型)
+        run: |
+          # 部分 Android WebView 默认用"宽视口"(约 980px) 渲染页面，
+          # 导致 @media(max-width:768px) 手机布局不生效、页面显示成桌面版。
+          # 在 MainActivity 强制关闭宽视口/概览模式，让所有机型都按手机宽度渲染。
+          MAIN=$(find android/app/src/main/java -name 'MainActivity.java' | head -1)
+          echo "MainActivity: $MAIN"
+          cat > "$MAIN" <<'EOF'
+          package com.mindspeak.app;
+
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  // 关闭"宽视口"与"概览模式"：强制以设备宽度渲染，手机布局必生效。
+                  // 兼容所有安卓机型/系统 WebView 版本。
+                  WebSettings s = getBridge().getWebView().getSettings();
+                  s.setUseWideViewPort(false);
+                  s.setLoadWithOverviewMode(false);
+                  s.setTextZoom(100);
+              }
+          }
+          EOF
+          echo "--- 加固后 MainActivity ---"
+          cat "$MAIN"
+
+
       - name: 添加麦克风/音频权限 (跟读练习)
         run: |
           sed -i 's|<!-- Permissions -->|<uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <!-- Permissions -->|' android/app/src/main/AndroidManifest.xml
