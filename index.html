@@ -62,8 +62,8 @@
   <script src="js/api-config.js?v=20260810-2"></script>
 </head>
 <body>
-    <!-- SVG Icon Sprite -->
-  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <!-- SVG Icon Sprite（兼容 WebView：用 0 尺寸 + aria-hidden 而非 display:none，保证 <use> 引用可渲染） -->
+  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
     <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></symbol>
@@ -272,17 +272,17 @@
 <header class="app-header">
     <div class="header-left">
       <button type="button" class="btn-menu" id="btn-menu" title="菜单" aria-label="打开菜单">
-        <svg class="icon"><use href="#i-menu"/></svg>
+        <svg class="icon"><use href="#i-menu" xlink:href="#i-menu"/></svg>
       </button>
-      <div class="logo"><svg class="icon icon-sage"><use href="#i-book"/></svg> 闻道 MindSpeak</div>
+      <div class="logo"><svg class="icon icon-sage"><use href="#i-book" xlink:href="#i-book"/></svg> 闻道 MindSpeak</div>
     </div>
     <div class="header-right">
       <div class="stats-bar">
-        <span title="等级"><svg class="icon icon-coral"><use href="#i-trophy"/></svg> <span id="stat-level">Lv.1</span></span>
-        <span title="积分"><svg class="icon icon-sage"><use href="#i-diamond"/></svg> <span id="stat-points">0</span></span>
-        <span class="stat-items-btn" title="道具（点击进入商店）"><svg class="icon icon-coral"><use href="#i-shop"/></svg> <span id="stat-items">0</span></span>
-        <span title="连续打卡"><svg class="icon icon-coral"><use href="#i-fire"/></svg> <span id="stat-streak">0</span> 天</span>
-        <span title="已掌握单词"><svg class="icon icon-sage"><use href="#i-check"/></svg> <span id="stat-words">0</span> 词</span>
+        <span title="等级"><svg class="icon icon-coral"><use href="#i-trophy" xlink:href="#i-trophy"/></svg> <span id="stat-level">Lv.1</span></span>
+        <span title="积分"><svg class="icon icon-sage"><use href="#i-diamond" xlink:href="#i-diamond"/></svg> <span id="stat-points">0</span></span>
+        <span class="stat-items-btn" title="道具（点击进入商店）"><svg class="icon icon-coral"><use href="#i-shop" xlink:href="#i-shop"/></svg> <span id="stat-items">0</span></span>
+        <span title="连续打卡"><svg class="icon icon-coral"><use href="#i-fire" xlink:href="#i-fire"/></svg> <span id="stat-streak">0</span> 天</span>
+        <span title="已掌握单词"><svg class="icon icon-sage"><use href="#i-check" xlink:href="#i-check"/></svg> <span id="stat-words">0</span> 词</span>
       </div>
       <button class="theme-toggle" id="btn-theme-toggle" title="切换主题">
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -294,43 +294,43 @@
   <!-- 左侧导航 -->
   <nav class="sidebar">
     <button class="nav-btn active" data-tab="home">
-      <svg class="icon"><use href="#i-chart"/></svg>
+      <svg class="icon"><use href="#i-chart" xlink:href="#i-chart"/></svg>
       <span class="label">首页</span>
     </button>
 
     <!-- 学习 -->
     <div class="nav-group" id="group-learn">
       <button type="button" class="nav-group-title" aria-expanded="true">
-        <svg class="icon"><use href="#i-book"/></svg>
+        <svg class="icon"><use href="#i-book" xlink:href="#i-book"/></svg>
         <span class="label">学习</span>
-        <svg class="nav-chevron"><use href="#i-chevron-down"/></svg>
+        <svg class="nav-chevron"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg>
       </button>
       <button class="nav-btn" data-tab="word">
-        <svg class="icon"><use href="#i-translate"/></svg>
+        <svg class="icon"><use href="#i-translate" xlink:href="#i-translate"/></svg>
         <span class="label">背单词</span>
       </button>
       <button class="nav-btn" data-tab="story">
-        <svg class="icon"><use href="#i-book"/></svg>
+        <svg class="icon"><use href="#i-book" xlink:href="#i-book"/></svg>
         <span class="label">词文串学</span>
       </button>
       <button class="nav-btn" data-tab="listening">
-        <svg class="icon"><use href="#i-headphones"/></svg>
+        <svg class="icon"><use href="#i-headphones" xlink:href="#i-headphones"/></svg>
         <span class="label">听力训练</span>
       </button>
       <button class="nav-btn" data-tab="reading">
-        <svg class="icon"><use href="#i-article"/></svg>
+        <svg class="icon"><use href="#i-article" xlink:href="#i-article"/></svg>
         <span class="label">阅读训练</span>
       </button>
       <button class="nav-btn" data-tab="grammar">
-        <svg class="icon"><use href="#i-edit"/></svg>
+        <svg class="icon"><use href="#i-edit" xlink:href="#i-edit"/></svg>
         <span class="label">语法练习</span>
       </button>
       <button class="nav-btn" data-tab="context">
-        <svg class="icon"><use href="#i-text"/></svg>
+        <svg class="icon"><use href="#i-text" xlink:href="#i-text"/></svg>
         <span class="label">语境填空</span>
       </button>
       <button class="nav-btn" data-tab="pk">
-        <svg class="icon"><use href="#i-trophy"/></svg>
+        <svg class="icon"><use href="#i-trophy" xlink:href="#i-trophy"/></svg>
         <span class="label">单词PK</span>
       </button>
     </div>
@@ -338,28 +338,28 @@
     <!-- 训练 -->
     <div class="nav-group" id="group-train">
       <button type="button" class="nav-group-title" aria-expanded="true">
-        <svg class="icon"><use href="#i-target"/></svg>
+        <svg class="icon"><use href="#i-target" xlink:href="#i-target"/></svg>
         <span class="label">训练</span>
-        <svg class="nav-chevron"><use href="#i-chevron-down"/></svg>
+        <svg class="nav-chevron"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg>
       </button>
       <button class="nav-btn" data-tab="spelling">
-        <svg class="icon"><use href="#i-spellcheck"/></svg>
+        <svg class="icon"><use href="#i-spellcheck" xlink:href="#i-spellcheck"/></svg>
         <span class="label">拼写测试</span>
       </button>
       <button class="nav-btn" data-tab="mistakes">
-        <svg class="icon"><use href="#i-error"/></svg>
+        <svg class="icon"><use href="#i-error" xlink:href="#i-error"/></svg>
         <span class="label">错题本</span>
       </button>
       <button class="nav-btn" data-tab="mistake-train">
-        <svg class="icon"><use href="#i-target"/></svg>
+        <svg class="icon"><use href="#i-target" xlink:href="#i-target"/></svg>
         <span class="label">错词强化</span>
       </button>
       <button class="nav-btn" data-tab="speak">
-        <svg class="icon"><use href="#i-mic"/></svg>
+        <svg class="icon"><use href="#i-mic" xlink:href="#i-mic"/></svg>
         <span class="label">跟读练习</span>
       </button>
       <button class="nav-btn" data-tab="pomodoro">
-        <svg class="icon"><use href="#i-timer"/></svg>
+        <svg class="icon"><use href="#i-timer" xlink:href="#i-timer"/></svg>
         <span class="label">番茄钟</span>
       </button>
     </div>
@@ -367,16 +367,16 @@
     <!-- 成长 -->
     <div class="nav-group" id="group-grow">
       <button type="button" class="nav-group-title" aria-expanded="true">
-        <svg class="icon"><use href="#i-trophy"/></svg>
+        <svg class="icon"><use href="#i-trophy" xlink:href="#i-trophy"/></svg>
         <span class="label">成长</span>
-        <svg class="nav-chevron"><use href="#i-chevron-down"/></svg>
+        <svg class="nav-chevron"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg>
       </button>
       <button class="nav-btn" data-tab="badges">
-        <svg class="icon"><use href="#i-trophy"/></svg>
+        <svg class="icon"><use href="#i-trophy" xlink:href="#i-trophy"/></svg>
         <span class="label">成就徽章</span>
       </button>
       <button class="nav-btn" data-tab="items">
-        <svg class="icon"><use href="#i-shop"/></svg>
+        <svg class="icon"><use href="#i-shop" xlink:href="#i-shop"/></svg>
         <span class="label">道具商店</span>
       </button>
     </div>
@@ -384,30 +384,30 @@
     <!-- 工具 -->
     <div class="nav-group" id="group-tool">
       <button type="button" class="nav-group-title" aria-expanded="true">
-        <svg class="icon"><use href="#i-list"/></svg>
+        <svg class="icon"><use href="#i-list" xlink:href="#i-list"/></svg>
         <span class="label">工具</span>
-        <svg class="nav-chevron"><use href="#i-chevron-down"/></svg>
+        <svg class="nav-chevron"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg>
       </button>
       <button class="nav-btn" data-tab="search">
-        <svg class="icon"><use href="#i-search"/></svg>
+        <svg class="icon"><use href="#i-search" xlink:href="#i-search"/></svg>
         <span class="label">查单词</span>
       </button>
       <button class="nav-btn" data-tab="favorites">
-        <svg class="icon"><use href="#i-bookmark"/></svg>
+        <svg class="icon"><use href="#i-bookmark" xlink:href="#i-bookmark"/></svg>
         <span class="label">收藏夹</span>
       </button>
     </div>
 
     <button class="nav-btn" data-tab="ai">
-      <svg class="icon"><use href="#i-sparkle"/></svg>
+      <svg class="icon"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg>
       <span class="label">AI助手</span>
     </button>
     <button class="nav-btn" data-tab="settings">
-      <svg class="icon"><use href="#i-settings"/></svg>
+      <svg class="icon"><use href="#i-settings" xlink:href="#i-settings"/></svg>
       <span class="label">设置</span>
     </button>
     <button class="nav-btn" data-tab="support">
-      <svg class="icon icon-coral"><use href="#i-gift"/></svg>
+      <svg class="icon icon-coral"><use href="#i-gift" xlink:href="#i-gift"/></svg>
       <span class="label">支持开发者</span>
     </button>
 </nav>
@@ -421,24 +421,24 @@
     <section id="page-home" class="page active">
       <div class="dash-greeting">
         <div>
-          <h2><svg class="icon icon-sage"><use href="#i-sparkle"/></svg> 学习控制中心</h2>
+          <h2><svg class="icon icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg> 学习控制中心</h2>
           <p class="dash-date" id="dash-date"></p>
         </div>
-        <button class="btn btn-primary" id="btn-dash-start"><svg class="icon"><use href="#i-translate"/></svg> 开始学习</button>
+        <button class="btn btn-primary" id="btn-dash-start"><svg class="icon"><use href="#i-translate" xlink:href="#i-translate"/></svg> 开始学习</button>
       </div>
 
       <!-- 顶部统计卡 -->
       <div class="dash-stat-grid">
         <div class="dash-stat-card">
-          <div class="dash-stat-icon icon-fire"><svg class="icon"><use href="#i-fire"/></svg></div>
+          <div class="dash-stat-icon icon-fire"><svg class="icon"><use href="#i-fire" xlink:href="#i-fire"/></svg></div>
           <div class="dash-stat-main"><div class="dash-stat-num" id="dash-streak">0</div><div class="dash-stat-label">连续打卡（天）</div></div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-icon icon-check"><svg class="icon"><use href="#i-check"/></svg></div>
+          <div class="dash-stat-icon icon-check"><svg class="icon"><use href="#i-check" xlink:href="#i-check"/></svg></div>
           <div class="dash-stat-main"><div class="dash-stat-num" id="dash-mastered">0</div><div class="dash-stat-label">已掌握词汇</div></div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-icon icon-today"><svg class="icon"><use href="#i-book"/></svg></div>
+          <div class="dash-stat-icon icon-today"><svg class="icon"><use href="#i-book" xlink:href="#i-book"/></svg></div>
           <div class="dash-stat-main"><div class="dash-stat-num" id="dash-today">0</div><div class="dash-stat-label">今日学习（词）</div></div>
         </div>
       </div>
@@ -446,7 +446,7 @@
       <div class="dash-grid">
         <!-- 今日学习任务 -->
         <div class="dash-card">
-          <h3 class="dash-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-calendar"/></svg> 今日学习任务</h3>
+          <h3 class="dash-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-calendar" xlink:href="#i-calendar"/></svg> 今日学习任务</h3>
           <div class="dash-row">
             <span class="dash-label">今日新学</span>
             <span class="dash-val"><b id="dash-new">0</b> / <span id="dash-goal">10</span> 词</span>
@@ -462,22 +462,22 @@
             <div class="dp-progress"><div class="dp-bar-fill dash-master-bar" id="dash-master-bar"></div></div>
           </div>
           <div class="dash-actions">
-            <button class="btn btn-primary btn-sm" data-goto="word"><svg class="icon"><use href="#i-translate"/></svg> 去背单词</button>
-            <button class="btn btn-sm" id="btn-dash-review"><svg class="icon"><use href="#i-refresh"/></svg> 开始复习</button>
-            <button class="btn btn-sm" data-goto="story"><svg class="icon"><use href="#i-book"/></svg> 词文串学</button>
+            <button class="btn btn-primary btn-sm" data-goto="word"><svg class="icon"><use href="#i-translate" xlink:href="#i-translate"/></svg> 去背单词</button>
+            <button class="btn btn-sm" id="btn-dash-review"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 开始复习</button>
+            <button class="btn btn-sm" data-goto="story"><svg class="icon"><use href="#i-book" xlink:href="#i-book"/></svg> 词文串学</button>
           </div>
         </div>
 
         <!-- AI 学习建议 -->
         <div class="dash-card">
-          <h3 class="dash-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-sparkle"/></svg> AI 学习建议</h3>
+          <h3 class="dash-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg> AI 学习建议</h3>
           <ul class="dash-tips" id="dash-tips"></ul>
         </div>
       </div>
 
       <!-- 快捷入口 -->
       <div class="dash-card">
-        <h3 class="dash-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-book"/></svg> 快捷入口</h3>
+        <h3 class="dash-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-book" xlink:href="#i-book"/></svg> 快捷入口</h3>
         <div class="dash-quick" id="dash-quick"></div>
       </div>
 
@@ -485,10 +485,10 @@
       <div class="dash-card dash-cta-card hidden" id="dash-assessment-cta">
         <div class="dash-cta-inner">
           <div class="dash-cta-text">
-            <h3 class="dash-card-title" style="margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-sage"><use href="#i-target"/></svg> 还不知道自己的水平？</h3>
+            <h3 class="dash-card-title" style="margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-sage"><use href="#i-target" xlink:href="#i-target"/></svg> 还不知道自己的水平？</h3>
             <p style="color:var(--text-secondary);font-size:0.9rem">花 5-8 分钟做一次能力测评，了解词汇 / 语法 / 听力 / 发音 / 阅读水平，生成专属学习计划</p>
           </div>
-          <button type="button" class="btn btn-primary" data-ob-assess><svg class="icon"><use href="#i-target"/></svg> 立即测一测</button>
+          <button type="button" class="btn btn-primary" data-ob-assess><svg class="icon"><use href="#i-target" xlink:href="#i-target"/></svg> 立即测一测</button>
         </div>
       </div>
     </section>
@@ -496,17 +496,17 @@
     <!-- AI 助手 -->
     <section id="page-ai" class="page">
       <div class="ai-hero">
-        <div class="ai-hero-icon"><svg class="icon"><use href="#i-sparkle"/></svg></div>
+        <div class="ai-hero-icon"><svg class="icon"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg></div>
         <div>
           <h2>AI 英语教练</h2>
           <p>基于你的学习数据生成个性化报告与行动建议</p>
         </div>
-        <button type="button" class="btn btn-primary" id="btn-assessment"><svg class="icon"><use href="#i-target"/></svg> 能力测评</button>
+        <button type="button" class="btn btn-primary" id="btn-assessment"><svg class="icon"><use href="#i-target" xlink:href="#i-target"/></svg> 能力测评</button>
       </div>
       <div class="ai-grid">
         <!-- 学习概况 -->
         <div class="ai-card">
-          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-analytics"/></svg> 学习概况</h3>
+          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-analytics" xlink:href="#i-analytics"/></svg> 学习概况</h3>
           <div class="ai-ov-grid">
             <div class="ai-ov-item"><span class="ai-ov-num" id="ai-ov-streak">0</span><span class="ai-ov-label">连续打卡（天）</span></div>
             <div class="ai-ov-item"><span class="ai-ov-num" id="ai-ov-mastered">0</span><span class="ai-ov-label">已掌握词汇</span></div>
@@ -517,33 +517,33 @@
 
         <!-- 能力诊断 -->
         <div class="ai-card">
-          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-target"/></svg> 能力诊断</h3>
+          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-target" xlink:href="#i-target"/></svg> 能力诊断</h3>
           <div class="ai-weak" id="ai-weakness"></div>
         </div>
 
         <!-- AI 建议 -->
         <div class="ai-card">
-          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-sparkle"/></svg> AI 建议</h3>
+          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg> AI 建议</h3>
           <ul class="ai-tips" id="ai-tips"></ul>
         </div>
 
         <!-- 今日行动 -->
         <div class="ai-card">
-          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-calendar"/></svg> 今日行动</h3>
+          <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-calendar" xlink:href="#i-calendar"/></svg> 今日行动</h3>
           <div class="ai-actions" id="ai-actions"></div>
         </div>
       </div>
 
       <!-- AI 对话（AI Coach 对话式交互） -->
       <div class="ai-chat-card">
-        <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-robot"/></svg> AI 对话</h3>
+        <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"><use href="#i-robot" xlink:href="#i-robot"/></svg> AI 对话</h3>
         <p class="ai-chat-sub">问我任何学习问题，例如：「解释单词 abandon」「帮我制定学习计划」「分析我的错题」「我学得怎么样？」</p>
         <div class="ai-chat-window" id="ai-chat-window">
           <div class="ai-chat-msgs" id="ai-chat-msgs"></div>
           <div class="ai-chat-chips" id="ai-chat-chips"></div>
           <div class="ai-chat-input-row">
             <input type="text" id="ai-chat-input" placeholder="输入你的问题，按回车发送..." maxlength="200" autocomplete="off">
-            <button class="btn btn-primary" id="ai-chat-send"><svg class="icon"><use href="#i-send"/></svg></button>
+            <button class="btn btn-primary" id="ai-chat-send"><svg class="icon"><use href="#i-send" xlink:href="#i-send"/></svg></button>
           </div>
         </div>
       </div>
@@ -551,23 +551,23 @@
 
     <!-- 背单词页面 -->
     <section id="page-word" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-translate"/></svg> 背单词</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-translate" xlink:href="#i-translate"/></svg> 背单词</h2>
       <div class="section-header">
         <label>选择词库：</label>
         <select id="word-category">
           <option value="">加载中...</option>
         </select>
         <div class="view-toggle">
-          <button class="view-btn active" id="btn-view-card" title="卡片视图"><svg class="icon"><use href="#i-carousel"/></svg></button>
-          <button class="view-btn" id="btn-view-list" title="列表视图"><svg class="icon"><use href="#i-list"/></svg></button>
+          <button class="view-btn active" id="btn-view-card" title="卡片视图"><svg class="icon"><use href="#i-carousel" xlink:href="#i-carousel"/></svg></button>
+          <button class="view-btn" id="btn-view-list" title="列表视图"><svg class="icon"><use href="#i-list" xlink:href="#i-list"/></svg></button>
         </div>
-        <button class="btn-sm" id="btn-add-word"><svg class="icon"><use href="#i-add"/></svg> 添加新词</button>
-        <button class="btn-sm" id="btn-reset-card-pos" title="把当前词库的翻页位置重置到第 1 张"><svg class="icon"><use href="#i-refresh"/></svg> 重置翻页进度</button>
+        <button class="btn-sm" id="btn-add-word"><svg class="icon"><use href="#i-add" xlink:href="#i-add"/></svg> 添加新词</button>
+        <button class="btn-sm" id="btn-reset-card-pos" title="把当前词库的翻页位置重置到第 1 张"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 重置翻页进度</button>
       </div>
 
       <div class="daily-plan-card" id="daily-plan-card">
         <div class="dp-header">
-          <span class="dp-title"><svg class="icon icon-sm icon-sage"><use href="#i-calendar"/></svg> 今日学习计划</span>
+          <span class="dp-title"><svg class="icon icon-sm icon-sage"><use href="#i-calendar" xlink:href="#i-calendar"/></svg> 今日学习计划</span>
           <button class="btn btn-sm" id="btn-dp-goal">每日新词目标：<span id="dp-goal-num">10</span> 词</button>
         </div>
         <div class="dp-row">
@@ -604,7 +604,7 @@
       <div class="card-area">
         <div class="word-nav">
           <button class="nav-arrow" id="prev-word">&lt;</button>
-          <button class="btn btn-sm btn-speak" id="btn-speak" title="朗读单词"><svg class="icon"><use href="#i-volume"/></svg> 朗读</button>
+          <button class="btn btn-sm btn-speak" id="btn-speak" title="朗读单词"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读</button>
           <span id="word-progress">0/0</span>
           <button class="nav-arrow" id="next-word">&gt;</button>
           <input type="number" id="word-jump-input" min="1" placeholder="跳转" title="输入序号后回车跳转到对应卡片" style="width:64px;padding:4px 6px;font-size:0.85rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
@@ -630,16 +630,16 @@
           </div>
         </div>
         <div class="word-actions">
-          <button class="btn btn-fav" id="btn-fav-word" title="收藏"><svg class="icon"><use href="#i-bookmark-add"/></svg></button>
-          <button class="btn btn-difficult" id="btn-forgot"><svg class="icon"><use href="#i-thumb-down"/></svg> 不认识</button>
-          <button class="btn btn-uncertain" id="btn-hesitate"><svg class="icon"><use href="#i-help"/></svg> 有点印象</button>
-          <button class="btn btn-know" id="btn-known"><svg class="icon"><use href="#i-thumb-up"/></svg> 认识</button>
-          <button class="btn btn-secondary" id="btn-flip"><svg class="icon"><use href="#i-flip"/></svg> 翻转</button>
+          <button class="btn btn-fav" id="btn-fav-word" title="收藏"><svg class="icon"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg></button>
+          <button class="btn btn-difficult" id="btn-forgot"><svg class="icon"><use href="#i-thumb-down" xlink:href="#i-thumb-down"/></svg> 不认识</button>
+          <button class="btn btn-uncertain" id="btn-hesitate"><svg class="icon"><use href="#i-help" xlink:href="#i-help"/></svg> 有点印象</button>
+          <button class="btn btn-know" id="btn-known"><svg class="icon"><use href="#i-thumb-up" xlink:href="#i-thumb-up"/></svg> 认识</button>
+          <button class="btn btn-secondary" id="btn-flip"><svg class="icon"><use href="#i-flip" xlink:href="#i-flip"/></svg> 翻转</button>
         </div>
       </div>
 
       <div class="ebbinghaus-plan">
-        <h3><svg class="icon icon-sage"><use href="#i-chart"/></svg> 艾宾浩斯遗忘曲线复习表</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-chart" xlink:href="#i-chart"/></svg> 艾宾浩斯遗忘曲线复习表</h3>
         <table class="plan-table">
           <thead>
             <tr><th>复习次数</th><th>间隔天数</th><th>记忆保持率</th></tr>
@@ -684,12 +684,12 @@
 
     <!-- 词文串学页面 -->
     <section id="page-story" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-book"/></svg> 词文串学</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-book" xlink:href="#i-book"/></svg> 词文串学</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">把今天新学的和待复习的单词串成一篇小短文，边读边巩固</p>
       <div class="story-toolbar">
-        <button class="btn btn-primary" id="btn-story-generate"><svg class="icon"><use href="#i-play"/></svg> 生成短文</button>
-        <button class="btn" id="btn-story-reshuffle"><svg class="icon"><use href="#i-refresh"/></svg> 换一批</button>
-        <button class="btn" id="btn-story-speak"><svg class="icon"><use href="#i-volume"/></svg> 朗读全文</button>
+        <button class="btn btn-primary" id="btn-story-generate"><svg class="icon"><use href="#i-play" xlink:href="#i-play"/></svg> 生成短文</button>
+        <button class="btn" id="btn-story-reshuffle"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 换一批</button>
+        <button class="btn" id="btn-story-speak"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读全文</button>
         <label class="story-toggle">
           <input type="checkbox" id="story-toggle-cn" checked> 显示中文翻译
         </label>
@@ -697,14 +697,14 @@
       <div class="story-summary hidden" id="story-summary"></div>
       <div class="story-box hidden" id="story-box"></div>
       <div class="story-words hidden" id="story-words">
-        <h3><svg class="icon icon-sage"><use href="#i-list"/></svg> 今日串学单词</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-list" xlink:href="#i-list"/></svg> 今日串学单词</h3>
         <div id="story-word-list"></div>
       </div>
     </section>
 
     <!-- 随声听页面 -->
     <section id="page-listen-along" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-headphones"/></svg> 随声听</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-headphones" xlink:href="#i-headphones"/></svg> 随声听</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">选择词库自动循环朗读，打开「听写模式」边听边默写</p>
       <div class="la-toolbar">
         <label>词库：
@@ -742,9 +742,9 @@
         <label class="la-inline"><input type="checkbox" id="la-write-mode" checked> 听写模式（隐藏单词）</label>
       </div>
       <div class="la-controls">
-        <button class="btn btn-primary" id="btn-la-play"><svg class="icon"><use href="#i-play"/></svg> 播放</button>
-        <button class="btn" id="btn-la-prev" title="上一个"><svg class="icon"><use href="#i-flip"/></svg> 上一个</button>
-        <button class="btn" id="btn-la-next" title="下一个">下一个 <svg class="icon"><use href="#i-flip"/></svg></button>
+        <button class="btn btn-primary" id="btn-la-play"><svg class="icon"><use href="#i-play" xlink:href="#i-play"/></svg> 播放</button>
+        <button class="btn" id="btn-la-prev" title="上一个"><svg class="icon"><use href="#i-flip" xlink:href="#i-flip"/></svg> 上一个</button>
+        <button class="btn" id="btn-la-next" title="下一个">下一个 <svg class="icon"><use href="#i-flip" xlink:href="#i-flip"/></svg></button>
       </div>
       <div class="la-display">
         <div class="la-progress">
@@ -768,7 +768,7 @@
 
     <!-- 拼写测试页面 -->
     <section id="page-spelling" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-spellcheck"/></svg> 拼写测试</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-spellcheck" xlink:href="#i-spellcheck"/></svg> 拼写测试</h2>
       <div class="section-header">
         <label>测试模式：</label>
         <select id="spelling-mode">
@@ -817,7 +817,7 @@
 
     <!-- 错题本页面 -->
     <section id="page-mistakes" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-error"/></svg> 错题本</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-error" xlink:href="#i-error"/></svg> 错题本</h2>
       <div class="section-header">
         <label>来源：</label>
         <select id="mistake-source">
@@ -857,8 +857,8 @@
           <h3>错题复习</h3>
           <div class="mistake-review-content" id="mistake-review-content"></div>
           <div class="modal-actions">
-            <button class="btn btn-know" id="mr-know"><svg class="icon"><use href="#i-check"/></svg> 已掌握</button>
-            <button class="btn btn-difficult" id="mr-still-wrong"><svg class="icon"><use href="#i-error"/></svg> 还不会</button>
+            <button class="btn btn-know" id="mr-know"><svg class="icon"><use href="#i-check" xlink:href="#i-check"/></svg> 已掌握</button>
+            <button class="btn btn-difficult" id="mr-still-wrong"><svg class="icon"><use href="#i-error" xlink:href="#i-error"/></svg> 还不会</button>
             <button class="btn btn-secondary" id="mr-close">关闭</button>
           </div>
         </div>
@@ -867,7 +867,7 @@
 
     <!-- 错词强化训练页面 -->
     <section id="page-mistake-train" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-target"/></svg> 错词强化训练</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-target" xlink:href="#i-target"/></svg> 错词强化训练</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">针对错题本中的单词进行专项训练，直到全部掌握</p>
       <div class="section-header">
         <label>来源：</label>
@@ -895,7 +895,7 @@
           </div>
           <div class="mt-result hidden" id="mt-result"></div>
           <div class="mt-actions" id="mt-actions" style="display:none">
-            <button class="btn btn-speak" id="btn-mt-speak"><svg class="icon"><use href="#i-volume"/></svg> 听发音</button>
+            <button class="btn btn-speak" id="btn-mt-speak"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 听发音</button>
             <button class="btn btn-primary" id="btn-mt-next">下一题 →</button>
           </div>
         </div>
@@ -930,7 +930,7 @@
 
     <!-- 音标学习页面 -->
     <section id="page-phonetics" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-mic"/></svg> 国际音标学习</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-mic" xlink:href="#i-mic"/></svg> 国际音标学习</h2>
 
       <div class="section-header">
         <label>分类：</label>
@@ -977,8 +977,8 @@
             <p id="phd-tip"></p>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-speak" id="phd-speak"><svg class="icon"><use href="#i-volume"/></svg> 朗读</button>
-            <button class="btn btn-know" id="phd-known"><svg class="icon"><use href="#i-check"/></svg> 已掌握</button>
+            <button class="btn btn-speak" id="phd-speak"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读</button>
+            <button class="btn btn-know" id="phd-known"><svg class="icon"><use href="#i-check" xlink:href="#i-check"/></svg> 已掌握</button>
             <button class="btn btn-secondary" id="phd-close">关闭</button>
           </div>
         </div>
@@ -988,9 +988,9 @@
       <div class="modal hidden" id="modal-logs">
         <div class="modal-content" style="width:860px;max-width:94vw">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-3)">
-            <h3 style="margin:0"><svg class="icon icon-sage"><use href="#i-article"/></svg> 错误日志</h3>
+            <h3 style="margin:0"><svg class="icon icon-sage"><use href="#i-article" xlink:href="#i-article"/></svg> 错误日志</h3>
             <div style="display:flex;gap:var(--sp-2)">
-              <button class="btn btn-sm" id="logs-refresh"><svg class="icon"><use href="#i-refresh"/></svg> 刷新</button>
+              <button class="btn btn-sm" id="logs-refresh"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 刷新</button>
               <button class="btn btn-sm btn-secondary" id="logs-close">关闭</button>
             </div>
           </div>
@@ -1016,7 +1016,7 @@
 
     <!-- 跟读练习页面 -->
     <section id="page-speak" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-mic"/></svg> 跟读练习</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-mic" xlink:href="#i-mic"/></svg> 跟读练习</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">听发音，跟读单词，系统自动评分</p>
       <div id="mic-notice" style="display:none;padding:var(--sp-3) var(--sp-4);background:var(--warning-light);border:1px solid var(--warning);border-radius:var(--radius-md);margin-bottom:var(--sp-4);font-size:0.85rem;color:var(--text-secondary)">
         提示：如果每次都弹出麦克风权限请求，请右键 index.html → Open with Live Server 打开
@@ -1080,7 +1080,7 @@
 
     <!-- 语法练习页面 -->
     <section id="page-grammar" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-edit"/></svg> 语法练习</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-edit" xlink:href="#i-edit"/></svg> 语法练习</h2>
       <div class="section-header">
         <label>选择练习类型：</label>
         <select id="grammar-type">
@@ -1135,7 +1135,7 @@
 
     <!-- 阅读训练页面 -->
     <section id="page-reading" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-article"/></svg> 阅读训练</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-article" xlink:href="#i-article"/></svg> 阅读训练</h2>
       <div class="section-header">
         <label>选择文章：</label>
         <select id="reading-select">
@@ -1155,9 +1155,9 @@
           <div class="r-text" id="r-text">
             <p>点击上方下拉菜单选择文章开始训练。每篇文章配有：</p>
             <ul>
-              <li><svg class="icon icon-sm"><use href="#i-translate"/></svg> 中文逐段对照翻译</li>
-              <li><svg class="icon icon-sm"><use href="#i-bookmark"/></svg> 重点词汇笔记</li>
-              <li><svg class="icon icon-sm"><use href="#i-quiz"/></svg> 阅读理解练习</li>
+              <li><svg class="icon icon-sm"><use href="#i-translate" xlink:href="#i-translate"/></svg> 中文逐段对照翻译</li>
+              <li><svg class="icon icon-sm"><use href="#i-bookmark" xlink:href="#i-bookmark"/></svg> 重点词汇笔记</li>
+              <li><svg class="icon icon-sm"><use href="#i-quiz" xlink:href="#i-quiz"/></svg> 阅读理解练习</li>
             </ul>
           </div>
           <div class="r-toggle" id="r-toggle">
@@ -1173,7 +1173,7 @@
 
     <!-- 听力训练页面 -->
 <section id="page-listening" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-headphones"/></svg> 听力训练</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-headphones" xlink:href="#i-headphones"/></svg> 听力训练</h2>
       <div class="section-header">
         <label>训练模式：</label>
         <select id="listening-mode">
@@ -1195,7 +1195,7 @@
 
         <div class="listening-card" id="listening-card">
           <div class="listening-prompt" id="listening-prompt">
-            <button class="btn btn-speak btn-lg" id="btn-listen"><svg class="icon"><use href="#i-volume"/></svg> 点击听发音</button>
+            <button class="btn btn-speak btn-lg" id="btn-listen"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 点击听发音</button>
             <div class="listening-hint" id="listening-hint"></div>
           </div>
           <div class="listening-input-area">
@@ -1222,7 +1222,7 @@
 
     <!-- 单词PK页面 -->
     <section id="page-pk" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-trophy"/></svg> 单词PK</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-trophy" xlink:href="#i-trophy"/></svg> 单词PK</h2>
       <div class="section-header">
         <label>词库：</label>
         <select id="pk-category">
@@ -1266,7 +1266,7 @@
 
     <!-- 收藏夹页面 -->
     <section id="page-favorites" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-bookmark"/></svg> 收藏夹</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-bookmark" xlink:href="#i-bookmark"/></svg> 收藏夹</h2>
       <div class="section-header">
         <label>来源：</label>
         <select id="fav-source">
@@ -1292,7 +1292,7 @@
       </div>
 
       <div class="fav-list" id="fav-list">
-        <p class="empty-tip">暂无收藏，在背单词时点击 <svg class="icon icon-sm"><use href="#i-bookmark-add"/></svg> 收藏</p>
+        <p class="empty-tip">暂无收藏，在背单词时点击 <svg class="icon icon-sm"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg> 收藏</p>
       </div>
 
       <!-- 收藏复习弹窗 -->
@@ -1301,8 +1301,8 @@
           <h3>收藏复习</h3>
           <div class="fav-review-content" id="fav-review-content"></div>
           <div class="modal-actions">
-            <button class="btn btn-know" id="fvr-know"><svg class="icon"><use href="#i-check"/></svg> 已掌握</button>
-            <button class="btn btn-difficult" id="fvr-still-wrong"><svg class="icon"><use href="#i-error"/></svg> 还不会</button>
+            <button class="btn btn-know" id="fvr-know"><svg class="icon"><use href="#i-check" xlink:href="#i-check"/></svg> 已掌握</button>
+            <button class="btn btn-difficult" id="fvr-still-wrong"><svg class="icon"><use href="#i-error" xlink:href="#i-error"/></svg> 还不会</button>
             <button class="btn btn-secondary" id="fvr-close">关闭</button>
           </div>
         </div>
@@ -1311,11 +1311,11 @@
 
     <!-- 设置页面 -->
     <section id="page-settings" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-settings"/></svg> 设置</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-settings" xlink:href="#i-settings"/></svg> 设置</h2>
 
       <!-- 学习报告 -->
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-analytics"/></svg> 学习报告</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-analytics" xlink:href="#i-analytics"/></svg> 学习报告</h3>
         <div class="report-grid">
           <div class="report-card">
             <div class="report-num" id="rpt-today">0</div>
@@ -1345,7 +1345,7 @@
 
       <!-- 学习数据分析 -->
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-analytics"/></svg> 学习数据分析</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-analytics" xlink:href="#i-analytics"/></svg> 学习数据分析</h3>
         <div class="analysis-grid">
           <div class="analysis-card">
             <div class="analysis-title">最佳学习时段</div>
@@ -1376,7 +1376,7 @@
 
       <!-- 每日挑战 -->
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-fire"/></svg> 每日挑战</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-fire" xlink:href="#i-fire"/></svg> 每日挑战</h3>
         <div class="daily-challenge" id="daily-challenge">
           <div class="dc-header">
             <span class="dc-date" id="dc-date">今日挑战</span>
@@ -1395,7 +1395,7 @@
 
       <!-- 打卡日历 -->
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-calendar"/></svg> 打卡日历</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-calendar" xlink:href="#i-calendar"/></svg> 打卡日历</h3>
         <div class="calendar-header">
           <button class="btn btn-sm" id="cal-prev">&lt;</button>
           <span id="cal-month-label"></span>
@@ -1415,17 +1415,17 @@
       <div class="settings-group">
         <h3>数据管理</h3>
         <div class="save-status" id="save-status">
-          <svg class="icon icon-sm icon-sage"><use href="#i-save"/></svg>
+          <svg class="icon icon-sm icon-sage"><use href="#i-save" xlink:href="#i-save"/></svg>
           <span id="save-time">未保存</span>
         </div>
-        <button class="btn btn-primary" id="btn-save-progress"><svg class="icon"><use href="#i-save"/></svg> 保存学习进度</button>
-        <button class="btn" id="btn-export-data"><svg class="icon"><use href="#i-upload"/></svg> 导出学习数据</button>
-<button class="btn" id="btn-export-fav"><svg class="icon"><use href="#i-bookmark-add"/></svg> 导出单词本</button>
-        <button class="btn" id="btn-export-mistakes"><svg class="icon"><use href="#i-error"/></svg> 导出错题本</button>
-        <button class="btn" id="btn-import-data"><svg class="icon"><use href="#i-download"/></svg> 导入学习数据</button>
-<button class="btn" id="btn-open-logs"><svg class="icon"><use href="#i-article"/></svg> 打开错误日志</button>
-        <button class="btn" id="btn-open-speech-diag"><svg class="icon"><use href="#i-volume"/></svg> 朗读诊断</button>
-        <button class="btn btn-danger" id="btn-reset-data"><svg class="icon"><use href="#i-delete"/></svg> 重置所有数据</button>
+        <button class="btn btn-primary" id="btn-save-progress"><svg class="icon"><use href="#i-save" xlink:href="#i-save"/></svg> 保存学习进度</button>
+        <button class="btn" id="btn-export-data"><svg class="icon"><use href="#i-upload" xlink:href="#i-upload"/></svg> 导出学习数据</button>
+<button class="btn" id="btn-export-fav"><svg class="icon"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg> 导出单词本</button>
+        <button class="btn" id="btn-export-mistakes"><svg class="icon"><use href="#i-error" xlink:href="#i-error"/></svg> 导出错题本</button>
+        <button class="btn" id="btn-import-data"><svg class="icon"><use href="#i-download" xlink:href="#i-download"/></svg> 导入学习数据</button>
+<button class="btn" id="btn-open-logs"><svg class="icon"><use href="#i-article" xlink:href="#i-article"/></svg> 打开错误日志</button>
+        <button class="btn" id="btn-open-speech-diag"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读诊断</button>
+        <button class="btn btn-danger" id="btn-reset-data"><svg class="icon"><use href="#i-delete" xlink:href="#i-delete"/></svg> 重置所有数据</button>
         <label class="auto-save-toggle">
           <input type="checkbox" id="auto-save" checked> 自动保存
           <span class="auto-save-interval">每 <input type="number" id="auto-save-interval" value="5" min="1" max="1440"> 分钟自动备份</span>
@@ -1440,7 +1440,7 @@
           <input type="checkbox" id="toggle-adaptive-review" checked> 自适应复习间隔（有点印象间隔减半、不认识次日重来）
         </label>
         <div style="margin-top:var(--sp-4);padding:var(--sp-4);background:var(--sage-surface);border-radius:var(--radius-md)">
-          <div style="font-weight:600;margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-sage"><use href="#i-sparkle"/></svg> 今日智能复习计划</div>
+          <div style="font-weight:600;margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg> 今日智能复习计划</div>
           <div style="display:flex;align-items:center;gap:var(--sp-3)">
             <span id="smart-review-progress" style="font-size:0.9rem;color:var(--sage-deep)">0/0 (0%)</span>
             <div style="flex:1;height:6px;background:var(--border);border-radius:var(--radius-full);overflow:hidden">
@@ -1450,7 +1450,7 @@
         </div>
       </div>
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-volume"/></svg> 朗读声音</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读声音</h3>
         <label style="display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap">
           预设声音：
           <select id="voice-select" style="min-width:260px">
@@ -1477,16 +1477,16 @@
             <option value="1.3">明亮</option>
           </select>
         </label>
-        <button class="btn btn-sm btn-primary" id="btn-voice-test"><svg class="icon"><use href="#i-volume"/></svg> 试听声音</button>
+        <button class="btn btn-sm btn-primary" id="btn-voice-test"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 试听声音</button>
         <p style="margin:var(--sp-3) 0 0;font-size:0.78rem;color:var(--text-tertiary);line-height:1.6">可选<b>在线音色</b>（百度/有道/谷歌，需联网，听觉一致、手机/网页同样生效）：百度·美音国内直连最快；有道美音/英音国内直连；谷歌音色多（美/英/澳）但国内手机可能连不上。也可选<b>系统声音</b>：取决于你的设备（Windows 通常有 David 男声 / Zira、Aria 女声，Chrome 有 Google 合成音）。切换后对背单词、随声听、听力等所有朗读生效。<br>在线自然声音色好，但每次点击需连服务器（约 0.5~1 秒）；勾选「本地即时语音」则用系统自带语音，几乎零延迟、不依赖网络。</p>
         <div style="margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--border)">
-          <div style="font-weight:600;margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-coral"><use href="#i-mic"/></svg> 自定义发音（真人录音）</div>
+          <div style="font-weight:600;margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-coral"><use href="#i-mic" xlink:href="#i-mic"/></svg> 自定义发音（真人录音）</div>
           <p style="margin:0 0 var(--sp-3);font-size:0.78rem;color:var(--text-tertiary);line-height:1.6">两种添加方式：<br>1. 单独上传：文件名就是单词名（如 hello.mp3 → hello）<br>2. 批量导入发音包：选择整个文件夹，自动按文件名映射所有音频（发音包可从网上按单词下载，一次导入几千个）。<br>朗读该单词时优先播放真人录音，没导入的单词仍用系统声音。本地存储最多约 4MB，导入超出部分会自动跳过。</p>
           <div style="display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center">
             <input type="file" id="cv-file" accept="audio/*" style="display:none">
             <input type="file" id="cv-file-dir" accept="audio/*" webkitdirectory directory style="display:none">
-            <button class="btn btn-sm btn-primary" id="btn-cv-add"><svg class="icon"><use href="#i-add"/></svg> 添加录音</button>
-            <button class="btn btn-sm" id="btn-cv-dir"><svg class="icon"><use href="#i-upload"/></svg> 批量导入发音包（文件夹）</button>
+            <button class="btn btn-sm btn-primary" id="btn-cv-add"><svg class="icon"><use href="#i-add" xlink:href="#i-add"/></svg> 添加录音</button>
+            <button class="btn btn-sm" id="btn-cv-dir"><svg class="icon"><use href="#i-upload" xlink:href="#i-upload"/></svg> 批量导入发音包（文件夹）</button>
             <span style="font-size:0.78rem;color:var(--text-tertiary)">支持 MP3 / WAV / M4A</span>
           </div>
           <div id="cv-list" style="margin-top:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2)"></div>
@@ -1502,7 +1502,7 @@
       </div>
       <div class="settings-group">
         <h3>分享学习成果</h3>
-        <button class="btn" id="btn-share-card"><svg class="icon"><use href="#i-carousel"/></svg> 生成分享卡片</button>
+        <button class="btn" id="btn-share-card"><svg class="icon"><use href="#i-carousel" xlink:href="#i-carousel"/></svg> 生成分享卡片</button>
         <div id="share-card-preview" style="display:none;margin-top:var(--sp-4)">
           <canvas id="share-canvas" width="400" height="200"></canvas>
           <button class="btn" id="btn-download-card" style="margin-top:var(--sp-2)">保存图片</button>
@@ -1517,7 +1517,7 @@
           <button class="color-btn" data-color="rose" style="background:#F43F5E" title="玫瑰红"></button>
           <button class="color-btn" data-color="amber" style="background:#F59E0B" title="琥珀黄"></button>
           <button class="color-btn" data-color="custom" id="btn-custom-color" title="自定义颜色" style="background:linear-gradient(135deg,#FF6B6B,#4ECDC4,#45B7D1,#96CEB4)">
-            <svg class="icon" style="width:16px;height:16px"><use href="#i-edit"/></svg>
+            <svg class="icon" style="width:16px;height:16px"><use href="#i-edit" xlink:href="#i-edit"/></svg>
           </button>
         </div>
         <div id="custom-color-picker" class="custom-color-area hidden">
@@ -1533,8 +1533,8 @@
       </div>
       <div class="settings-group">
         <div class="collapse-header" id="bg-collapse-header">
-          <h3 style="margin:0"><svg class="icon icon-sage"><use href="#i-upload"/></svg> 自定义背景</h3>
-          <svg class="icon collapse-arrow" id="bg-collapse-arrow"><use href="#i-play"/></svg>
+          <h3 style="margin:0"><svg class="icon icon-sage"><use href="#i-upload" xlink:href="#i-upload"/></svg> 自定义背景</h3>
+          <svg class="icon collapse-arrow" id="bg-collapse-arrow"><use href="#i-play" xlink:href="#i-play"/></svg>
         </div>
         <div class="collapse-body" id="bg-collapse-body">
           <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:var(--sp-3)">上传你喜欢的照片作为应用背景</p>
@@ -1542,17 +1542,17 @@
             <input type="file" id="bg-file-input" accept="image/*" style="display:none">
             <p style="color:var(--text-tertiary);margin-bottom:var(--sp-3);font-size:0.85rem">支持 JPG、PNG、GIF 格式，最大 5MB</p>
             <button class="btn btn-primary" id="btn-select-bg">
-              <svg class="icon"><use href="#i-upload"/></svg> 选择图片
+              <svg class="icon"><use href="#i-upload" xlink:href="#i-upload"/></svg> 选择图片
             </button>
             <div class="bg-preview-container" id="bg-preview-container" style="display:none">
               <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:var(--sp-2);text-align:left">预览效果：</p>
               <img id="bg-preview-img" class="bg-preview-img" alt="背景预览">
               <div class="bg-preview-actions">
                 <button class="btn btn-sm btn-primary" id="btn-apply-bg">
-                  <svg class="icon"><use href="#i-check"/></svg> 应用背景
+                  <svg class="icon"><use href="#i-check" xlink:href="#i-check"/></svg> 应用背景
                 </button>
                 <button class="btn btn-sm btn-danger" id="btn-remove-bg">
-                  <svg class="icon"><use href="#i-delete"/></svg> 移除背景
+                  <svg class="icon"><use href="#i-delete" xlink:href="#i-delete"/></svg> 移除背景
                 </button>
               </div>
             </div>
@@ -1577,33 +1577,33 @@
 
     <!-- 道具商店页面 -->
     <section id="page-items" class="page">
-        <h2><svg class="icon icon-sage"><use href="#i-shop"/></svg> 道具背包</h2>
+        <h2><svg class="icon icon-sage"><use href="#i-shop" xlink:href="#i-shop"/></svg> 道具背包</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">在这里使用道具。双倍卡/护盾卡激活后下次单词PK自动生效；提示卡/跳过卡/幸运卡点击"去练习"进入对应练习后使用</p>
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-bookmark"/></svg> 我的背包</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-bookmark" xlink:href="#i-bookmark"/></svg> 我的背包</h3>
         <div class="item-bag" id="item-bag"></div>
       </div>
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-shop"/></svg> 道具商店</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-shop" xlink:href="#i-shop"/></svg> 道具商店</h3>
         <div class="item-shop-grid" id="item-shop-grid"></div>
       </div>
       <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-sparkle"/></svg> 专属主题（积分兑换）</h3>
+        <h3><svg class="icon icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg> 专属主题（积分兑换）</h3>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:var(--sp-3)">用积分兑换专属主题，永久拥有、随时切换。兑换后立即生效，明暗模式切换依然有效。</p>
         <div id="theme-shop-bar" style="margin-bottom:var(--sp-3)"></div>
         <div class="theme-shop-grid" id="theme-shop-grid"></div>
       </div>
 
       <div class="settings-group">
-        <h3><svg class="icon icon-coral"><use href="#i-gift"/></svg> 支持开发者</h3>
+        <h3><svg class="icon icon-coral"><use href="#i-gift" xlink:href="#i-gift"/></svg> 支持开发者</h3>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:var(--sp-3)">如果这个工具对你有帮助，欢迎支持下开发者 👉</p>
-        <button class="btn btn-primary" data-goto="support"><svg class="icon"><use href="#i-gift"/></svg> 打开「支持开发者」页</button>
+        <button class="btn btn-primary" data-goto="support"><svg class="icon"><use href="#i-gift" xlink:href="#i-gift"/></svg> 打开「支持开发者」页</button>
       </div>
     </section>
 
     <!-- 支持开发者页面 -->
     <section id="page-support" class="page">
-      <h2><svg class="icon icon-coral"><use href="#i-gift"/></svg> 支持开发者</h2>
+      <h2><svg class="icon icon-coral"><use href="#i-gift" xlink:href="#i-gift"/></svg> 支持开发者</h2>
       <div class="support-wrap">
         <div class="support-note">
           <p>你好呀～很高兴这个小小的英语学习工具能成为你背单词路上的伙伴。</p>
@@ -1633,7 +1633,7 @@
 
     <!-- 成就徽章页面 -->
     <section id="page-badges" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-trophy"/></svg> 成就徽章</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-trophy" xlink:href="#i-trophy"/></svg> 成就徽章</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">达成条件自动解锁徽章，每枚奖励 30 积分</p>
       <div class="badge-summary" id="badge-summary"></div>
       <div class="badge-grid" id="badge-grid"></div>
@@ -1641,7 +1641,7 @@
 
     <!-- 语境填空页面 -->
     <section id="page-context" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-text"/></svg> 语境填空</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-text" xlink:href="#i-text"/></svg> 语境填空</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">在真实句子中填入正确的单词，强化语境记忆</p>
       <div class="context-progress" style="margin-bottom:var(--sp-4)">
         <span id="context-progress-text" style="font-size:0.85rem;color:var(--text-tertiary)">第 0/0 题</span>
@@ -1664,7 +1664,7 @@
         </div>
       </div>
       <div style="text-align:center">
-        <button class="btn btn-primary" id="btn-start-context" style="padding:14px 32px;font-size:1rem"><svg class="icon"><use href="#i-play"/></svg> 开始练习</button>
+        <button class="btn btn-primary" id="btn-start-context" style="padding:14px 32px;font-size:1rem"><svg class="icon"><use href="#i-play" xlink:href="#i-play"/></svg> 开始练习</button>
       </div>
       <div id="context-score" class="context-score hidden">
         <h3>练习完成！</h3>
@@ -1679,7 +1679,7 @@
 
     <!-- 番茄钟页面 -->
     <section id="page-pomodoro" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-timer"/></svg> 番茄钟专注</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-timer" xlink:href="#i-timer"/></svg> 番茄钟专注</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-5)">25分钟专注学习，5分钟休息，提高学习效率</p>
       <div class="pomodoro-container">
         <div class="pomodoro-display" id="pomodoro-display">25:00</div>
@@ -1691,8 +1691,8 @@
             <option value="45">45分钟</option>
             <option value="60">60分钟</option>
           </select>
-          <button class="btn btn-primary btn-pomodoro" id="btn-pomodoro-start"><svg class="icon"><use href="#i-play"/></svg> 开始专注</button>
-          <button class="btn" id="btn-pomodoro-reset"><svg class="icon"><use href="#i-refresh"/></svg> 重置</button>
+          <button class="btn btn-primary btn-pomodoro" id="btn-pomodoro-start"><svg class="icon"><use href="#i-play" xlink:href="#i-play"/></svg> 开始专注</button>
+          <button class="btn" id="btn-pomodoro-reset"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 重置</button>
         </div>
         <div id="pomodoro-message" class="pomodoro-message hidden"></div>
         <div id="pomodoro-stats" class="pomodoro-stats">已完成 0 个番茄 · 累计 0 分钟</div>
@@ -1701,7 +1701,7 @@
 
     <!-- 查单词页面 -->
     <section id="page-search" class="page">
-      <h2><svg class="icon icon-sage"><use href="#i-search"/></svg> 查单词</h2>
+      <h2><svg class="icon icon-sage"><use href="#i-search" xlink:href="#i-search"/></svg> 查单词</h2>
       <div class="search-box">
         <input type="text" id="search-input" placeholder="输入英文单词或中文释义..." maxlength="50" autocomplete="off">
         <button class="btn btn-primary" id="btn-search">查询</button>
@@ -1713,17 +1713,17 @@
 
   <!-- 移动端底部导航（App 级，仅 ≤768px 显示，桌面端隐藏） -->
   <nav class="bottom-nav" aria-label="底部导航">
-    <button type="button" class="bottom-nav-btn" data-tab="home"><svg class="icon"><use href="#i-chart"/></svg><span>首页</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="word"><svg class="icon"><use href="#i-translate"/></svg><span>背单词</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="ai"><svg class="icon"><use href="#i-sparkle"/></svg><span>AI</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="items"><svg class="icon"><use href="#i-shop"/></svg><span>商店</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg><span>设置</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="home"><svg class="icon"><use href="#i-chart" xlink:href="#i-chart"/></svg><span>首页</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="word"><svg class="icon"><use href="#i-translate" xlink:href="#i-translate"/></svg><span>背单词</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="ai"><svg class="icon"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg><span>AI</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="items"><svg class="icon"><use href="#i-shop" xlink:href="#i-shop"/></svg><span>商店</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="settings"><svg class="icon"><use href="#i-settings" xlink:href="#i-settings"/></svg><span>设置</span></button>
   </nav>
 
   <!-- 主动回忆弹窗 -->
   <div class="modal hidden" id="modal-recall">
     <div class="modal-content" style="text-align:center">
-      <h3><svg class="icon icon-sage"><use href="#i-psychology"/></svg> 主动回忆</h3>
+      <h3><svg class="icon icon-sage"><use href="#i-psychology" xlink:href="#i-psychology"/></svg> 主动回忆</h3>
       <div id="recall-prompt" style="color:var(--text-secondary);margin-bottom:var(--sp-2)"></div>
       <div id="recall-meaning" style="font-size:2rem;font-weight:800;margin:var(--sp-5) 0;
         background:linear-gradient(135deg,var(--text),var(--primary-dark));
@@ -1764,7 +1764,7 @@
     <div class="modal-content ob-modal-content">
       <div class="ob-head">
         <h3 id="ob-step-title">第 1 步 · 欢迎</h3>
-        <button type="button" class="btn-icon" id="btn-ob-close" title="跳过引导"><svg class="icon"><use href="#i-close"/></svg></button>
+        <button type="button" class="btn-icon" id="btn-ob-close" title="跳过引导"><svg class="icon"><use href="#i-close" xlink:href="#i-close"/></svg></button>
       </div>
       <div class="ob-dots">
         <span class="ob-dot active"></span><span class="ob-dot"></span><span class="ob-dot"></span><span class="ob-dot"></span>
@@ -1772,10 +1772,10 @@
 
       <!-- 第 1 步：欢迎 -->
       <div class="ob-view ob-view-0" style="text-align:center">
-        <div class="ob-welcome-icon"><svg class="icon icon-sage"><use href="#i-sparkle"/></svg></div>
+        <div class="ob-welcome-icon"><svg class="icon icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg></div>
         <h2>欢迎使用 闻道 MindSpeak</h2>
         <p style="color:var(--text-secondary)">跟着 4 个步骤，3 分钟完成设置，<br>就能开始你的免费英语学习之旅</p>
-        <button type="button" class="btn btn-primary" id="btn-ob-welcome-next"><svg class="icon"><use href="#i-chevron-right"/></svg> 马上下一步</button>
+        <button type="button" class="btn btn-primary" id="btn-ob-welcome-next"><svg class="icon"><use href="#i-chevron-right" xlink:href="#i-chevron-right"/></svg> 马上下一步</button>
       </div>
 
       <!-- 第 2 步：每日目标 -->
@@ -1790,10 +1790,10 @@
         </div>
         <div class="ob-goal-custom-row">
           <input type="number" id="ob-goal-custom" class="assess-input ob-goal-custom-input hidden" placeholder="自定义数量（1-100）" min="1" max="100">
-          <button type="button" class="btn btn-sm" id="ob-goal-toggle-custom"><svg class="icon"><use href="#i-edit"/></svg> 自定义</button>
+          <button type="button" class="btn btn-sm" id="ob-goal-toggle-custom"><svg class="icon"><use href="#i-edit" xlink:href="#i-edit"/></svg> 自定义</button>
         </div>
         <div class="ob-nav-actions">
-          <button type="button" class="btn btn-sm" id="btn-ob-goal-back"><svg class="icon"><use href="#i-chevron-left"/></svg> 上一步</button>
+          <button type="button" class="btn btn-sm" id="btn-ob-goal-back"><svg class="icon"><use href="#i-chevron-left" xlink:href="#i-chevron-left"/></svg> 上一步</button>
           <button type="button" class="btn btn-primary btn-sm" id="btn-ob-goal-next">下一步</button>
         </div>
       </div>
@@ -1804,9 +1804,9 @@
         <p class="ob-sub">测评会从词汇、语法、听力、发音、阅读五个维度了解你的水平，为你生成学习计划</p>
         <div class="ob-assess-box" id="ob-assess-info"></div>
         <div class="ob-nav-actions" style="flex-direction:column;align-items:stretch;gap:var(--sp-3)">
-          <button type="button" class="btn btn-primary" id="btn-ob-assess-start"><svg class="icon"><use href="#i-play"/></svg> 立即测一测（约 5-8 分钟）</button>
+          <button type="button" class="btn btn-primary" id="btn-ob-assess-start"><svg class="icon"><use href="#i-play" xlink:href="#i-play"/></svg> 立即测一测（约 5-8 分钟）</button>
           <button type="button" class="btn btn-sm" id="btn-ob-assess-skip">跳过测评，先看通用计划</button>
-          <button type="button" class="btn btn-sm" id="btn-ob-assess-back" style="align-self:flex-start"><svg class="icon"><use href="#i-chevron-left"/></svg> 上一步</button>
+          <button type="button" class="btn btn-sm" id="btn-ob-assess-back" style="align-self:flex-start"><svg class="icon"><use href="#i-chevron-left" xlink:href="#i-chevron-left"/></svg> 上一步</button>
         </div>
       </div>
 
@@ -1815,8 +1815,8 @@
         <h3 class="ob-question">你的专属学习计划</h3>
         <div id="ob-plan-box"></div>
         <div class="ob-nav-actions">
-          <button type="button" class="btn btn-sm" id="btn-ob-plan-back"><svg class="icon"><use href="#i-chevron-left"/></svg> 上一步</button>
-          <button type="button" class="btn btn-primary" id="btn-ob-start"><svg class="icon"><use href="#i-play"/></svg> 开始学习</button>
+          <button type="button" class="btn btn-sm" id="btn-ob-plan-back"><svg class="icon"><use href="#i-chevron-left" xlink:href="#i-chevron-left"/></svg> 上一步</button>
+          <button type="button" class="btn btn-primary" id="btn-ob-start"><svg class="icon"><use href="#i-play" xlink:href="#i-play"/></svg> 开始学习</button>
         </div>
         <button type="button" class="btn btn-sm" id="btn-ob-skip" style="width:100%;margin-top:var(--sp-2)">先跳过，稍后再完善计划</button>
       </div>
@@ -1827,23 +1827,23 @@
   <div class="modal hidden" id="assessment-modal">
     <div class="modal-content assess-modal-content">
       <div class="assess-head">
-        <h3><svg class="icon icon-sage"><use href="#i-target"/></svg> 能力测评</h3>
-        <button type="button" class="btn-icon" id="btn-assessment-close" title="关闭"><svg class="icon"><use href="#i-close"/></svg></button>
+        <h3><svg class="icon icon-sage"><use href="#i-target" xlink:href="#i-target"/></svg> 能力测评</h3>
+        <button type="button" class="btn-icon" id="btn-assessment-close" title="关闭"><svg class="icon"><use href="#i-close" xlink:href="#i-close"/></svg></button>
       </div>
 
       <!-- 欢迎页 -->
       <div class="assess-view assess-view-welcome" style="text-align:center">
-        <div class="assess-welcome-icon"><svg class="icon icon-sage"><use href="#i-sparkle"/></svg></div>
+        <div class="assess-welcome-icon"><svg class="icon icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg></div>
         <p>通过 <b>15 道题</b> 快速定位你的英语水平，<br>覆盖五个核心能力维度：</p>
         <div class="assess-welcome-dims">
-          <span class="aw-dim"><svg class="icon"><use href="#i-book"/></svg>词汇</span>
-          <span class="aw-dim"><svg class="icon"><use href="#i-spellcheck"/></svg>语法</span>
-          <span class="aw-dim"><svg class="icon"><use href="#i-headphones"/></svg>听力</span>
-          <span class="aw-dim"><svg class="icon"><use href="#i-mic"/></svg>发音</span>
-          <span class="aw-dim"><svg class="icon"><use href="#i-article"/></svg>阅读</span>
+          <span class="aw-dim"><svg class="icon"><use href="#i-book" xlink:href="#i-book"/></svg>词汇</span>
+          <span class="aw-dim"><svg class="icon"><use href="#i-spellcheck" xlink:href="#i-spellcheck"/></svg>语法</span>
+          <span class="aw-dim"><svg class="icon"><use href="#i-headphones" xlink:href="#i-headphones"/></svg>听力</span>
+          <span class="aw-dim"><svg class="icon"><use href="#i-mic" xlink:href="#i-mic"/></svg>发音</span>
+          <span class="aw-dim"><svg class="icon"><use href="#i-article" xlink:href="#i-article"/></svg>阅读</span>
         </div>
         <p>大约需要 5-8 分钟，发音题需使用麦克风</p>
-        <button type="button" class="btn btn-primary" id="btn-assessment-start"><svg class="icon"><use href="#i-play"/></svg> 开始测评</button>
+        <button type="button" class="btn btn-primary" id="btn-assessment-start"><svg class="icon"><use href="#i-play" xlink:href="#i-play"/></svg> 开始测评</button>
       </div>
 
       <!-- 答题页 -->
@@ -1867,8 +1867,8 @@
       <div class="assess-view assess-view-result" style="display:none">
         <div id="assess-result-box"></div>
         <div class="assess-result-actions">
-          <button type="button" class="btn btn-secondary" id="btn-assessment-again"><svg class="icon"><use href="#i-refresh"/></svg> 再测一次</button>
-          <button type="button" class="btn btn-primary" data-assessment-close><svg class="icon"><use href="#i-close"/></svg> 完成</button>
+          <button type="button" class="btn btn-secondary" id="btn-assessment-again"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 再测一次</button>
+          <button type="button" class="btn btn-primary" data-assessment-close><svg class="icon"><use href="#i-close" xlink:href="#i-close"/></svg> 完成</button>
         </div>
       </div>
     </div>
