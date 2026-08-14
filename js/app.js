@@ -1068,6 +1068,14 @@ _markOnlineBroken: function() {
     // 百度 gettts 有 Referer 校验（安卓 WebView 里 no-referrer 常失效 → 返回错误码 4 空音频），
     // 谷歌源墙内不可达。故系统默认/本地声音/未匹配音色的兜底顺序为：有道美音 → 有道英音 → 百度 → 谷歌系。
     var DEFAULT_ORDER = ['youdao_us', 'youdao_uk', 'baidu', 'google_us', 'google_uk', 'google_au', 'google_in'];
+    // 安卓 WebView：<audio> 无视 referrerPolicy，必带页面 Referer（https://localhost），
+    // 百度 gettts 校验 Referer 返回空、谷歌安卓 UA 返回 404 —— 这俩系连了必失败还拖慢降级。
+    // 安卓端直接从候选源剔除百度/谷歌，只用有道（不校验 Referer，实测稳定出声）。
+    var _isAndroidSrc = false;
+    try { _isAndroidSrc = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase()); } catch(e) {}
+    if (_isAndroidSrc) {
+      DEFAULT_ORDER = ['youdao_us', 'youdao_uk'];
+    }
     var vn = '';
     try { if (self.getSettings) vn = self.getSettings().voiceName || ''; } catch(e) {}
     var firstId = VOICE_FIRST[vn] || '';
@@ -5696,6 +5704,15 @@ function fillVoiceOptions() {
       // 合成，手机上选了也不会响（会走远程兜底）。标注"需电脑"，避免误导用户。
       var isAndroid = false;
       try { isAndroid = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase()); } catch(e) {}
+      // 安卓 WebView 里 <audio> 无视 referrerPolicy，始终带页面 Referer（https://localhost）：
+      // 百度 gettts 校验 Referer（带非 fanyi.baidu.com 返回空音频）、谷歌安卓 UA 返回 404，
+      // 这俩系在手机上点了必无声。只保留不校验 Referer 的有道美音/英音，避免误导用户。
+      // （桌面版浏览器 referrerPolicy 正常，保留全部音色。）
+      if (isAndroid) {
+        ONLINE_STATIC = ONLINE_STATIC.filter(function(o) {
+          return o.v === '__online_youdao_us__' || o.v === '__online_youdao_uk__';
+        });
+      }
       var localHint = isAndroid ? '（手机版不可用，需电脑 + server 运行）' : '（离线 SAPI，需 server 运行）';
       html += '<option value="__local_david__">本地男声（David · ' + localHint + '</option>';
       html += '<option value="__local_zira__">本地女声（Zira · ' + localHint + '</option>';
