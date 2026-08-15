@@ -447,7 +447,6 @@
       return result;
     };
   }
-
 })();
 
 // ---------------- reading-extra.js ----------------
@@ -929,7 +928,6 @@ var EXTRA_READING = [
       added++;
     }
   });
-
 })();
 
 // ---------------- reading-expand2.js ----------------
@@ -1318,7 +1316,6 @@ var EXTRA_READING = [
       added++;
     }
   });
-
 })();
 
 // ---------------- reading-expand3.js ----------------
@@ -1533,7 +1530,6 @@ var EXTRA_READING = [
       added++;
     }
   });
-
 })();
 
 // ---------------- reading-expand4.js ----------------
@@ -1965,5 +1961,4 @@ var EXTRA_READING = [
       added++;
     }
   });
-
 })();

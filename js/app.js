@@ -277,13 +277,14 @@ TTSManager.cancel();
         this._stopLocalAudio();
         var audio = new Audio(custom[key]);
         this._localAudio = audio; // 登记到共享句柄：连续点击时 _stopLocalAudio 能停掉上一个，防叠加播放
+        this._attachAudioEl(audio);
         var that = this;
         if (opts && opts.onend) {
-          audio.onended = function() { that._localAudio = null; if (opts.onend) opts.onend(); };
+          audio.onended = function() { that._localAudio = null; that._detachAudioEl(audio); if (opts.onend) opts.onend(); };
         } else {
-          audio.onended = function() { that._localAudio = null; };
+          audio.onended = function() { that._localAudio = null; that._detachAudioEl(audio); };
         }
-        audio.onerror = function() { that._localAudio = null; };
+        audio.onerror = function() { that._localAudio = null; that._detachAudioEl(audio); };
         var pr = audio.play();
         // play() 是异步的：同步抛错或 Promise 拒绝都兜底走 speechSynthesis，绝不静默
         if (pr && pr.catch) pr.catch(function() { that._speakTTS(text, lang, opts); });
@@ -365,13 +366,15 @@ TTSManager.cancel();
       this._stopLocalAudio();
       var audio = new Audio(src);
       this._localAudio = audio;
+      this._attachAudioEl(audio);
       console.log('[TTS LETTER] ' + up);
       console.log('[TTS LETTER] Voice: 音频资源 ' + src);
       if (opts && opts.onend) audio.onended = function() {
         if (self._localAudio === audio) self._localAudio = null;
+        self._detachAudioEl(audio);
         try { opts.onend(); } catch(e) {}
       };
-      audio.onerror = function() { if (self._localAudio === audio) self._localAudio = null; toTTS(); };
+      audio.onerror = function() { if (self._localAudio === audio) self._localAudio = null; self._detachAudioEl(audio); toTTS(); };
       var pr = audio.play();
       if (pr && pr.catch) pr.catch(function(e) {
         if (e && e.name === 'AbortError') return;
@@ -727,6 +730,15 @@ var u;
     }
     this._waSeq = (this._waSeq || 0) + 1;
   },
+  // Android WebView 兼容：部分 WebView 里 new Audio() 创建的元素若不挂到 DOM 上
+  // 会"看似播放成功却不出声"（onplay 正常触发、无 error）。统一在播放前挂到
+  // <body>（不可见），结束/失败/换源后移除，避免元素残留与重复挂载。
+  _attachAudioEl: function(audio) {
+    try { if (audio && !audio.parentNode && document.body) document.body.appendChild(audio); } catch(e) {}
+  },
+  _detachAudioEl: function(audio) {
+    try { if (audio && audio.parentNode) audio.parentNode.removeChild(audio); } catch(e) {}
+  },
   // 保底朗读：在线声不可用/浏览器不支持 speechSynthesis 时，
   // 用本地 server /api/tts（Windows SAPI Microsoft Zira/Huihui，完全离线）
   // 合成 WAV 播放，确保"点击朗读一定有声音"。只有保底也失败才提示用户。
@@ -757,6 +769,7 @@ _speakLocal: function(text, lang, opts) {
     try { audio = new Audio(url); } catch(e) { this._ttsLocalFail(opts); return; }
     this._stopLocalAudio();
     this._localAudio = audio;
+    this._attachAudioEl(audio);
     var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
     // 同一段音频只报一次失败：加载 onerror 和 play() 拒绝都可能触发，避免连弹两个 Toast
@@ -768,12 +781,14 @@ _speakLocal: function(text, lang, opts) {
     };
     audio.onended = function() {
       if (self._localAudio === audio) self._localAudio = null;
+      self._detachAudioEl(audio);
       fireEnd();
     };
 audio.onerror = function() {
       // 已被下一次点击取代（pause+清 src 会触发 onerror）→ 正常现象，不算失败
-      if (self._localAudio !== audio) { self._diag('local-old-abort', String(text).slice(0, 20)); return; }
+      if (self._localAudio !== audio) { self._diag('local-old-abort', String(text).slice(0, 20)); self._detachAudioEl(audio); return; }
       self._diag('local-onerror', 'code=' + (audio.error ? audio.error.code : '?'));
+      self._detachAudioEl(audio);
       failOnce();
     };
     fireStart();
@@ -824,6 +839,7 @@ _speakGoogleTTS: function(text, lang, opts) {
     var audio;
     try { audio = new Audio(url); } catch(e) { this._speakLocal(text, lang, opts); return; }
     this._localAudio = audio;
+    this._attachAudioEl(audio);
     var fireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
     var failed = false;
@@ -831,16 +847,19 @@ var failOnce = function() {
       if (failed) return;
       failed = true;
       if (self._localAudio === audio) self._localAudio = null;
+      self._detachAudioEl(audio);
       self._diag('google-fail', String(text).slice(0, 20));
       self._speakLocal(text, lang, opts);
     };
     audio.onended = function() {
       if (self._localAudio === audio) self._localAudio = null;
+      self._detachAudioEl(audio);
       self._diag('local-ended', String(text).slice(0, 20));
       fireEnd();
     };
     audio.onerror = function() {
       if (self._localAudio !== audio) return;
+      self._detachAudioEl(audio);
       failOnce();
     };
     fireStart();
@@ -1098,8 +1117,10 @@ _markOnlineBroken: function() {
       var h = self._srcHealth || (self._srcHealth = {});
       h[id] = 0;
     };
-    // 并行抢播源集合：首选源（用户选的音色）+ 国内直连兜底（百度/有道美音），
+    // 并行抢播源集合：首选源（用户选的音色）+ 国内直连兜底（有道/百度），
     // 最多 3 个同时发起（并发过多会触发百度/有道反爬返回空 HTML），谁先出声用谁。
+    // 注意：安卓端只过滤 DEFAULT_ORDER 不够——百度/谷歌仍会以"兜底源"身份进入这里的
+    // 并行抢播（fb 列表），其空音频会抢占胜者导致无声。安卓必须在这里也剔除百度/谷歌。
     var pickSrcs = function() {
       // 快跳过：本块当前的 src 已在健康表里（连续失败过），直接推进到下一个候选，
       // 避免"选一个已知失败的源再等 3.2s 超时"——真机全部源被墙时几十秒才报错，
@@ -1107,9 +1128,17 @@ _markOnlineBroken: function() {
       while (src < SRC_COUNT && self._srcHealth && (self._srcHealth[order[src].id] || 0) >= 2) src++;
       var first = order[src] || order[0];
       var ids = [first.id];
-      var fb = ['youdao_us', 'youdao_uk', 'baidu'];
-      for (var fi = 0; fi < fb.length; fi++) {
-        if (ids.indexOf(fb[fi]) === -1 && !(self._srcHealth && (self._srcHealth[fb[fi]] || 0) >= 2)) ids.push(fb[fi]);
+      if (_isAndroidSrc) {
+        // 安卓并行候选只含有道美/英音（不校验 Referer，实测稳定出声）；
+        // 百度 gettts 带页面 Referer 返回空音频、谷歌安卓 UA 返回 404，连了必失败还抢胜者
+        if (ids[0] !== 'youdao_us') ids.push('youdao_us');
+        if (ids.indexOf('youdao_uk') === -1) ids.push('youdao_uk');
+        ids = ids.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk'; });
+      } else {
+        var fb = ['youdao_us', 'youdao_uk', 'baidu'];
+        for (var fi = 0; fi < fb.length; fi++) {
+          if (ids.indexOf(fb[fi]) === -1 && !(self._srcHealth && (self._srcHealth[fb[fi]] || 0) >= 2)) ids.push(fb[fi]);
+        }
       }
       var out = [];
       for (var oi2 = 0; oi2 < ids.length; oi2++) {
@@ -1176,6 +1205,8 @@ _markOnlineBroken: function() {
           // <audio> 默认带页面来源 Referer（github.io），会被拒播；设 no-referrer 绕过。
           // 有道源不受 Referer 限制，设此属性也无副作用。
           try { audio.referrerPolicy = 'no-referrer'; } catch(e) {}
+          // Android WebView 兼容：挂到 DOM 再播放，避免"播放成功但无声"
+          self._attachAudioEl(audio);
           (self._pendingAudio = self._pendingAudio || []).push(audio);
           var claim = function() {
             if (seq !== self._waSeq || done || resolved) return;
@@ -1191,24 +1222,35 @@ _markOnlineBroken: function() {
             self._pendingAudio = [];
           markSrcOk(srcObj.id);
             if (!fireStartFired) { fireStartFired = true; fireStart(); }
-            // 空/损坏音频判定：部分源（如百度 gettts 在安卓 WebView 被 Referer 拒）会返回
-            // 空 MP3 或空 HTML，<audio> 能 onplay 但极短时间（<400ms）就 ended 且没真实声音。
-            // 此时若把它当"成功"，会停掉并行发起的其他可用源（有道等）→ 表现成"选了这个
-            // 音色没声音"。判定为空音频 → 释放胜者状态，立即用下一个可用源兜底出声。
+            // 空/损坏/卡住音频判定：部分源（如百度 gettts 在安卓 WebView 被 Referer 拒）会
+            // 返回空 MP3 或空 HTML，<audio> 能 onplay 但立即 ended 且 currentTime 始终为 0
+            // （没有真实声音）；个别 WebView 里 <audio> 播放无声但 currentTime 不动。
+            // 此时若把它当"成功"，会停掉并行发起的其他可用源（有道等）→ 表现成"点了没声音"。
+            // 判定后释放胜者状态，立即用下一个可用源兜底出声。
+            // 注意：判定必须能真正触发——旧版用 (Date.now()-claimAt)<400 判断，而
+            // setTimeout(400) 回调触发时该差值恒 ≥400（定时器不可能提前触发），
+            // 条件永不成立 = 死代码，空音频会一直占着胜者位导致无声无提示。
             var claimAt = Date.now();
             setTimeout(function() {
-              if (seq !== self._waSeq || done) return;
-              if (win === audio && (audio.ended || audio.currentTime === 0) && (Date.now() - claimAt) < 400) {
-                self._diag('remote-empty', 'chunk=' + ci + ' src=' + srcObj.id + ' (空/损坏音频，换源)');
+              if (seq !== self._waSeq || done || !resolved) return;
+              if (win !== audio) return;
+              var t = 0;
+              try { t = audio.currentTime || 0; } catch(e) {}
+              // ① ended 且 currentTime=0：空/损坏文件（真实发音结束前 currentTime>0）；
+              // ② 700ms 仍无推进：播放无声/卡住（WebView 兼容问题），同样换源兜底。
+              var bad = (audio.ended && t === 0) || (!audio.ended && t === 0 && (Date.now() - claimAt) >= 700);
+              if (bad) {
+                self._diag('remote-empty', 'chunk=' + ci + ' src=' + srcObj.id + ' (空/损坏/卡住音频，换源)');
                 resolved = false;
                 win = null;
                 if (self._localAudio === audio) self._localAudio = null;
                 try { audio.pause(); audio.src = ''; } catch(e) {}
+                self._detachAudioEl(audio);
                 markSrcFail(srcObj.id);
                 src++;
                 playChunk();
               }
-            }, 400);
+            }, 700);
           };
           audio.oncanplaythrough = function() { if (!resolved) { try { audio.play(); } catch(e) {} } };
           audio.onplay = claim;
@@ -1217,13 +1259,28 @@ _markOnlineBroken: function() {
             // 只认获胜者：败者在被 pause/清 src 时也可能触发 ended，误推进块会跳过剩余 chunk
             if (win !== audio && resolved) return;
             if (self._localAudio === audio) self._localAudio = null;
+            self._detachAudioEl(audio);
             if (to) { clearTimeout(to); to = null; }
+            // 空音频保护（onended 路径）：胜者极短就 ended 且 currentTime 从未推进（=0）
+            // → 空/损坏文件。若按"成功"处理（anyPlayed=true）会整句无声却无提示，且 700ms
+            // 看门狗已被 done 挡住无法恢复。这里释放胜者位，换下一个源重播本块。
+            var t = 0;
+            try { t = audio.currentTime || 0; } catch(e) {}
+            if (win === audio && t === 0) {
+              self._diag('remote-empty-end', 'chunk=' + ci + ' src=' + srcObj.id + ' (空音频直接 ended，换源)');
+              resolved = false;
+              win = null;
+              markSrcFail(srcObj.id);
+              if (!done) { src++; playChunk(); }
+              return;
+            }
             if (!done) { anyPlayed = true; ci++; src = 0; playChunk(); }
           };
           audio.onerror = function() {
             self._diag('remote-err', 'chunk=' + ci + ' src=' + srcObj.id + ' ' + (audio.error ? audio.error.code : '?'));
             // 败者被 pause/清 src 触发的 AbortError 不算失败（健康标记只记真实源问题）；
             // 只有"generate 阶段已决定不是胜者"的源才跳过。resolved 后其它源全是被主动停的。
+            self._detachAudioEl(audio);
             if (!resolved) markSrcFail(srcObj.id);
             // 单个源失败不立即换源：并行其它源可能正在出声，交给块级窗口兜底
           };
@@ -5895,7 +5952,13 @@ if (name) {
           '<button class="btn btn-sm" title="试听" data-act="play"><svg class="icon"><use href="#i-volume"/></svg></button>' +
           '<button class="btn btn-sm btn-danger" title="删除" data-act="del"><svg class="icon"><use href="#i-delete"/></svg></button>';
         row.querySelector('[data-act="play"]').addEventListener('click', function() {
-          try { var a = new Audio(customVoiceMap[w]); a.play(); } catch(e) {}
+          try {
+            var a = new Audio(customVoiceMap[w]);
+            SpeechUtil._attachAudioEl(a);
+            a.onended = function() { SpeechUtil._detachAudioEl(a); };
+            a.onerror = function() { SpeechUtil._detachAudioEl(a); };
+            a.play();
+          } catch(e) {}
         });
         row.querySelector('[data-act="del"]').addEventListener('click', function() {
           delete customVoiceMap[w];
