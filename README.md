@@ -17,13 +17,13 @@
 
 <div align="center">
 
-[![下载 APK](https://img.shields.io/badge/⬇️_下载最新版_APK_v1.1.1-brightgreen?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Asthxx/mindspeak/releases/download/v1.1.1/MindSpeak-Android-v1.1.1.apk)
+[![下载 APK](https://img.shields.io/badge/⬇️_下载最新版_APK_v1.0.0-brightgreen?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Asthxx/mindspeak/releases/download/v1.0.0/MindSpeak-Android-v1.0.0.apk)
 
 [![查看全部版本](https://img.shields.io/badge/查看全部版本-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Asthxx/mindspeak/releases)
 
 </div>
 
-1. 点击上方绿色按钮下载 `MindSpeak-Android-v1.1.1.apk` 到手机；
+1. 点击上方绿色按钮下载 `MindSpeak-Android-v1.0.0.apk` 到手机；
 2. 打开文件安装（首次需在手机设置中允许「安装未知来源应用」）；
 3. 安装完成，打开「闻道 MindSpeak」即可开始背词学习。
 

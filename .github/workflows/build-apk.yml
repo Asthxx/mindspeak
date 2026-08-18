@@ -113,8 +113,10 @@ jobs:
                   <item name="windowNoTitle">true</item>
                   <item name="android:windowNoTitle">true</item>
                   <item name="android:windowContentOverlay">@null</item>
-                  <!-- 状态栏/导航栏：不透明，颜色与 App 顶部 UI 背景一致（浅色 #F4F6F8） -->
-                  <item name="android:statusBarColor">#F4F6F8</item>
+                  <!-- 状态栏：与 App 顶部白色 header 融为一体（header 背景 rgba(255,255,255,0.85)≈白），
+                       消除"顶部一条杠"。深色图标保证在浅色条上清晰可见 -->
+                  <item name="android:statusBarColor">#FFFFFF</item>
+                  <item name="android:windowLightStatusBar">true</item>
                   <item name="android:navigationBarColor">#F4F6F8</item>
                   <item name="android:windowDrawsSystemBarBackgrounds">true</item>
               </style>
