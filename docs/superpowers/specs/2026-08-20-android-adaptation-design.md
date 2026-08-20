@@ -72,12 +72,12 @@ export default config;
 ```json
 {
   "devDependencies": {
-    "@capacitor/cli": "^6.0.0",
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/local-notifications": "^6.0.0",
-    "@capacitor/status-bar": "^6.0.0",
-    "@capacitor/navigation-bar": "^6.0.0"
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/status-bar": "^8.0.3",
+    "@capgo/capacitor-navigation-bar": "^8.2.6"
   },
   "scripts": {
     "android:build": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
