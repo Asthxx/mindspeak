@@ -9,15 +9,16 @@ import fi.iki.elonen.NanoHTTPD;
 
 public class NanoHTTPDServer extends NanoHTTPD implements TextToSpeech.OnInitListener {
     private static final String TAG = "MindSpeakServer";
-    private Context context;
+    private static final int MAX_TTS_TEXT_LENGTH = 4000;
+    private final Context context;
     private TextToSpeech tts;
-    private boolean ttsReady = false;
+    private volatile boolean ttsReady = false;
 
     public NanoHTTPDServer(Context context, int port) throws IOException {
         super(port);
-        this.context = context;
-        this.tts = new TextToSpeech(context, this);
-        start(NanoHTTPD.SOCKET_TIMEOUT, false);
+        this.context = context.getApplicationContext();
+        this.tts = new TextToSpeech(this.context, this);
+        start(5000, false);
         Log.i(TAG, "Server started on port " + port);
     }
 
@@ -68,6 +69,10 @@ public class NanoHTTPDServer extends NanoHTTPD implements TextToSpeech.OnInitLis
                     "{\"ok\":false,\"error\":\"missing text\"}");
             }
 
+            if (text.length() > MAX_TTS_TEXT_LENGTH) {
+                text = text.substring(0, MAX_TTS_TEXT_LENGTH);
+            }
+
             if (!ttsReady) {
                 return newFixedLengthResponse(Response.Status.SERVICE_UNAVAILABLE, "application/json",
                     "{\"ok\":false,\"error\":\"tts not ready\"}");
@@ -86,7 +91,7 @@ public class NanoHTTPDServer extends NanoHTTPD implements TextToSpeech.OnInitLis
         } catch (Exception e) {
             Log.e(TAG, "TTS error", e);
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json",
-                "{\"ok\":false,\"error\":\"" + e.getMessage() + "\"}");
+                "{\"ok\":false,\"error\":\"internal error\"}");
         }
     }
 
@@ -101,7 +106,7 @@ public class NanoHTTPDServer extends NanoHTTPD implements TextToSpeech.OnInitLis
             return newFixedLengthResponse(Response.Status.OK, "application/json", "{\"ok\":true}");
         } catch (Exception e) {
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json",
-                "{\"ok\":false,\"error\":\"" + e.getMessage() + "\"}");
+                "{\"ok\":false,\"error\":\"internal error\"}");
         }
     }
 
@@ -113,15 +118,30 @@ public class NanoHTTPDServer extends NanoHTTPD implements TextToSpeech.OnInitLis
         if (colonIdx < 0) return null;
         int startQuote = json.indexOf('"', colonIdx + 1);
         if (startQuote < 0) return null;
-        int endQuote = json.indexOf('"', startQuote + 1);
+        int endQuote = findUnescapedQuote(json, startQuote + 1);
         if (endQuote < 0) return null;
-        return json.substring(startQuote + 1, endQuote);
+        String value = json.substring(startQuote + 1, endQuote);
+        return value.replace("\\\"", "\"").replace("\\\\", "\\");
+    }
+
+    private int findUnescapedQuote(String s, int from) {
+        for (int i = from; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                i++;
+                continue;
+            }
+            if (c == '"') return i;
+        }
+        return -1;
     }
 
     public void shutdown() {
+        ttsReady = false;
         if (tts != null) {
             tts.stop();
             tts.shutdown();
+            tts = null;
         }
         stop();
     }

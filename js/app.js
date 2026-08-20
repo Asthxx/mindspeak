@@ -5423,7 +5423,7 @@ App.prototype._initMobileDrawer = function() {
 };
 App.prototype._initAndroidBackHandler = function() {
   if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
-  var self = this;
+  var lastBackTime = 0;
   window.Capacitor.Plugins.App.addListener('backButton', function() {
     var sidebar = document.getElementById('sidebar');
     if (sidebar && sidebar.classList.contains('open')) {
@@ -5439,7 +5439,15 @@ App.prototype._initAndroidBackHandler = function() {
       window.history.back();
       return;
     }
-    Toast.info('再按一次退出');
+    var now = Date.now();
+    if (now - lastBackTime < 2000) {
+      if (window.Capacitor.Plugins.App && window.Capacitor.Plugins.App.exitApp) {
+        window.Capacitor.Plugins.App.exitApp();
+      }
+    } else {
+      lastBackTime = now;
+      Toast.info('再按一次退出');
+    }
   });
 };
 App.prototype.showTab = function(tab) {

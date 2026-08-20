@@ -5,12 +5,13 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Lifecycle;
 import android.util.Log;
 
 @CapacitorPlugin(name = "HttpServer")
 public class HttpServerPlugin extends Plugin {
     private static final String TAG = "HttpServerPlugin";
-    private NanoHTTPDServer server;
+    private volatile NanoHTTPDServer server;
     private static final int PORT = 3000;
 
     @PluginMethod
@@ -40,8 +41,17 @@ public class HttpServerPlugin extends Plugin {
     @PluginMethod
     public void isRunning(PluginCall call) {
         JSObject ret = new JSObject();
-        ret.put("running", server != null && server.isAlive());
+        NanoHTTPDServer s = server;
+        ret.put("running", s != null && s.isAlive());
         call.resolve(ret);
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (server != null) {
+            server.shutdown();
+            server = null;
+        }
     }
 
     private JSObject makeResponse(boolean ok, String message) {

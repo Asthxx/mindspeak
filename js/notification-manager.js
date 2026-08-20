@@ -2,6 +2,7 @@
   var TAG = 'NotificationManager';
   var CHANNEL_ID = 'mindspeak-study';
   var CHANNEL_NAME = '学习提醒';
+  var _nextId = 1;
 
   var NotificationManager = {
     _permissionGranted: false,
@@ -22,6 +23,11 @@
         window.Capacitor.Plugins.LocalNotifications.requestPermissions().then(function(result) {
           self._permissionGranted = result.display === 'granted';
           Logger.log(TAG, '通知权限状态: ' + result.display);
+          if (!self._permissionGranted) {
+            Logger.log(TAG, '通知权限被拒绝，提醒功能不可用');
+          }
+        }).catch(function(err) {
+          Logger.log(TAG, '权限请求失败: ' + (err.message || err));
         });
       }
     },
@@ -34,6 +40,8 @@
           description: '每日学习提醒和复习通知',
           importance: 4,
           visibility: 1,
+        }).catch(function(err) {
+          Logger.log(TAG, '创建通知渠道失败: ' + (err.message || err));
         });
       }
     },
@@ -43,17 +51,22 @@
         Logger.log(TAG, '非 Capacitor 环境，跳过通知调度');
         return;
       }
+      if (!this._permissionGranted) {
+        Logger.log(TAG, '通知权限未授予，跳过调度');
+        return;
+      }
       var self = this;
+      var notifId = _nextId++;
       window.Capacitor.Plugins.LocalNotifications.schedule({
         notifications: [{
-          id: Date.now() % 100000,
+          id: notifId,
           title: title || '学习提醒',
           body: body || '该复习啦！',
           channelId: CHANNEL_ID,
           schedule: { every: 'day', at: { hour: hour || 8, minute: minute || 30 } },
         }]
       }).then(function() {
-        Logger.log(TAG, '每日提醒已调度');
+        Logger.log(TAG, '每日提醒已调度 (id=' + notifId + ')');
       }).catch(function(err) {
         Logger.log(TAG, '调度失败: ' + (err.message || err));
       });
@@ -63,9 +76,11 @@
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
         window.Capacitor.Plugins.LocalNotifications.getPending().then(function(result) {
           if (result.notifications && result.notifications.length > 0) {
-            var ids = result.notifications.map(function(n) { return n.id; });
-            window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: ids.map(function(id) { return { id: id }; }) });
+            var ids = result.notifications.map(function(n) { return { id: n.id }; });
+            window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: ids });
           }
+        }).catch(function(err) {
+          Logger.log(TAG, '取消通知失败: ' + (err.message || err));
         });
       }
     },

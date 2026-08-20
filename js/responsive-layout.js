@@ -36,7 +36,8 @@
     },
 
     getBreakpoint: function() {
-      return this._currentBreakpoint || this._detect() || this._currentBreakpoint;
+      if (!this._currentBreakpoint) this._detect();
+      return this._currentBreakpoint;
     },
 
     getColumns: function() {

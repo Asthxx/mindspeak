@@ -10,8 +10,9 @@
     "desktop:pack": "node scripts/desktop-pack.js",
     "desktop:build": "npm run build && npm run desktop:pack && tauri build",
     "desktop:dev": "node server/server.js & tauri dev",
-    "android:build": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug",
-    "android:release": "npm run build && npx cap sync android && cd android && gradlew.bat assembleRelease",
+    "android:build": "npm run build && npx cap sync android && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fix-java17.ps1 && cd android && gradlew.bat assembleDebug",
+    "android:release": "npm run build && npx cap sync android && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fix-java17.ps1 && cd android && gradlew.bat assembleRelease",
+    "android:fix": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fix-java17.ps1",
     "android:dev": "npx cap open android"
   },
   "devDependencies": {
