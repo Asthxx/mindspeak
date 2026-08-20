@@ -157,22 +157,22 @@ var SpeechUtil = {
   // 朗读设置缓存：voice_name（预设声音名称）、voice_rate（语速）、voice_pitch（音调）、
   // instant（是否本地即时语音：不依赖在线连接，用 server SAPI 合成，几乎零延迟）
 getSettings: function() {
-    if (this._settings) return this._settings;
-    // 即时语音默认值：只有用户没动过 voice_instant 时才做"自动探测"；
-    // 本地有 server 时保持开（零延迟），GitHub Pages/手机等无后端环境自动关。
+    // 每次从 localStorage 实时读取，避免缓存过期导致声音切换不生效。
+    // getSettings() 调用频率低（仅朗读/设置页），无需缓存优化。
     var hasInstant = false;
     try { hasInstant = (window.localStorage.getItem('voice_instant') !== null); } catch(e) {}
     var instant;
     if (hasInstant) instant = Storage.get('voice_instant', '1') === '1';
     else instant = !(this._serverDown === true);
-    this._settings = {
+    var s = {
       voiceName: Storage.get('voice_name', ''),
       rate: parseFloat(Storage.get('voice_rate', '')) || 0.9,
       pitch: parseFloat(Storage.get('voice_pitch', '')) || 1,
       instant: instant,
       _defaultInstant: !hasInstant
     };
-    return this._settings;
+    this._settings = s;
+    return s;
   },
   updateSettings: function(s) {
     this._settings = s;
@@ -193,7 +193,9 @@ getSettings: function() {
       var _hc = document.documentElement.className || '';
       var _isAndroid = /android/.test(_ua) || /platform-android/.test(_hc);
       var _isCap = /capacitor|bridge\.capacitor|\(([^)]*net\.js\.[^)]*)/.test(navigator.userAgent || '');
-      if (_isAndroid || _isCap) {
+      // Capacitor v3+ 注入 window.Capacitor 全局对象，比 UA 检测更可靠
+      var _isCapGlobal = !!(window.Capacitor && window.Capacitor.isNative);
+      if (_isAndroid || _isCap || _isCapGlobal) {
         this._serverDown = true;
         this._diag('probe', 'android/capacitor => serverDown=true (APK 内无后端)');
         this._syncInstantDefault();
@@ -594,6 +596,9 @@ var attempt = function() {
       // 英文文本必须用英文声：本机没有英文声时 _pickLocalENVoice 会回退到"任意非在线声"
       // （实测回退成中文 Huihui），英文被中文声读 → 读不准。此时直接落本地 SAPI（Zira），
       // 离线、发音准确；在线英文声可用时不受影响。
+      // voice 为 null 时（所有声音都失败过），清除注入的旧 voice 引用，
+      // 避免 stale voice 被传给 _speakLocal/_speakServerless 导致不可预期行为。
+      if (!voice && opts) opts.voice = null;
 var voiceEN = !!(voice && /^en/i.test(String(voice.lang || '')));
       if (!voiceEN && /^en/i.test(String(lang || 'en-US'))) {
         if (useDeviceVoice) {
@@ -1729,6 +1734,15 @@ var DataStore = {
     return getLocalDateStr(next);
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.escapeHtml = escapeHtml;
+  window.getLocalDateStr = getLocalDateStr;
+  window.calculateStreak = calculateStreak;
+  window.Storage = Storage;
+  window.DataStore = DataStore;
+  window.SpeechUtil = SpeechUtil;
+}
 
 // ==================== 主题切换 ====================
 var ThemeToggle = {
@@ -5263,7 +5277,12 @@ function App() {
   this.aiChatModule = init('AiChatModule', function() { return new AiChatModule(); });
   this.assessmentModule = init('AssessmentModule', function() { return new AssessmentModule(); });
   this.onboardingModule = init('OnboardingModule', function() { return new OnboardingModule(); });
-  App.detectPlatform();
+  var platform = App.detectPlatform();
+  var isAndroid = platform === 'android';
+  var isCap = !!(window.Capacitor && window.Capacitor.isNative);
+  if (isAndroid || isCap) {
+    this._initAndroidBackHandler();
+  }
   this.initNav();
   this.currentTab = 'home';
   this.updateGlobalStats();
@@ -5400,6 +5419,27 @@ App.prototype._initMobileDrawer = function() {
   // Android 返回键：抽屉打开时优先关抽屉
   window.addEventListener('popstate', function() {
     if (sidebar.classList.contains('open')) close(false);
+  });
+};
+App.prototype._initAndroidBackHandler = function() {
+  if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+  var self = this;
+  window.Capacitor.Plugins.App.addListener('backButton', function() {
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+      return;
+    }
+    var modal = document.querySelector('.modal-overlay.active');
+    if (modal) {
+      modal.classList.remove('active');
+      return;
+    }
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    Toast.info('再按一次退出');
   });
 };
 App.prototype.showTab = function(tab) {
