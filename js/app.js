@@ -7062,4 +7062,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.app = new App();
   window.app.initCustomBg();
+
+  if (window.NotificationManager) {
+    window.NotificationManager.init();
+  }
 });
