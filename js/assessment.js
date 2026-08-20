@@ -53,6 +53,7 @@ var AssessmentEngine = {
     }
     var pool = this._distractorPool;
     if (pool.length < n + 1) pool = pool.concat(['正确', '错误', '答案', '词汇', '短语']);
+    else pool = pool.slice(); // 在副本上做 partial Fisher-Yates，避免污染缓存池
     var seen = {}, out = [];
     // 部分 Fisher-Yates：只需抽够 n 个不同的释义即可，不做全池随机排序。
     // 之前 pool.slice().sort(随机) 每次出卷都要排 60k 词全池（约 1.5s），点击「开始测评」卡顿的根因。

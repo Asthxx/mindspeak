@@ -71,7 +71,8 @@ var ItemSystem = (function() {
       Toast.warning('积分不足！需要 ' + it.price + ' 积分');
       return;
     }
-    window.app.gamification.addPoints(-it.price);
+    var ok = window.app.gamification.addPoints(-it.price);
+    if (ok === false) return; // 积分扣除失败，不发放道具
     this.data[id] = this.count(id) + 1;
     this.save();
     Toast.success('获得「' + it.name + '」×1');
@@ -295,6 +296,8 @@ var ItemSystem = (function() {
   return ItemSystem;
 })();
 
+if (typeof window !== 'undefined') window.ItemSystem = ItemSystem;
+
 // ==================== 专属主题（积分兑换） ====================
 // 每个主题提供 light/dark 两套完整 CSS 变量，通过 [data-theme-id] 属性选择器注入，
 // 优先级高于 design-system 的 [data-theme="dark"] 和 [data-theme-color] 预设。
@@ -507,3 +510,5 @@ var ThemeShop = (function() {
   };
   return ThemeShop;
 })();
+
+if (typeof window !== 'undefined') window.ThemeShop = ThemeShop;

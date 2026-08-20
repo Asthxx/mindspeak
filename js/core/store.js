@@ -100,11 +100,12 @@ window.UserState = (function() {
   }
 
   // update(key, updater, fallback)：读取 → updater(旧值) → 写回，返回新值
+  // set 失败（配额超限）时返回 null，调用方可据此知道写入未持久化
   function update(key, updater, fallback) {
     var cur = get(key, fallback);
     var next = typeof updater === 'function' ? updater(cur) : cur;
-    set(key, next);
-    return next;
+    var ok = set(key, next);
+    return ok ? next : null;
   }
 
   function remove(key) {

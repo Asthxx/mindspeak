@@ -233,3 +233,5 @@ var BadgeSystem = (function() {
 
   return BadgeSystem;
 })();
+
+if (typeof window !== 'undefined') window.BadgeSystem = BadgeSystem;

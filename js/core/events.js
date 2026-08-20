@@ -30,7 +30,10 @@ window.EventBus = (function() {
     if (!name || typeof fn !== 'function') return window.EventBus;
     var arr = listeners[name] = listeners[name] || [];
     arr.push(fn);
-    if (arr.length > MAX_PER_EVENT) arr.shift();
+    if (arr.length > MAX_PER_EVENT) {
+      arr.shift();
+      console.warn('[EventBus] listener limit (' + MAX_PER_EVENT + ') exceeded for "' + name + '", oldest listener dropped');
+    }
     return window.EventBus;
   }
 
@@ -50,7 +53,10 @@ window.EventBus = (function() {
       off(name, wrapper);
       fn(data);
     };
-    return on(name, wrapper);
+    on(name, wrapper);
+    // 返回可取消的订阅对象（兼容链式调用：对象上同时挂 EventBus 引用）
+    var sub = { cancel: function() { off(name, wrapper); }, bus: window.EventBus };
+    return sub;
   }
 
   function emit(name, data) {

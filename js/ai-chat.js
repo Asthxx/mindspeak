@@ -358,3 +358,5 @@ var AiChatModule = (function() {
 
   return AiChatModule;
 })();
+
+if (typeof window !== 'undefined') window.AiChatModule = AiChatModule;
