@@ -5,12 +5,25 @@
   "description": "闻道 MindSpeak 英语学习软件（Web + PWA + Android + 桌面版）",
   "scripts": {
     "build": "node build.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "desktop:pack": "node scripts/desktop-pack.js",
     "desktop:build": "npm run build && npm run desktop:pack && tauri build",
-    "desktop:dev": "node server/server.js & tauri dev"
+    "desktop:dev": "node server/server.js & tauri dev",
+    "android:build": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug",
+    "android:release": "npm run build && npx cap sync android && cd android && gradlew.bat assembleRelease",
+    "android:dev": "npx cap open android"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/status-bar": "^8.0.3",
+    "@capgo/capacitor-navigation-bar": "^8.2.6",
     "@tauri-apps/cli": "^2.4.0",
-    "terser": "^5.49.2"
+    "jsdom": "^30.0.1",
+    "terser": "^5.49.2",
+    "vitest": "^4.1.11"
   }
 }
