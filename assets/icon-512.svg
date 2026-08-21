@@ -28,7 +28,7 @@
   <rect x="288" y="175" width="22" height="76" rx="11" fill="#5B82A6" fill-opacity="0.55"/>
   <rect x="328" y="200" width="22" height="50" rx="11" fill="#5B82A6" fill-opacity="0.35"/>
   <!-- 珊瑚点缀圆 -->
-  <circle cx="388" cy="378" r="52" fill="url(#coral)"/>
+  <circle cx="388" cy="378" r="52" fill="#3E5F7F"/>
   <!-- M 字母 -->
   <path d="M362 364 L378 364 L388 348 L398 364 L414 364 L414 398 L398 398 L398 376 L388 362 L378 376 L378 398 L362 398Z" fill="#FFFFFF"/>
 </svg>
