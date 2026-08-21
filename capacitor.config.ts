@@ -1,19 +1,23 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.mindspeak.app',
-  appName: 'MindSpeak',
+  appId: 'com.asthxx.mindspeak',
+  appName: '闻道 MindSpeak',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: true,
   },
   android: {
     buildOptions: {
-      keystorePath: 'mindspeak.jks',
-      keystoreAlias: 'mindspeak',
-    }
-  }
+      releaseType: 'APK',
+    },
+  },
+  plugins: {
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon',
+      iconColor: '#488AFF',
+    },
+  },
 };
 
 export default config;
