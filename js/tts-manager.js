@@ -180,14 +180,25 @@ var TTSManager = (function() {
     // opts.immediate=true 时立即 speak（iOS Safari 需在用户手势上下文内触发，不能延迟）。
     // opts.onerror 也会收到同步 speak 异常。
     speak(text, opts) {
-      if (!('speechSynthesis' in window)) return null;
       opts = opts || {};
+      const lang = (opts.lang || (this.voice && this.voice.lang) || 'en-US');
+      const rate = (typeof opts.rate === 'number') ? opts.rate : this.rate;
+      // Capacitor 原生 TTS 优先（Android WebView 的 speechSynthesis 有已知问题）
+      if (window.NativeTTSBridge && window.NativeTTSBridge.available) {
+        try { window.NativeTTSBridge.stop(); } catch (_e) {}
+        const ok = window.NativeTTSBridge.speak(text || '', lang, rate);
+        if (ok) {
+          if (opts.onstart) { try { opts.onstart(); } catch (_e) {} }
+          if (opts.onend) { setTimeout(function() { try { opts.onend(); } catch (_e) {} }, 800); }
+          return { native: true };
+        }
+      }
+      if (!('speechSynthesis' in window)) return null;
       const u = this.createUtterance(text, opts);
       if (opts.onstart) u.onstart = opts.onstart;
       if (opts.onend) u.onend = opts.onend;
       if (opts.onerror) u.onerror = opts.onerror;
       console.log('[TTS] playing:', u.voice ? u.voice.name : '(no voice)');
-      // 每次播放统一输出页面与声音，便于核对：所有页面都必须读到同一个 TTSManager.voice
       console.log('[TTS DEBUG] page:', this._currentPage());
       console.log('[TTS DEBUG] voice:', u.voice ? u.voice.name : '(system default)');
       const self = this;
@@ -216,6 +227,9 @@ var TTSManager = (function() {
     // 统一停止当前朗读并清空队列（安全封装：内部判断 speechSynthesis 是否存在并吞掉异常）。
     // 所有"停止/打断朗读"的场景都必须走这里，禁止在 tts-manager.js 之外直接调 speechSynthesis.cancel()。
     cancel() {
+      if (window.NativeTTSBridge && window.NativeTTSBridge.available) {
+        try { window.NativeTTSBridge.stop(); } catch (_e) {}
+      }
       if (!('speechSynthesis' in window)) return;
       try { window.speechSynthesis.cancel(); } catch (e) {}
     }

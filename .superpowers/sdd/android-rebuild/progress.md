@@ -23,3 +23,7 @@
 ## Task 5: complete (commit b8d9005, deleted leftover fix-java17.sh)
 
 ## Task 6: complete (commit da01720, SW Capacitor skip added)
+
+## Task 7: complete (commit 00f9ab7, AndroidManifest.xml + network security config)
+
+## Task 8: complete (all checks passed, READY FOR ANDROID SDK)

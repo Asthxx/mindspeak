@@ -35,7 +35,8 @@ src-tauri/node-runtime/
 *.dmg
 *.AppImage
 
-# Android rebuild
+# Android rebuild（android/ 由 npx cap add android 自动生成，不入库）
 android/
 *.jks
 *.keystore
+!android-template/
