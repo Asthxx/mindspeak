@@ -369,8 +369,8 @@ TTSManager.cancel();
       var audio = new Audio(src);
       this._localAudio = audio;
       this._attachAudioEl(audio);
-      console.log('[TTS LETTER] ' + up);
-      console.log('[TTS LETTER] Voice: 音频资源 ' + src);
+      Logger.log('TTS' + up);
+      Logger.log('TTS: 音频资源 ' + src);
       if (opts && opts.onend) audio.onended = function() {
         if (self._localAudio === audio) self._localAudio = null;
         self._detachAudioEl(audio);
@@ -399,20 +399,20 @@ _speakLetterTTS: function(up, opts) {
     if (this._burstMode && this._burstUntil && now < this._burstUntil) {
       this._burstUntil = now + 3000;
       if (this._burstMode === 'google') {
-        console.log('[TTS LETTER] ' + up);
-        console.log('[TTS LETTER] Voice: online-google (burst-locked)');
+        Logger.log('TTS' + up);
+        Logger.log('TTS: online-google (burst-locked)');
         this._speakGoogleTTS(text, 'en-US', o);
         return;
       }
       if (this._burstMode === 'local') {
-        console.log('[TTS LETTER] ' + up);
-        console.log('[TTS LETTER] Voice: local (burst-locked)');
+        Logger.log('TTS' + up);
+        Logger.log('TTS: local (burst-locked)');
         this._speakLocal(text, 'en-US', o);
         return;
       }
       if (this._burstMode === 'device') {
-        console.log('[TTS LETTER] ' + up);
-        console.log('[TTS LETTER] Voice: device-default (burst-locked)');
+        Logger.log('TTS' + up);
+        Logger.log('TTS: device-default (burst-locked)');
         this._speakServerless(text, 'en-US', o);
         return;
       }
@@ -422,16 +422,16 @@ _speakLetterTTS: function(up, opts) {
     var settings = this.getSettings();
     // 「本地男声/女声（David/Zira）」：字母同样走本地 SAPI
     if (settings.voiceName === '__local_david__' || settings.voiceName === '__local_zira__') {
-      console.log('[TTS LETTER] ' + up);
-      console.log('[TTS LETTER] Voice: ' + settings.voiceName);
+      Logger.log('TTS' + up);
+      Logger.log('TTS: ' + settings.voiceName);
       var lv2 = {};
       lv2.voice = settings.voiceName === '__local_zira__' ? 'zira' : 'david';
       this._speakLocal(text, 'en-US', lv2);
       return;
     }
     if (settings.voiceName && settings.voiceName.indexOf('__online_') === 0) {
-      console.log('[TTS LETTER] ' + up);
-      console.log('[TTS LETTER] Voice: ' + settings.voiceName);
+      Logger.log('TTS' + up);
+      Logger.log('TTS: ' + settings.voiceName);
       if (settings.voiceName === '__online_google__' && !(this._serverDown === true)) {
         this._speakGoogleTTS(text, 'en-US', o);
       } else {
@@ -443,8 +443,8 @@ _speakLetterTTS: function(up, opts) {
     try { if (TTSManager && TTSManager.voice) voice = TTSManager.voice; } catch(e) {}
     if (!voice) voice = this._pickVoice(settings.voiceName, null);
     var vName = (voice && voice.name) || 'system default';
-    console.log('[TTS LETTER] ' + up);
-    console.log('[TTS LETTER] Voice: ' + vName);
+    Logger.log('TTS' + up);
+    Logger.log('TTS: ' + vName);
     // voice 注入：attempt 首次朗读优先用注入的声音，保证 utterance.voice 就是当前所选
     o.voice = voice;
     this._speakTTSOnline(text, 'en-US', o);
@@ -506,6 +506,54 @@ _speakTTS: function(text, lang, opts) {
       if (opts) for (var lk in opts) lvo[lk] = opts[lk];
       lvo.voice = settings.voiceName === '__local_zira__' ? 'zira' : 'david';
       this._speakLocal(text, lang, lvo);
+      return;
+    }
+    if (settings.voiceName && settings.voiceName.indexOf('__local_piper_') === 0) {
+      this._stopLocalAudio();
+      if (this._serverDown === true) {
+        this._speakTTSOnline(text, lang, opts);
+        return;
+      }
+      var piperVoiceMap = {
+        '__local_piper_us_amy__': 'en_US-amy-medium',
+        '__local_piper_us_lessac__': 'en_US-lessac-medium',
+        '__local_piper_gb_alba__': 'en_GB-alba-medium'
+      };
+      var piperVoiceId = piperVoiceMap[settings.voiceName] || 'en_US-amy-medium';
+      var base = window.API_BASE || '';
+      var piperUrl = base + '/api/piper-tts?text=' + encodeURIComponent(text) + '&voice=' + encodeURIComponent(piperVoiceId);
+      var self = this;
+      var audio;
+      try { audio = new Audio(piperUrl); } catch(e) { this._speakTTSOnline(text, lang, opts); return; }
+      this._localAudio = audio;
+      this._attachAudioEl(audio);
+      var pFireStart = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
+      var pFireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
+      var pFailed = false;
+      var piperFailOnce = function() {
+        if (pFailed) return;
+        pFailed = true;
+        if (self._localAudio === audio) self._localAudio = null;
+        self._detachAudioEl(audio);
+        self._speakTTSOnline(text, lang, opts);
+      };
+      audio.onended = function() {
+        if (self._localAudio === audio) self._localAudio = null;
+        self._detachAudioEl(audio);
+        pFireEnd();
+      };
+      audio.onerror = function() {
+        if (self._localAudio !== audio) return;
+        self._detachAudioEl(audio);
+        piperFailOnce();
+      };
+      pFireStart();
+      var pr;
+      try { pr = audio.play(); } catch(e) { piperFailOnce(); return; }
+      if (pr && pr.catch) pr.catch(function(e) {
+        if (e && e.name === 'AbortError') return;
+        piperFailOnce();
+      });
       return;
     }
     if (settings.voiceName && settings.voiceName.indexOf('__online_') === 0) {
@@ -1069,13 +1117,19 @@ _markOnlineBroken: function() {
     // 在线发音源表：每个源对应一种音色/服务，均可用浏览器 <audio> 直连跨域播放（无需 CORS）。
     // 百度/有道国内直连可达且免费；谷歌可选的音色最多（美/英/澳音），墙内不可达时作为兜底。
     var SRC_ALL = [
-      { id: 'baidu',     name: '百度·美音', url: function(t, l) { return 'https://fanyi.baidu.com/gettts?lan=' + l + '&text=' + ENC(t) + '&spd=3&source=web'; } },
-      { id: 'youdao_us', name: '有道·美音', url: function(t) { return 'https://dict.youdao.com/dictvoice?audio=' + ENC(t) + '&type=1'; } },
-      { id: 'youdao_uk', name: '有道·英音', url: function(t) { return 'https://dict.youdao.com/dictvoice?audio=' + ENC(t) + '&type=2'; } },
-      { id: 'google_us', name: '谷歌·美音', url: function(t, l) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + l + '&q=' + ENC(t); } },
-      { id: 'google_uk', name: '谷歌·英音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-GB&q=' + ENC(t); } },
-      { id: 'google_au', name: '谷歌·澳音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-AU&q=' + ENC(t); } },
-      { id: 'google_in', name: '谷歌·印度音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-IN&q=' + ENC(t); } }
+      { id: 'baidu',        name: '百度·美音', url: function(t, l) { return 'https://fanyi.baidu.com/gettts?lan=' + l + '&text=' + ENC(t) + '&spd=3&source=web'; } },
+      { id: 'youdao_us',    name: '有道·美音', url: function(t) { return 'https://dict.youdao.com/dictvoice?audio=' + ENC(t) + '&type=1'; } },
+      { id: 'youdao_uk',    name: '有道·英音', url: function(t) { return 'https://dict.youdao.com/dictvoice?audio=' + ENC(t) + '&type=2'; } },
+      { id: 'google_us',    name: '谷歌·美音', url: function(t, l) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + l + '&q=' + ENC(t); } },
+      { id: 'google_uk',    name: '谷歌·英音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-GB&q=' + ENC(t); } },
+      { id: 'google_au',    name: '谷歌·澳音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-AU&q=' + ENC(t); } },
+      { id: 'google_in',    name: '谷歌·印度音', url: function(t) { return 'https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en-IN&q=' + ENC(t); } },
+      { id: 'edge_us_jenny', name: 'Edge 美音女声', url: function(t) { return (window.API_BASE || '') + '/api/edge-tts?text=' + ENC(t) + '&voice=en-US-JennyNeural'; } },
+      { id: 'edge_us_guy',   name: 'Edge 美音男声', url: function(t) { return (window.API_BASE || '') + '/api/edge-tts?text=' + ENC(t) + '&voice=en-US-GuyNeural'; } },
+      { id: 'edge_gb_sonia', name: 'Edge 英音女声', url: function(t) { return (window.API_BASE || '') + '/api/edge-tts?text=' + ENC(t) + '&voice=en-GB-SoniaNeural'; } },
+      { id: 'edge_au_natasha', name: 'Edge 澳音女声', url: function(t) { return (window.API_BASE || '') + '/api/edge-tts?text=' + ENC(t) + '&voice=en-AU-NatashaNeural'; } },
+      { id: 'edge_in_neerja',  name: 'Edge 印度英语', url: function(t) { return (window.API_BASE || '') + '/api/edge-tts?text=' + ENC(t) + '&voice=en-IN-NeerjaNeural'; } },
+      { id: 'edge_zh_xiaoxiao', name: 'Edge 中文女声', url: function(t, l) { return (window.API_BASE || '') + '/api/edge-tts?text=' + ENC(t) + '&voice=zh-CN-XiaoxiaoNeural&lang=' + ENC(l || 'zh-CN'); } }
     ];
     // 虚拟在线音色 → 首先尝试的源。设置页选中的在线音色（voice_name 存 __online_*）会
     // 把对应源排到最前，选中源失败再按默认顺序兜底换源，实现"选了什么音色，远程就出什么声"。
@@ -1086,7 +1140,13 @@ _markOnlineBroken: function() {
       '__online_google__': 'google_us',
       '__online_google_uk__': 'google_uk',
       '__online_google_au__': 'google_au',
-      '__online_google_in__': 'google_in'
+      '__online_google_in__': 'google_in',
+      '__online_edge_us_jenny__': 'edge_us_jenny',
+      '__online_edge_us_guy__': 'edge_us_guy',
+      '__online_edge_gb_sonia__': 'edge_gb_sonia',
+      '__online_edge_au_natasha__': 'edge_au_natasha',
+      '__online_edge_in_neerja__': 'edge_in_neerja',
+      '__online_edge_zh_xiaoxiao__': 'edge_zh_xiaoxiao'
     };
     // 默认兜底顺序：有道优先（国内直连稳定，用户实测可达）。
     // 百度 gettts 有 Referer 校验（安卓 WebView 里 no-referrer 常失效 → 返回错误码 4 空音频），
@@ -3880,13 +3940,13 @@ PKModule.prototype.checkAnswer = function(btn, isCorrect, w) {
       var accColor = h.accuracy >= 80 ? 'var(--success)' : (h.accuracy >= 50 ? 'var(--coral)' : 'var(--danger)');
       return '<div class="pk-history-item" style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:var(--sp-3);border-bottom:1px solid var(--border);font-size:0.85rem">'
         + '<div style="color:var(--text-tertiary);font-size:0.8rem;min-width:0">' + escapeHtml(h.time) + '</div>'
-        + '<button class="btn btn-sm btn-danger pk-del-btn" data-id="' + h.id + '" style="padding:2px 10px;font-size:0.75rem">删除</button>'
+        + '<button class="btn btn-sm btn-danger pk-del-btn" data-id="' + escapeHtml(String(h.id)) + '" style="padding:2px 10px;font-size:0.75rem">删除</button>'
         + '<div style="display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;min-width:0">'
         +   '<span style="color:var(--text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(h.category) + '</span>'
-        +   '<span style="color:var(--success)">对 ' + h.correct + '</span>'
-        +   '<span style="color:var(--danger)">错 ' + h.wrong + '</span>'
-        +   '<span style="color:' + accColor + ';font-weight:600">' + h.accuracy + '%</span>'
-        +   '<span style="color:var(--sage)">' + h.points + ' 分</span>'
+        +   '<span style="color:var(--success)">对 ' + escapeHtml(String(h.correct)) + '</span>'
+        +   '<span style="color:var(--danger)">错 ' + escapeHtml(String(h.wrong)) + '</span>'
+        +   '<span style="color:' + accColor + ';font-weight:600">' + escapeHtml(String(h.accuracy)) + '%</span>'
+        +   '<span style="color:var(--sage)">' + escapeHtml(String(h.points)) + ' 分</span>'
         + '</div>'
         + '</div>';
     }).join('');
@@ -4958,7 +5018,7 @@ var DailyChallenge = (function() {
       }
       return '<div class="dc-task ' + (done ? 'done' : '') + '">' +
         '<span class="dc-check">' + (done ? '✓' : '○') + '</span>' +
-        '<span class="dc-text">' + t.text + '</span>' +
+        '<span class="dc-text">' + escapeHtml(t.text) + '</span>' +
         prog +
       '</div>';
     }).join('');
@@ -5262,7 +5322,7 @@ var SmartReview = (function() {
 // ==================== 主应用 ====================
 function App() {
   var self = this;
-  function init(name, fn) { try { return fn(); } catch(e) { console.warn('Module init failed:', name, e.message); return null; } }
+  function init(name, fn) { try { return fn(); } catch(e) { Logger.log('Module init failed: ' + name + ' - ' + e.message); return null; } }
   this.wordModule = init('WordModule', function() { return new WordModule(); });
   this.storyModule = init('StoryModule', function() { return new StoryModule(); });
   this.phoneticModule = init('PhoneticModule', function() { return new PhoneticModule(); });
@@ -5813,6 +5873,12 @@ function fillVoiceOptions() {
       // 选中的在线音色会把对应发音源排到远程兜底最前（见 _speakRemoteFallback）。
       // 值以 __online_ 开头，与系统声音区分；不匹配任何 speechSynthesis voice。
       var ONLINE_STATIC = [
+        { v: '__online_edge_us_jenny__', label: 'Edge 美音女声（Jenny · 高质量）' },
+        { v: '__online_edge_us_guy__', label: 'Edge 美音男声（Guy · 高质量）' },
+        { v: '__online_edge_gb_sonia__', label: 'Edge 英音女声（Sonia · 高质量）' },
+        { v: '__online_edge_au_natasha__', label: 'Edge 澳音女声（Natasha · 高质量）' },
+        { v: '__online_edge_in_neerja__', label: 'Edge 印度英语（Neerja · 高质量）' },
+        { v: '__online_edge_zh_xiaoxiao__', label: 'Edge 中文女声（晓晓 · 高质量）' },
         { v: '__online_baidu__', label: '百度·美音（国内直连，推荐）' },
         { v: '__online_youdao_us__', label: '有道·美音（国内直连）' },
         { v: '__online_youdao_uk__', label: '有道·英音（国内直连）' },
@@ -5822,24 +5888,26 @@ function fillVoiceOptions() {
         { v: '__online_google_in__', label: '谷歌·印度口音（需网络）' }
       ];
       var html = '<option value="">系统默认（自动选本地语音）</option>';
-      // Android 打包版无本地 server：本地男女声（David/Zira）依赖 Windows server 的 SAPI
-      // 合成，手机上选了也不会响（会走远程兜底）。标注"需电脑"，避免误导用户。
       var isAndroid = App.detectPlatform() === 'android';
-      // 安卓 WebView 里 <audio> 无视 referrerPolicy，始终带页面 Referer（https://localhost）：
-      // 百度 gettts 校验 Referer（带非 fanyi.baidu.com 返回空音频）、谷歌安卓 UA 返回 404，
-      // 这俩系在手机上点了必无声。只保留不校验 Referer 的有道美音/英音，避免误导用户。
-      // （桌面版浏览器 referrerPolicy 正常，保留全部音色。）
       if (isAndroid) {
         ONLINE_STATIC = ONLINE_STATIC.filter(function(o) {
           return o.v === '__online_youdao_us__' || o.v === '__online_youdao_uk__';
         });
       }
       var localHint = isAndroid ? '（手机版不可用，需电脑 + server 运行）' : '（离线 SAPI，需 server 运行）';
-      html += '<option value="__local_david__">本地男声（David · ' + localHint + '</option>';
-      html += '<option value="__local_zira__">本地女声（Zira · ' + localHint + '</option>';
+      var piperHint = isAndroid ? '（手机版不可用，需电脑 + server 运行）' : '（离线，需 server 下载）';
+      html += '<optgroup label="本地离线">';
+      html += '<option value="__local_piper_us_amy__">Piper 美音女声（Amy · ' + piperHint + ')</option>';
+      html += '<option value="__local_piper_us_lessac__">Piper 美音男声（Lessac · ' + piperHint + ')</option>';
+      html += '<option value="__local_piper_gb_alba__">Piper 英音女声（Alba · ' + piperHint + ')</option>';
+      html += '<option value="__local_david__">本地男声（David · ' + localHint + ')</option>';
+      html += '<option value="__local_zira__">本地女声（Zira · ' + localHint + ')</option>';
+      html += '</optgroup>';
+      html += '<optgroup label="高质量在线（需网络）">';
       for (var vi2 = 0; vi2 < ONLINE_STATIC.length; vi2++) {
         html += '<option value="' + ONLINE_STATIC[vi2].v + '">' + onlineStaticLabel(ONLINE_STATIC[vi2].v, ONLINE_STATIC[vi2].label) + '</option>';
       }
+      html += '</optgroup>';
       voiceSelect.innerHTML = html;
       var enVoices = [];
       for (var i = 0; i < voices.length; i++) {
@@ -6231,28 +6299,60 @@ if (name) {
   };
 // 导入备份：字段名 → localStorage 键写回；custom_words 逐库写回；背景图写回 IDB
 // 返回 false 表示 word_progress 等大字段写入失败（配额超限），供调用方提示真实结果
-  App.prototype._applyBackup = function(data) {
-    var ok = true;
+  App.prototype._sanitizeBackup = function(data) {
+    var sanitized = {};
     this._backupFields.forEach(function(f) {
-      if (f[3]) return; // 大字段（word_progress/custom_voice）走下面的独立回写，避免导入时若不慎双写
-      if (data[f[0]] !== undefined && data[f[0]] !== null) {
-        if (DataStore.setProgress(f[1], data[f[0]]) === false) ok = false;
+      var key = f[0], defaultVal = f[2], val = data[key];
+      if (val === undefined || val === null) return;
+      var dt = typeof defaultVal;
+      if (dt === 'number') {
+        sanitized[key] = (typeof val === 'number' && isFinite(val)) ? val : defaultVal;
+      } else if (dt === 'boolean') {
+        sanitized[key] = !!val;
+      } else if (dt === 'string') {
+        sanitized[key] = (typeof val === 'string') ? val.substring(0, 1000) : String(val).substring(0, 1000);
+      } else if (Array.isArray(defaultVal)) {
+        sanitized[key] = Array.isArray(val) ? val.slice(0, 500) : defaultVal;
+      } else if (dt === 'object') {
+        sanitized[key] = (val && typeof val === 'object' && !Array.isArray(val)) ? val : defaultVal;
+      } else {
+        sanitized[key] = val;
       }
     });
-    if (data.wordProgress !== undefined && data.wordProgress !== null) {
-      if (DataStore.setProgress('word_progress', data.wordProgress) === false) ok = false;
+    if (Array.isArray(data.wordProgress) || (data.wordProgress && typeof data.wordProgress === 'object')) {
+      sanitized.wordProgress = data.wordProgress;
     }
-    if (data.customVoice !== undefined && data.customVoice !== null) {
-      if (DataStore.setProgress('custom_voice', data.customVoice) === false) ok = false;
+    if (data.customVoice && typeof data.customVoice === 'object') {
+      sanitized.customVoice = data.customVoice;
     }
     if (Array.isArray(data.customWords)) {
+      sanitized.customWords = data.customWords.slice(0, 50);
+    }
+    return sanitized;
+  };
+  App.prototype._applyBackup = function(data) {
+    var ok = true;
+    var safe = this._sanitizeBackup(data);
+    this._backupFields.forEach(function(f) {
+      if (f[3]) return;
+      if (safe[f[0]] !== undefined && safe[f[0]] !== null) {
+        if (DataStore.setProgress(f[1], safe[f[0]]) === false) ok = false;
+      }
+    });
+    if (safe.wordProgress !== undefined && safe.wordProgress !== null) {
+      if (DataStore.setProgress('word_progress', safe.wordProgress) === false) ok = false;
+    }
+    if (safe.customVoice !== undefined && safe.customVoice !== null) {
+      if (DataStore.setProgress('custom_voice', safe.customVoice) === false) ok = false;
+    }
+    if (Array.isArray(safe.customWords)) {
       var cats = DataStore.getDefaultWords().categories || [];
-      for (var i = 0; i < cats.length && i < data.customWords.length; i++) {
-        if (Array.isArray(data.customWords[i]) && Storage.setJSON('custom_words_' + i, data.customWords[i]) === false) ok = false;
+      for (var i = 0; i < cats.length && i < safe.customWords.length; i++) {
+        if (Array.isArray(safe.customWords[i]) && Storage.setJSON('custom_words_' + i, safe.customWords[i]) === false) ok = false;
       }
     }
-    if (data.customBg) {
-      IDBStore.put('custom_bg', data.customBg).catch(function() {});
+    if (safe.customBg) {
+      IDBStore.put('custom_bg', safe.customBg).catch(function() {});
     }
     return ok;
   };
@@ -6626,7 +6726,7 @@ var base = window.API_BASE || '';
           var data = JSON.parse(ev.target.result);
           // 兼容旧备份：字段名与 _backupFields 的导出字段名一致，直接应用
 if (data && typeof data === 'object' && (data.wordProgress || data.mistakes || data.favorites)) {
-            var imported = self._applyBackup(data);
+            var imported = self._applyBackup(self._sanitizeBackup(data));
             self._recallIndex = null; // 词库进度可能变化，主动回忆索引失效重建
             if (self.readingModule) self.readingModule._wordIndex = null;
             if (self.aiChatModule) self.aiChatModule._wordIndex = null;
