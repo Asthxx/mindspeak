@@ -299,6 +299,13 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .assess-view{padding:var(--sp-5) var(--sp-2) var(--sp-4)}
   .assess-head{padding-bottom:var(--sp-3)}
   .aw-dim{padding:var(--sp-2) var(--sp-3);font-size:0.82rem}
+  .assess-modal-content{padding-bottom:env(safe-area-inset-bottom,16px)}
+  .assess-option{min-height:48px;padding:12px 14px;font-size:0.95rem}
+  .ar-num{width:42px;height:42px;font-size:0.85rem}
+  .assess-nav{gap:var(--sp-2)}
+  .assess-nav .btn{min-height:44px;flex:1}
+  .assess-result-actions{flex-direction:column}
+  .assess-result-actions .btn{width:100%}
 
   /* ================= 目标选择 / 每日计划 ================= */
   .ob-goal-options{grid-template-columns:1fr 1fr;gap:var(--sp-3)}
@@ -430,7 +437,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .dash-card:hover,.theme-card:hover,.item-card:hover{transform:none;box-shadow:var(--shadow-sm)}
   .fav-item:hover{transform:none}
   .nav-arrow:hover,.option-btn:hover,.pk-option-btn:hover,.spelling-option-btn:hover,
-  .filter-btn:hover,.btn-icon:hover{transform:none}
+  .filter-btn:hover,.btn-icon:hover,.assess-option:hover{transform:none}
 }
 /* 滚动条细线化（移动端视觉轻盈） */
 .content::-webkit-scrollbar{width:0}
@@ -512,6 +519,9 @@ html.platform-android{
 .platform-android .vocab-card { border-radius: 12px; }
 .platform-android .theme-item { border-radius: 16px; }
 .platform-android .setting-item { border-radius: 8px; }
+.platform-android .assess-modal-content{border-radius:0;max-height:100dvh;height:100dvh}
+.platform-android .assess-option{-webkit-tap-highlight-color:transparent}
+.platform-android .ar-num{-webkit-tap-highlight-color:transparent}
 
 .md3-ripple { position: relative; overflow: hidden; }
 .md3-ripple::after {
