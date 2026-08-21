@@ -14,7 +14,7 @@
     },
 
     _isAndroid: function() {
-      return /android/i.test(navigator.userAgent);
+      return App.detectPlatform() === 'android';
     },
 
     _requestPermission: function() {

@@ -5807,8 +5807,7 @@ function fillVoiceOptions() {
       var html = '<option value="">系统默认（自动选本地语音）</option>';
       // Android 打包版无本地 server：本地男女声（David/Zira）依赖 Windows server 的 SAPI
       // 合成，手机上选了也不会响（会走远程兜底）。标注"需电脑"，避免误导用户。
-      var isAndroid = false;
-      try { isAndroid = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase()); } catch(e) {}
+      var isAndroid = App.detectPlatform() === 'android';
       // 安卓 WebView 里 <audio> 无视 referrerPolicy，始终带页面 Referer（https://localhost）：
       // 百度 gettts 校验 Referer（带非 fanyi.baidu.com 返回空音频）、谷歌安卓 UA 返回 404，
       // 这俩系在手机上点了必无声。只保留不校验 Referer 的有道美音/英音，避免误导用户。
