@@ -34,3 +34,8 @@ src-tauri/node-runtime/
 *.app
 *.dmg
 *.AppImage
+
+# Android rebuild
+android/
+*.jks
+*.keystore

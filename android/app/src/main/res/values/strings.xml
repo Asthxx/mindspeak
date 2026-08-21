@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">MindSpeak</string>
-    <string name="title_activity_main">MindSpeak</string>
-    <string name="package_name">com.mindspeak.app</string>
-    <string name="custom_url_scheme">com.mindspeak.app</string>
-</resources>
