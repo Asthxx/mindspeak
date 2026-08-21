@@ -410,35 +410,8 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   }
 }
 
-/* Dark Mode */
-@media (prefers-color-scheme:dark){
-  :root{
-    --ivory:#0F1419;--ivory-warm:#141A20;--ivory-deep:#0A0E12;--ivory-card:#1A2028;
-    --sage:#7BA9CE;--sage-deep:#9FC5E4;--sage-muted:#5E8FB8;--sage-light:#1C2B3D;--sage-surface:#182433;
-    --coral:#FF9A78;--coral-deep:#FF8A65;--coral-light:#2A1A15;--coral-surface:#201510;
-    --ink:#F0F0F0;--ink-soft:#E0E0E0;--text:#D0D0D0;--text-secondary:#9A9A9A;--text-tertiary:#6A6A6A;--text-ghost:#4A4A4A;
-    --border:#2A3038;--border-light:#1E2428;--border-focus:#3A4048;
-    --success:#6BC48A;--success-light:#182433;--success-dark:#8AE4A8;
-    --warning:#D4B85A;--warning-light:#2A2518;
-    --danger:#E87878;--danger-light:#2A1A1A;--danger-dark:#F89898;
-    --shadow-xs:0 1px 2px rgba(0,0,0,0.2);--shadow-sm:0 2px 4px rgba(0,0,0,0.25);
-    --shadow-md:0 4px 12px rgba(0,0,0,0.3);--shadow-lg:0 8px 24px rgba(0,0,0,0.35);
-    --shadow-xl:0 16px 48px rgba(0,0,0,0.4);
-    --shadow-coral:0 4px 20px rgba(255,154,120,0.2);--shadow-sage:0 4px 20px rgba(123,169,206,0.15);
-  }
-  .app-header{background:rgba(15,20,25,0.85);border-bottom-color:var(--border)}
-  .sidebar{border-right-color:var(--border)}
-  .nav-btn{color:var(--sidebar-text)}
-  .nav-btn:hover{background:var(--sidebar-hover)}
-  .nav-btn.active{background:var(--sidebar-active)}
-  .bottom-nav{background:rgba(20,26,34,0.92);border-top-color:var(--border)}
-  .bottom-nav-btn.active{background:var(--sage-surface);color:var(--sage-deep)}
-  .bottom-nav-btn.active .icon{color:var(--sage-deep)}
-  .content{background:linear-gradient(180deg,var(--ivory) 0%,var(--ivory-deep) 100%)}
-  select,input[type="text"],input[type="number"]{background:var(--ivory-card);border-color:var(--border);color:var(--text)}
-  .mistake-item,.fav-item,.stat-card,.report-card{background:var(--ivory-card);border-color:var(--border)}
-  .modal-content{background:var(--ivory-card)}
-}
+/* Dark mode is controlled by data-theme="dark" in design-system.css.
+   @media (prefers-color-scheme:dark) removed — it conflicted with the user's manual toggle. */
 
 /* Animations + 触摸反馈 */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}

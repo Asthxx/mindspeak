@@ -1939,6 +1939,17 @@ h2{
   color:var(--text);
   border-color:var(--border);
 }
+[data-theme="dark"] .sidebar{border-right-color:var(--border)}
+[data-theme="dark"] .nav-btn{color:var(--sidebar-text)}
+[data-theme="dark"] .nav-btn:hover{background:var(--sidebar-hover)}
+[data-theme="dark"] .nav-btn.active{background:var(--sidebar-active)}
+[data-theme="dark"] .bottom-nav{background:rgba(20,26,34,0.92);border-top-color:var(--border)}
+[data-theme="dark"] .bottom-nav-btn.active{background:var(--sage-surface);color:var(--sage-deep)}
+[data-theme="dark"] .bottom-nav-btn.active .icon{color:var(--sage-deep)}
+[data-theme="dark"] .content{background:linear-gradient(180deg,var(--ivory) 0%,var(--ivory-deep) 100%)}
+[data-theme="dark"] .mistake-item,[data-theme="dark"] .fav-item,
+[data-theme="dark"] .stat-card,[data-theme="dark"] .report-card{background:var(--ivory-card);border-color:var(--border)}
+[data-theme="dark"] .modal-content{background:var(--ivory-card)}
 
 /* ============ 主题颜色选择 ============ */
 .theme-colors{display:flex;gap:var(--sp-3);flex-wrap:wrap;align-items:center}

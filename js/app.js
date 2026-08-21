@@ -1755,14 +1755,31 @@ var ThemeToggle = {
   apply: function(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     Storage.set('theme', theme);
+    this._syncNativeBars(theme);
+    this._syncMetaThemeColor(theme);
   },
   toggle: function() {
     var current = document.documentElement.getAttribute('data-theme');
     var next = current === 'dark' ? 'light' : 'dark';
     this.apply(next);
     Toast.info(next === 'dark' ? '已切换到深色模式' : '已切换到浅色模式');
-    // 明暗切换后，重新套用当前主题色（让 dark 下的派生色生效）
     ThemeColor.reapply();
+  },
+  _syncNativeBars: function(theme) {
+    if (!window.Capacitor) return;
+    var isDark = theme === 'dark';
+    if (window.Capacitor.Plugins.StatusBar) {
+      window.Capacitor.Plugins.StatusBar.setStyle({ style: isDark ? 'DARK' : 'LIGHT' });
+      window.Capacitor.Plugins.StatusBar.setBackgroundColor({ color: isDark ? '#1A1B1E' : '#FFFFFF' });
+    }
+    if (window.Capacitor.Plugins.NavigationBar) {
+      window.Capacitor.Plugins.NavigationBar.setStyle({ style: isDark ? 'DARK' : 'LIGHT' });
+      window.Capacitor.Plugins.NavigationBar.setColor({ color: isDark ? '#1A1B1E' : '#FFFFFF' });
+    }
+  },
+  _syncMetaThemeColor: function(theme) {
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#1A1B1E' : '#F4F6F8');
   }
 };
 
@@ -7023,6 +7040,7 @@ App.prototype.exportMistakes = function() {
 document.addEventListener('DOMContentLoaded', function() {
   ThemeToggle.init();
   ThemeColor.init();
+  if (window.AndroidUIInit) AndroidUIInit.init();
   KeyboardShortcuts.init();
   LearningReminder.init();
 

@@ -4,8 +4,6 @@
   var AndroidUIInit = {
     init: function() {
       if (!this._isAndroid()) return;
-      this._initStatusBar();
-      this._initNavigationBar();
       this._initTouchFeedback();
       this._initSplash();
       Logger.log(TAG, 'Android UI 初始化完成');
@@ -13,20 +11,6 @@
 
     _isAndroid: function() {
       return App.detectPlatform() === 'android';
-    },
-
-    _initStatusBar: function() {
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar) {
-        window.Capacitor.Plugins.StatusBar.setStyle({ style: 'LIGHT' });
-        window.Capacitor.Plugins.StatusBar.setBackgroundColor({ color: '#FFFFFF' });
-      }
-    },
-
-    _initNavigationBar: function() {
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.NavigationBar) {
-        window.Capacitor.Plugins.NavigationBar.setStyle({ style: 'LIGHT' });
-        window.Capacitor.Plugins.NavigationBar.setColor({ color: '#FFFFFF' });
-      }
     },
 
     _initTouchFeedback: function() {
