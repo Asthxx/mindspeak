@@ -249,6 +249,136 @@ app.get('/api/edge-tts', (req, res) => {
     .catch((err) => finish(null, err && err.message || 'connect failed'));
 });
 
+// ==================== Piper TTS：本地离线神经网络语音合成 ====================
+const PIPER_DIR = path.join(os.homedir(), '.local', 'share', 'mindspeak-piper');
+const PIPER_BIN = path.join(PIPER_DIR, 'piper' + (process.platform === 'win32' ? '.exe' : ''));
+const PIPER_VOICE_DIR = path.join(PIPER_DIR, 'voices');
+const PIPER_BASE_URL = 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2';
+const PIPER_PLATFORMS = {
+  'win32-x64': 'piper_windows_amd64.zip',
+  'linux-x64': 'piper_linux_amd64.tar.gz',
+  'linux-arm64': 'piper_linux_aarch64.tar.gz',
+  'darwin-x64': 'piper_macos_x64.tar.gz',
+  'darwin-arm64': 'piper_macos_aarch64.tar.gz'
+};
+const PIPER_VOICES = {
+  'en_US-amy-medium': 'en_US-amy-medium.onnx',
+  'en_US-lessac-medium': 'en_US-lessac-medium.onnx',
+  'en_GB-alba-medium': 'en_GB-alba-medium.onnx'
+};
+
+function ensurePiperDir() {
+  try { fs.mkdirSync(PIPER_DIR, { recursive: true }); fs.mkdirSync(PIPER_VOICE_DIR, { recursive: true }); } catch (e) {}
+}
+
+function downloadFile(url, dest) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    https.get(url, { headers: { 'User-Agent': 'mindspeak-piper/1.0' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        file.close();
+        return downloadFile(res.headers.location, dest).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) { file.close(); try { fs.unlinkSync(dest); } catch (e) {} return reject(new Error('HTTP ' + res.statusCode)); }
+      res.pipe(file);
+      file.on('finish', () => { file.close(resolve); });
+      file.on('error', (err) => { try { fs.unlinkSync(dest); } catch (e) {} reject(err); });
+    }).on('error', (err) => { file.close(); try { fs.unlinkSync(dest); } catch (e) {} reject(err); });
+  });
+}
+
+async function ensurePiperBinary() {
+  if (fs.existsSync(PIPER_BIN)) return true;
+  const key = process.platform + '-' + process.arch;
+  const archive = PIPER_PLATFORMS[key];
+  if (!archive) return false;
+  ensurePiperDir();
+  const archivePath = path.join(PIPER_DIR, archive);
+  logger.info('piper-tts', '下载 Piper 二进制', { platform: key, url: PIPER_BASE_URL + '/' + archive });
+  await downloadFile(PIPER_BASE_URL + '/' + archive, archivePath);
+  if (process.platform === 'win32') {
+    await new Promise((resolve, reject) => {
+      execFile('powershell.exe', ['-NoProfile', '-Command',
+        `Expand-Archive -Path '${archivePath}' -DestinationPath '${PIPER_DIR}' -Force`],
+        { timeout: 60000, windowsHide: true }, (err) => err ? reject(err) : resolve());
+    });
+  } else {
+    await new Promise((resolve, reject) => {
+      exec('tar', ['xzf', archivePath, '-C', PIPER_DIR], { timeout: 60000 }, (err) => err ? reject(err) : resolve());
+    });
+  }
+  try { fs.unlinkSync(archivePath); } catch (e) {}
+  return fs.existsSync(PIPER_BIN);
+}
+
+async function ensurePiperVoice(voiceName) {
+  const onnxFile = PIPER_VOICES[voiceName];
+  if (!onnxFile) throw new Error('Unknown Piper voice: ' + voiceName);
+  const dest = path.join(PIPER_VOICE_DIR, onnxFile);
+  if (fs.existsSync(dest)) return dest;
+  ensurePiperDir();
+  const url = PIPER_BASE_URL + '/' + onnxFile;
+  logger.info('piper-tts', '下载 Piper 语音包', { voice: voiceName });
+  await downloadFile(url, dest);
+  return dest;
+}
+
+const piperCache = new Map();
+const piperPending = new Map();
+app.get('/api/piper-tts', async (req, res) => {
+  const text = String(req.query.text || '').trim();
+  const voice = String(req.query.voice || 'en_US-amy-medium').slice(0, 64);
+  if (!text || text.length > 500) return res.status(400).json({ ok: false, message: 'text too long or empty' });
+  if (!PIPER_VOICES[voice]) return res.status(400).json({ ok: false, message: 'unknown voice: ' + voice });
+  const key = crypto.createHash('sha1').update(text + '|' + voice).digest('hex');
+  const cached = piperCache.get(key);
+  if (cached) {
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(cached);
+  }
+  const waiting = piperPending.get(key);
+  if (waiting) { waiting.push(res); return; }
+  piperPending.set(key, [res]);
+  const finish = (buf, reason) => {
+    const list = piperPending.get(key) || [];
+    piperPending.delete(key);
+    if (buf) {
+      if (piperCache.size > 500) piperCache.clear();
+      piperCache.set(key, buf);
+      for (const r of list) {
+        try {
+          r.setHeader('Content-Type', 'audio/wav');
+          r.setHeader('Cache-Control', 'public, max-age=86400');
+          r.send(buf);
+        } catch (e) {}
+      }
+      logger.info('piper-tts', '合成成功', { text: text.slice(0, 30), voice, bytes: buf.length });
+    } else {
+      for (const r of list) {
+        try { r.status(502).json({ ok: false, message: reason || 'piper tts failed' }); } catch (e) {}
+      }
+      logger.warn('piper-tts', '合成失败', { text: text.slice(0, 30), voice, reason });
+    }
+  };
+  try {
+    await ensurePiperBinary();
+    const voicePath = await ensurePiperVoice(voice);
+    const outWav = path.join(PIPER_DIR, key + '.wav');
+    if (!fs.existsSync(outWav)) {
+      await new Promise((resolve, reject) => {
+        execFile(PIPER_BIN, ['--model', voicePath, '--output_file', outWav],
+          { input: text, timeout: 30000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
+          (err) => err ? reject(err) : resolve());
+      });
+    }
+    const buf = fs.readFileSync(outWav);
+    finish(buf);
+  } catch (err) {
+    finish(null, err.message);
+  }
+});
+
 // ==================== 在线自然女声（Google 合成代理） ====================
 // 本机浏览器直连 translate.googleapis.com 会被代理/TUN 拦截且需 CORS，
 // 但 Node 直连可达。这里在服务端抓取 Google TTS 音频并回传，
