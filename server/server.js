@@ -179,6 +179,76 @@ app.get('/api/tts', (req, res) => {
     });
 });
 
+// ==================== Edge TTS：微软免费神经网络语音合成 ====================
+// 通过 msedge-tts npm 包（Edge Read Aloud WebSocket 协议，内置 Sec-MS-GEC 鉴权）合成，
+// 无需 API key。缓存策略与 /api/online-tts 一致：内容寻址 + 并发去重 + 内存 LRU。
+// 注：原计划的 edge-tts 包（v1.0.1）早于微软 2024-10 强制的 Sec-MS-GEC 令牌，已全面 403 失效，
+// 故改用持续维护的 msedge-tts；其 SSML 模板不转义文本，注入防护由本端点的 xmlEscape 完成。
+const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+const edgeCache = new Map();
+const edgePending = new Map();
+// 文本/语音名会插入包内 SSML 模板，必须先做 XML 转义，防 <、& 等字符破坏模板或注入标签
+function xmlEscape(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+}
+app.get('/api/edge-tts', (req, res) => {
+  const text = String(req.query.text || '').trim();
+  const voice = String(req.query.voice || 'en-US-JennyNeural').slice(0, 64).replace(/[^A-Za-z0-9-]/g, '') || 'en-US-JennyNeural';
+  const lang = String(req.query.lang || 'en-US').slice(0, 32);
+  if (!text || text.length > 500) return res.status(400).json({ ok: false, message: 'text too long or empty' });
+  const key = crypto.createHash('sha1').update(text + '|' + voice).digest('hex');
+  const cached = edgeCache.get(key);
+  if (cached) {
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(cached);
+  }
+  // 并发去重：同一内容已有请求在合成中 → 挂到它后面，合成完一起回传
+  const waiting = edgePending.get(key);
+  if (waiting) { waiting.push(res); return; }
+  edgePending.set(key, [res]);
+  // 每次合成独占一个实例（实例内仅一条 WebSocket，复用会串音），用完即关
+  const tts = new MsEdgeTTS();
+  let done = false;
+  const finish = (buf, reason) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    try { tts.close(); } catch (e) {}
+    const list = edgePending.get(key) || [];
+    edgePending.delete(key);
+    if (buf && buf.length > 0) {
+      if (edgeCache.size > 500) edgeCache.clear();
+      edgeCache.set(key, buf);
+      for (const r of list) {
+        try {
+          r.setHeader('Content-Type', 'audio/mpeg');
+          r.setHeader('Cache-Control', 'public, max-age=86400');
+          r.send(buf);
+        } catch (e) {}
+      }
+      logger.info('edge-tts', '合成成功', { text: text.slice(0, 30), voice, bytes: buf.length });
+    } else {
+      for (const r of list) {
+        try { r.status(502).json({ ok: false, message: reason || 'edge tts failed' }); } catch (e) {}
+      }
+      logger.warn('edge-tts', '合成失败', { text: text.slice(0, 30), voice, reason });
+    }
+  };
+  // 包内无超时：WebSocket 挂起会让请求永不落定，这里加 15s 兜底（对齐 online-tts 的 12s）
+  const timer = setTimeout(() => finish(null, 'timeout 15s'), 15000);
+  tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3)
+    .then(() => {
+      const { audioStream } = tts.toStream(xmlEscape(text), { rate: '+0%', pitch: '+0Hz' });
+      const chunks = [];
+      audioStream.on('data', (chunk) => chunks.push(chunk));
+      audioStream.on('end', () => finish(Buffer.concat(chunks)));
+      audioStream.on('close', () => finish(Buffer.concat(chunks)));
+      audioStream.on('error', (err) => finish(null, err && err.message || 'stream error'));
+    })
+    .catch((err) => finish(null, err && err.message || 'connect failed'));
+});
+
 // ==================== 在线自然女声（Google 合成代理） ====================
 // 本机浏览器直连 translate.googleapis.com 会被代理/TUN 拦截且需 CORS，
 // 但 Node 直连可达。这里在服务端抓取 Google TTS 音频并回传，
