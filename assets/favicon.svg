@@ -1,5 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#5B82A6"/>
-  <path d="M14 18h24a8 8 0 0 1 8 8v20a8 8 0 0 0-8-8H14z" fill="#EEF4F9"/>
-  <path d="M50 18h-4v28h4a8 8 0 0 0 8-8v-12a8 8 0 0 0-8-8z" fill="#FF8A65"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7BA9CE"/>
+      <stop offset="100%" stop-color="#3E5F7F"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- 语音气泡 -->
+  <rect x="14" y="12" width="36" height="26" rx="6" fill="#FFFFFF"/>
+  <polygon points="22,38 26,44 30,38" fill="#FFFFFF"/>
+  <!-- 声波竖条 -->
+  <rect x="20" y="20" width="3" height="8" rx="1.5" fill="#5B82A6" fill-opacity="0.4"/>
+  <rect x="25" y="17" width="3" height="14" rx="1.5" fill="#5B82A6" fill-opacity="0.6"/>
+  <rect x="30" y="15" width="3" height="18" rx="1.5" fill="#3E5F7F"/>
+  <rect x="35" y="18" width="3" height="12" rx="1.5" fill="#5B82A6" fill-opacity="0.6"/>
+  <rect x="40" y="21" width="3" height="7" rx="1.5" fill="#5B82A6" fill-opacity="0.4"/>
+  <!-- 珊瑚 M 点缀 -->
+  <circle cx="50" cy="50" r="7" fill="#FF9A76"/>
+  <text x="50" y="53.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#FFFFFF">M</text>
 </svg>

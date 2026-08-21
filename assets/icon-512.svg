@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7BA9CE"/>
+      <stop offset="100%" stop-color="#3E5F7F"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="130" y1="140" x2="380" y2="340" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#EEF4F9"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF9A76"/>
+      <stop offset="100%" stop-color="#FF8A65"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景圆角方形 -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- 装饰圆弧 -->
+  <circle cx="420" cy="100" r="160" fill="#FFFFFF" fill-opacity="0.06"/>
+  <circle cx="90" cy="440" r="120" fill="#FFFFFF" fill-opacity="0.04"/>
+  <!-- 语音气泡 -->
+  <rect x="120" y="110" width="272" height="210" rx="36" fill="url(#bubble)"/>
+  <polygon points="180,320 210,365 240,320" fill="url(#bubble)"/>
+  <!-- 声波竖条 -->
+  <rect x="168" y="195" width="22" height="56" rx="11" fill="#5B82A6" fill-opacity="0.35"/>
+  <rect x="208" y="170" width="22" height="82" rx="11" fill="#5B82A6" fill-opacity="0.55"/>
+  <rect x="248" y="150" width="22" height="108" rx="11" fill="#3E5F7F"/>
+  <rect x="288" y="175" width="22" height="76" rx="11" fill="#5B82A6" fill-opacity="0.55"/>
+  <rect x="328" y="200" width="22" height="50" rx="11" fill="#5B82A6" fill-opacity="0.35"/>
+  <!-- 珊瑚点缀圆 -->
+  <circle cx="388" cy="378" r="52" fill="url(#coral)"/>
+  <!-- M 字母 -->
+  <path d="M362 364 L378 364 L388 348 L398 364 L414 364 L414 398 L398 398 L398 376 L388 362 L378 376 L378 398 L362 398Z" fill="#FFFFFF"/>
+</svg>

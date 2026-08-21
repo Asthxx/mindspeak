@@ -8,9 +8,15 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F8F6F1",
-  "theme_color": "#F8F6F1",
+  "theme_color": "#5B82A6",
   "categories": ["education", "productivity"],
   "icons": [
+    {
+      "src": "assets/icon-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "assets/pwa/icon-192.png",
       "sizes": "192x192",
