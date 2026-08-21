@@ -15,3 +15,11 @@
 ## Task 1.2: complete (commit 3ac05b1, review clean)
 
 ## Task 2: complete (commit 8f99ab3, review clean)
+
+## Task 3: complete (commit 5d1455f, review clean — fixed EngineParam->Engine)
+
+## Task 4: complete (commit 23d50e1, review clean — added android-ui-init.js + notification-manager.js to jsOrder)
+
+## Task 5: complete (commit b8d9005, deleted leftover fix-java17.sh)
+
+## Task 6: complete (commit da01720, SW Capacitor skip added)
