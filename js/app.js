@@ -1150,15 +1150,17 @@ _markOnlineBroken: function() {
     };
     // 默认兜底顺序：有道优先（国内直连稳定，用户实测可达）。
     // 百度 gettts 有 Referer 校验（安卓 WebView 里 no-referrer 常失效 → 返回错误码 4 空音频），
-    // 谷歌源墙内不可达。故系统默认/本地声音/未匹配音色的兜底顺序为：有道美音 → 有道英音 → 百度 → 谷歌系。
-    var DEFAULT_ORDER = ['youdao_us', 'youdao_uk', 'baidu', 'google_us', 'google_uk', 'google_au', 'google_in'];
+    // Edge TTS 走 server 合成（需 server 在线），谷歌源墙内不可达。
+    // 故兜底顺序为：有道美音 → 有道英音 → 百度 → Edge 美音 → 谷歌系。
+    var DEFAULT_ORDER = ['youdao_us', 'youdao_uk', 'baidu', 'edge_us_jenny', 'google_us', 'google_uk', 'google_in'];
     // 安卓 WebView：<audio> 无视 referrerPolicy，必带页面 Referer（https://localhost），
     // 百度 gettts 校验 Referer 返回空、谷歌安卓 UA 返回 404 —— 这俩系连了必失败还拖慢降级。
     // 安卓端直接从候选源剔除百度/谷歌，只用有道（不校验 Referer，实测稳定出声）。
     var _isAndroidSrc = false;
     try { _isAndroidSrc = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase()); } catch(e) {}
     if (_isAndroidSrc) {
-      DEFAULT_ORDER = ['youdao_us', 'youdao_uk'];
+      // 安卓：过滤掉百度/谷歌（Referer/UA 问题必失败），保留有道 + Edge（server 端合成不受影响）
+      DEFAULT_ORDER = DEFAULT_ORDER.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk' || id === 'edge_us_jenny'; });
     }
     var vn = '';
     try { if (self.getSettings) vn = self.getSettings().voiceName || ''; } catch(e) {}
@@ -1194,13 +1196,14 @@ _markOnlineBroken: function() {
       var first = order[src] || order[0];
       var ids = [first.id];
       if (_isAndroidSrc) {
-        // 安卓并行候选只含有道美/英音（不校验 Referer，实测稳定出声）；
+        // 安卓并行候选：有道（不校验 Referer，实测稳定出声）+ Edge（server 端合成，不受 UA/Referer 影响）；
         // 百度 gettts 带页面 Referer 返回空音频、谷歌安卓 UA 返回 404，连了必失败还抢胜者
         if (ids[0] !== 'youdao_us') ids.push('youdao_us');
         if (ids.indexOf('youdao_uk') === -1) ids.push('youdao_uk');
-        ids = ids.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk'; });
+        if (ids.indexOf('edge_us_jenny') === -1) ids.push('edge_us_jenny');
+        ids = ids.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk' || id === 'edge_us_jenny'; });
       } else {
-        var fb = ['youdao_us', 'youdao_uk', 'baidu'];
+        var fb = ['youdao_us', 'youdao_uk', 'baidu', 'edge_us_jenny'];
         for (var fi = 0; fi < fb.length; fi++) {
           if (ids.indexOf(fb[fi]) === -1 && !(self._srcHealth && (self._srcHealth[fb[fi]] || 0) >= 2)) ids.push(fb[fi]);
         }

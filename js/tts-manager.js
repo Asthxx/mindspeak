@@ -74,7 +74,7 @@ var TTSManager = (function() {
       try { saved = window.UserState ? window.UserState.getRaw('tts_voice', '') : localStorage.getItem('tts_voice'); } catch (e) {}
       if (!saved) { try { saved = window.UserState ? window.UserState.getRaw('selectedVoice', '') : localStorage.getItem('selectedVoice'); } catch (e) {} }
       if (!saved) { try { saved = window.UserState ? window.UserState.getRaw('voice_name', '') : localStorage.getItem('voice_name'); } catch (e) {} }
-      if (saved && saved !== '__online_google__' && saved.indexOf('__online_') !== 0) {
+      if (saved && saved !== '__online_google__' && saved.indexOf('__online_') !== 0 && saved.indexOf('__local_piper_') !== 0) {
         const v = this._pickByName(saved);
         if (v) { this.voice = v; return; }
       }
@@ -116,20 +116,31 @@ var TTSManager = (function() {
     // 用户在下拉框切换声音：找到对应 voice 设为当前声音并持久化到 localStorage["tts_voice"]。
     // 切换时是否 cancel 正在播的声音由调用方决定（设置页会在切换后重新朗读）。
     setVoice(name) {
-      // 虚拟在线音色（__online_*）不是真实 speechSynthesis voice：选择它时清除本地
-      // speechSynthesis 选择，避免误用系统声音；实际发声由 app.js 的 remoteFallback 接管
-      if (!name || (typeof name === 'string' && name.indexOf('__online_') === 0)) {
+      // 虚拟在线音色（__online_* / __local_piper_*）不是真实 speechSynthesis voice：
+      // 清除本地 speechSynthesis voice 对象（避免误用系统声音），
+      // 但必须持久化 voice_name 到 localStorage，保证 TTSManager.speak() 能读到并路由。
+      if (!name || (typeof name === 'string' && (name.indexOf('__online_') === 0 || name.indexOf('__local_piper_') === 0))) {
         this.voice = null;
         try {
-          if (window.UserState) {
-            window.UserState.remove('tts_voice');
-            window.UserState.remove('selectedVoice');
+          if (name) {
+            if (window.UserState) {
+              window.UserState.setRaw('tts_voice', name);
+              window.UserState.setRaw('selectedVoice', name);
+            } else {
+              localStorage.setItem('tts_voice', name);
+              localStorage.setItem('selectedVoice', name);
+            }
           } else {
-            localStorage.removeItem('tts_voice');
-            localStorage.removeItem('selectedVoice');
+            if (window.UserState) {
+              window.UserState.remove('tts_voice');
+              window.UserState.remove('selectedVoice');
+            } else {
+              localStorage.removeItem('tts_voice');
+              localStorage.removeItem('selectedVoice');
+            }
           }
         } catch (e) {}
-        console.log('[TTS] selected cleared:', name);
+        console.log('[TTS] selected:', name || '(cleared)');
         return false;
       }
       const v = this._pickByName(name);
@@ -175,6 +186,15 @@ var TTSManager = (function() {
       return this.applyVoice(u, opts || {});
     }
 
+    // 从 localStorage 读取当前选中的 voice_name（兼容三个键名）
+    _getVoiceName() {
+      var vn = '';
+      try { vn = window.UserState ? window.UserState.getRaw('tts_voice', '') : localStorage.getItem('tts_voice'); } catch (e) {}
+      if (!vn) { try { vn = window.UserState ? window.UserState.getRaw('selectedVoice', '') : localStorage.getItem('selectedVoice'); } catch (e) {} }
+      if (!vn) { try { vn = window.UserState ? window.UserState.getRaw('voice_name', '') : localStorage.getItem('voice_name'); } catch (e) {} }
+      return vn || '';
+    }
+
     // 统一朗读入口：cancel 旧声 → 用当前声音创建 utterance → 挂回调 → 100ms 后 speak。
     // 100ms 间隔用于避开 Chromium 的 cancel+speak 竞态（取消后立刻 speak 会吞掉本次朗读）；
     // opts.immediate=true 时立即 speak（iOS Safari 需在用户手势上下文内触发，不能延迟）。
@@ -193,14 +213,68 @@ var TTSManager = (function() {
           return { native: true };
         }
       }
+      // voice_name 路由：读取 localStorage 中用户选择的声音名，委托给 SpeechUtil 的对应路径。
+      // 保证"设置页选了什么声音，所有入口（TTSManager.speak / SpeechUtil.speak / listen-along 等）
+      // 都用该声音"。SpeechUtil 在运行时已就绪（tts-manager.js 先加载，speak() 后调用）。
+      // 安全守卫：如果 opts.voice 已经是真实的 SpeechSynthesisVoice 对象（_speakTTSOnline
+      // 等内部调用方注入的），说明调用方已经解析好了声音，跳过 voice_name 路由，
+      // 直接走 speechSynthesis 用 opts.voice 播放，避免 Piper/online 失败 → _speakTTSOnline →
+      // TTSManager.speak → 再次路由到同一个失败源的无限循环。
+      var _vn = this._getVoiceName();
+      var _hasRealVoice = !!(opts && opts.voice && typeof opts.voice === 'object' && opts.voice.name && typeof opts.voice.name === 'string');
+      if (_vn && !_hasRealVoice && window.SpeechUtil) {
+        var _su = window.SpeechUtil;
+        // 本地男声/女声（David/Zira）→ server SAPI
+        if (_vn === '__local_david__' || _vn === '__local_zira__') {
+          var _lvo = {};
+          if (opts) for (var _lk in opts) _lvo[_lk] = opts[_lk];
+          _lvo.voice = _vn === '__local_zira__' ? 'zira' : 'david';
+          try { window.speechSynthesis.cancel(); } catch (_e) {}
+          _su._stopLocalAudio();
+          _su._speakLocal(text, lang, _lvo);
+          return;
+        }
+        // Piper 本地离线神经网络语音
+        if (_vn.indexOf('__local_piper_') === 0) {
+          try { window.speechSynthesis.cancel(); } catch (_e) {}
+          _su._stopLocalAudio();
+          if (_su._serverDown === true) { _su._speakTTSOnline(text, lang, opts); return; }
+          var _piperMap = { '__local_piper_us_amy__': 'en_US-amy-medium', '__local_piper_us_lessac__': 'en_US-lessac-medium', '__local_piper_gb_alba__': 'en_GB-alba-medium' };
+          var _piperId = _piperMap[_vn] || 'en_US-amy-medium';
+          var _pBase = window.API_BASE || '';
+          var _pUrl = _pBase + '/api/piper-tts?text=' + encodeURIComponent(text) + '&voice=' + encodeURIComponent(_piperId);
+          var _pAudio;
+          try { _pAudio = new Audio(_pUrl); } catch (e) { _su._speakTTSOnline(text, lang, opts); return; }
+          _su._localAudio = _pAudio;
+          _su._attachAudioEl(_pAudio);
+          var _pFs = opts && opts.onstart ? function() { try { opts.onstart(); } catch(e) {} } : function() {};
+          var _pFe = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
+          var _pFail = false;
+          var _pFailOnce = function() { if (_pFail) return; _pFail = true; if (_su._localAudio === _pAudio) _su._localAudio = null; _su._detachAudioEl(_pAudio); _su._speakTTSOnline(text, lang, opts); };
+          _pAudio.onended = function() { if (_su._localAudio === _pAudio) _su._localAudio = null; _su._detachAudioEl(_pAudio); _pFe(); };
+          _pAudio.onerror = function() { if (_su._localAudio !== _pAudio) return; _su._detachAudioEl(_pAudio); _pFailOnce(); };
+          _pFs();
+          var _pr; try { _pr = _pAudio.play(); } catch (e) { _pFailOnce(); return; }
+          if (_pr && _pr.catch) _pr.catch(function(e) { if (e && e.name === 'AbortError') return; _pFailOnce(); });
+          return;
+        }
+        // 在线虚拟音色（__online_*）→ Google 合成 / 远程发音兜底
+        if (_vn.indexOf('__online_') === 0) {
+          try { window.speechSynthesis.cancel(); } catch (_e) {}
+          _su._stopLocalAudio();
+          if (_vn === '__online_google__' && !(_su._serverDown === true)) {
+            _su._speakGoogleTTS(text, lang, opts);
+          } else {
+            _su._speakServerless(text, lang, opts);
+          }
+          return;
+        }
+      }
       if (!('speechSynthesis' in window)) return null;
       const u = this.createUtterance(text, opts);
       if (opts.onstart) u.onstart = opts.onstart;
       if (opts.onend) u.onend = opts.onend;
       if (opts.onerror) u.onerror = opts.onerror;
-      console.log('[TTS] playing:', u.voice ? u.voice.name : '(no voice)');
-      console.log('[TTS DEBUG] page:', this._currentPage());
-      console.log('[TTS DEBUG] voice:', u.voice ? u.voice.name : '(system default)');
       const self = this;
       const fire = function() {
         try { if (window.speechSynthesis.paused) window.speechSynthesis.resume(); } catch (e) {}

@@ -187,6 +187,7 @@ app.get('/api/tts', (req, res) => {
 const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
 const edgeCache = new Map();
 const edgePending = new Map();
+const edgeInProgress = new Map(); // key → true: 正在合成中，新请求挂到 pending 而非重启 WebSocket
 // 文本/语音名会插入包内 SSML 模板，必须先做 XML 转义，防 <、& 等字符破坏模板或注入标签
 function xmlEscape(s) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
@@ -203,10 +204,11 @@ app.get('/api/edge-tts', (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.send(cached);
   }
-  // 并发去重：同一内容已有请求在合成中 → 挂到它后面，合成完一起回传
+  // 并发去重：合成中 → 挂到 pending 列表，合成完一起回传（不重启 WebSocket）
   const waiting = edgePending.get(key);
-  if (waiting) { waiting.push(res); return; }
+  if (waiting || edgeInProgress.get(key)) { (waiting || edgePending.get(key) || (() => { const l = []; edgePending.set(key, l); return l; })()).push(res); return; }
   edgePending.set(key, [res]);
+  edgeInProgress.set(key, true);
   // 每次合成独占一个实例（实例内仅一条 WebSocket，复用会串音），用完即关
   const tts = new MsEdgeTTS();
   let done = false;
@@ -217,6 +219,7 @@ app.get('/api/edge-tts', (req, res) => {
     try { tts.close(); } catch (e) {}
     const list = edgePending.get(key) || [];
     edgePending.delete(key);
+    edgeInProgress.delete(key);
     if (buf && buf.length > 0) {
       if (edgeCache.size > 500) edgeCache.clear();
       edgeCache.set(key, buf);
@@ -325,9 +328,10 @@ async function ensurePiperVoice(voiceName) {
 
 const piperCache = new Map();
 const piperPending = new Map();
+const piperInProgress = new Map(); // key → true: 正在合成中，新请求挂到 pending 而非重启合成
 app.get('/api/piper-tts', async (req, res) => {
   const text = String(req.query.text || '').trim();
-  const voice = String(req.query.voice || 'en_US-amy-medium').slice(0, 64);
+  const voice = String(req.query.voice || 'en_US-amy-medium').slice(0, 64).replace(/[^A-Za-z0-9_-]/g, '') || 'en_US-amy-medium';
   if (!text || text.length > 500) return res.status(400).json({ ok: false, message: 'text too long or empty' });
   if (!PIPER_VOICES[voice]) return res.status(400).json({ ok: false, message: 'unknown voice: ' + voice });
   const key = crypto.createHash('sha1').update(text + '|' + voice).digest('hex');
@@ -337,12 +341,15 @@ app.get('/api/piper-tts', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.send(cached);
   }
+  // 并发去重：合成中 → 挂到 pending 列表，合成完一起回传（不重启进程）
   const waiting = piperPending.get(key);
-  if (waiting) { waiting.push(res); return; }
+  if (waiting || piperInProgress.get(key)) { (waiting || piperPending.get(key) || (() => { const l = []; piperPending.set(key, l); return l; })()).push(res); return; }
   piperPending.set(key, [res]);
+  piperInProgress.set(key, true);
   const finish = (buf, reason) => {
     const list = piperPending.get(key) || [];
     piperPending.delete(key);
+    piperInProgress.delete(key);
     if (buf) {
       if (piperCache.size > 500) piperCache.clear();
       piperCache.set(key, buf);
@@ -361,6 +368,8 @@ app.get('/api/piper-tts', async (req, res) => {
       logger.warn('piper-tts', '合成失败', { text: text.slice(0, 30), voice, reason });
     }
   };
+  // 整体 45s 超时：防止下载二进制/语音包挂起导致请求永不落定
+  const piperTimeout = setTimeout(() => finish(null, 'piper timeout 45s'), 45000);
   try {
     await ensurePiperBinary();
     const voicePath = await ensurePiperVoice(voice);
@@ -373,8 +382,11 @@ app.get('/api/piper-tts', async (req, res) => {
       });
     }
     const buf = fs.readFileSync(outWav);
+    try { fs.unlinkSync(outWav); } catch (e) {} // 清理临时 .wav，避免磁盘泄漏
+    clearTimeout(piperTimeout);
     finish(buf);
   } catch (err) {
+    clearTimeout(piperTimeout);
     finish(null, err.message);
   }
 });

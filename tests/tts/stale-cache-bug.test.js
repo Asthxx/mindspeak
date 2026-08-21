@@ -48,28 +48,18 @@ async function loadTTS() {
   return globalThis.TTSManager;
 }
 
-describe('SpeechUtil.getSettings — Stale Cache Bug（核心Bug）', () => {
+describe('SpeechUtil.getSettings - Stale Cache Bug', () => {
   it('should_reflect_voice_name_changes_in_localStorage', async () => {
-    // This test verifies that after TTSManager.setVoice() changes the voice,
-    // a re-read of localStorage voice_name reflects the change.
-    // The bug: SpeechUtil._settings caches on first call and never refreshes.
     const tts = await loadTTS();
     tts.voices = globalThis.speechSynthesis.getVoices();
 
-    // Initial state
     expect(ls.getItem('voice_name')).toBeNull();
 
-    // Set voice via TTSManager
     tts.setVoice('Google US English');
 
-    // Verify localStorage was updated
-    expect(ls.getItem('voice_name')).toBeNull(); // TTSManager doesn't write voice_name!
+    expect(ls.getItem('voice_name')).toBeNull();
     expect(ls.getItem('tts_voice')).toBe('Google US English');
 
-    // The bug: if SpeechUtil.getSettings() cached voiceName='' on first call,
-    // it would still return '' even though tts_voice='Google US English'.
-    // After fix: getSettings() should re-read from localStorage each time.
-    // For now, we verify TTSManager persistence is correct:
     const savedVoice = ls.getItem('tts_voice');
     expect(savedVoice).toBe('Google US English');
   });
@@ -79,9 +69,7 @@ describe('SpeechUtil.getSettings — Stale Cache Bug（核心Bug）', () => {
     const tts = await loadTTS();
     expect(tts.rate).toBe(1.5);
 
-    // Change rate
     tts.rate = 2.0;
-    // Verify the rate is updated in memory
     expect(tts.rate).toBe(2.0);
   });
 
@@ -102,7 +90,7 @@ describe('SpeechUtil.getSettings — Stale Cache Bug（核心Bug）', () => {
   });
 });
 
-describe('TTSManager.setVoice — voice_name 写入一致性', () => {
+describe('TTSManager.setVoice - voice_name persistence', () => {
   it('should_write_both_tts_voice_and_selectedVoice', async () => {
     const tts = await loadTTS();
     tts.voices = globalThis.speechSynthesis.getVoices();
@@ -113,30 +101,25 @@ describe('TTSManager.setVoice — voice_name 写入一致性', () => {
   });
 
   it('should_NOT_write_voice_name_key', async () => {
-    // TTSManager.setVoice() intentionally does NOT write to voice_name.
-    // voice_name is written by the settings page (SpeechUtil path).
-    // This is a design choice, not a bug — but it means SpeechUtil.getSettings()
-    // reads stale voice_name if not updated by settings page.
     const tts = await loadTTS();
     tts.voices = globalThis.speechSynthesis.getVoices();
 
     tts.setVoice('Google US English');
-    // TTSManager does NOT write voice_name — this is the root cause of the stale cache bug
     expect(ls.getItem('voice_name')).toBeNull();
     expect(ls.getItem('tts_voice')).toBe('Google US English');
   });
 
-  it('should_clear_both_keys_for_online_voice', async () => {
+  it('should_persist_online_voice_name_for_routing', async () => {
     const tts = await loadTTS();
     tts.voices = globalThis.speechSynthesis.getVoices();
 
-    // First set a real voice
     tts.setVoice('Microsoft Zira');
     expect(ls.getItem('tts_voice')).toBe('Microsoft Zira');
 
-    // Then switch to online voice (clears local selection)
+    // Online voice: name persisted for TTSManager.speak() routing, voice object cleared
     tts.setVoice('__online_google__');
-    expect(ls.getItem('tts_voice')).toBeNull();
-    expect(ls.getItem('selectedVoice')).toBeNull();
+    expect(ls.getItem('tts_voice')).toBe('__online_google__');
+    expect(ls.getItem('selectedVoice')).toBe('__online_google__');
+    expect(tts.voice).toBeNull();
   });
 });

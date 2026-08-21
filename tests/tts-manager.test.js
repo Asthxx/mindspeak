@@ -93,7 +93,8 @@ describe('TTSManager — setVoice', () => {
     var result = tts.setVoice('__online_google__');
     expect(result).toBe(false);
     expect(tts.voice).toBeNull();
-    expect(localStorage.getItem('tts_voice')).toBeNull();
+    // 新行为：在线音色名称持久化到 localStorage（供 TTSManager.speak 路由），不再清除
+    expect(localStorage.getItem('tts_voice')).toBe('__online_google__');
   });
 });
 

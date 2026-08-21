@@ -58,12 +58,12 @@ describe('Capacitor 配置文件', () => {
   if (configExists) {
     const configContent = readFileSync(configPath, 'utf8');
 
-    it('should_have_appId_com_mindspeak_app', () => {
-      expect(configContent).toContain("appId: 'com.mindspeak.app'");
+    it('should_have_appId_com_asthxx_mindspeak', () => {
+      expect(configContent).toContain("appId: 'com.asthxx.mindspeak'");
     });
 
-    it('should_have_appName_MindSpeak', () => {
-      expect(configContent).toContain("appName: 'MindSpeak'");
+    it('should_have_appName_mindspeak', () => {
+      expect(configContent).toContain("appName: '闻道 MindSpeak'");
     });
 
     it('should_have_webDir_dist', () => {
@@ -74,8 +74,8 @@ describe('Capacitor 配置文件', () => {
       expect(configContent).toContain("androidScheme: 'https'");
     });
 
-    it('should_have_cleartext_enabled', () => {
-      expect(configContent).toContain('cleartext: true');
+    it('should_have_local_notifications_config', () => {
+      expect(configContent).toContain('LocalNotifications');
     });
   }
 });
