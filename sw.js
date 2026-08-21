@@ -40,6 +40,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // Capacitor 环境跳过：origin 为 https://localhost 表示 Capacitor 打包环境
+  if (location.origin === 'https://localhost' && location.protocol === 'https:') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
