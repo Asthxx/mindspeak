@@ -14,6 +14,7 @@ const jsOrder = [
   'js/core/events.js', // EventBus 事件总线（模块解耦）
   'js/core/store.js', // UserState 统一状态访问层（含幂等 migration）
   'js/tts-manager.js', // 全局统一 TTS 服务必须最先加载（其他文件都依赖 window.TTSManager）
+  'js/nativetts-bridge.js', // Capacitor 原生 TTS 桥接层（Android 端由 tts-manager 调用）
   'js/app.js',
   'js/badges.js',
   'js/daily-plan.js',

@@ -11,3 +11,7 @@
 - **Cost if wrong:** Minimal — code is ready, just needs SDK to build.
 
 ## Task Progress
+
+## Task 1.2: complete (commit 3ac05b1, review clean)
+
+## Task 2: complete (commit 8f99ab3, review clean)
