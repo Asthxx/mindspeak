@@ -15,6 +15,8 @@ const jsOrder = [
   'js/core/store.js', // UserState 统一状态访问层（含幂等 migration）
   'js/tts-manager.js', // 全局统一 TTS 服务必须最先加载（其他文件都依赖 window.TTSManager）
   'js/nativetts-bridge.js', // Capacitor 原生 TTS 桥接层（Android 端由 tts-manager 调用）
+  'js/android-ui-init.js', // Android UI 初始化（StatusBar、NavigationBar、触摸反馈、启动屏）
+  'js/notification-manager.js', // Android 本地通知管理（学习提醒、复习调度）
   'js/app.js',
   'js/badges.js',
   'js/daily-plan.js',
