@@ -1,0 +1,29 @@
+/* css/android.css - Android 专用样式 */
+/* 隔离说明：本文件通过 <link> 无条件加载，因此所有规则必须使用 html.platform-android 前缀隔离；
+   非 Android 平台（无该类）不会命中任何规则，Windows 网页不受影响。
+   （注意：不可使用 html:not(.platform-android){display:none} 之类规则——那会在 Windows 上隐藏整个页面。） */
+
+/* 基础变量 */
+:root {
+  --android-safe-top: env(safe-area-inset-top, 0px);
+  --android-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --android-nav-height: 56px;
+  --android-touch-target: 44px;
+}
+
+/* 页面基础布局 */
+html.platform-android body {
+  padding-bottom: var(--android-nav-height);
+  padding-top: var(--android-safe-top);
+  overflow-x: hidden;
+}
+
+html.platform-android .page {
+  display: none;
+  min-height: 100vh;
+  padding-bottom: 20px;
+}
+
+html.platform-android .page.active {
+  display: block;
+}

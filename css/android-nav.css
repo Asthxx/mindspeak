@@ -1,0 +1,42 @@
+/* css/android-nav.css - Android 底部导航栏 */
+html.platform-android .bottom-nav {
+  display: flex !important;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--android-nav-height);
+  background: var(--bg-card, #fff);
+  border-top: 1px solid var(--border, #e0e0e0);
+  padding-bottom: var(--android-safe-bottom);
+  z-index: 1000;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+}
+
+html.platform-android .bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--android-touch-target);
+  padding: 4px 0;
+  color: var(--text-secondary, #666);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+html.platform-android .bottom-nav-btn.active {
+  color: var(--primary, #5B82A6);
+}
+
+html.platform-android .bottom-nav-btn .icon {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 2px;
+}
+
+html.platform-android .bottom-nav-btn span {
+  font-size: 11px;
+  line-height: 1;
+}

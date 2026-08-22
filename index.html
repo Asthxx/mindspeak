@@ -64,6 +64,10 @@
      不破坏 file:// 离线、localhost 开发、HTTPS 公网部署三种模式。
      注：frame-ancestors 等个别指令在 <meta> 中会被部分浏览器忽略，正式部署建议由后端同源加同值响应头。 -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob: https:; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 https:; font-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; frame-src 'none';">
+  <!-- Android 专用样式：全部规则带 html.platform-android 前缀，非 Android 平台不生效 -->
+  <link rel="stylesheet" href="css/android.css" id="android-css">
+  <link rel="stylesheet" href="css/android-nav.css">
+  <link rel="stylesheet" href="css/android-animations.css">
 <link rel="stylesheet" href="css/design-system.css">
   <link rel="stylesheet" href="css/icons.css">
   <link rel="stylesheet" href="css/style.css">
