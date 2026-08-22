@@ -1160,7 +1160,7 @@ _markOnlineBroken: function() {
     try { _isAndroidSrc = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase()); } catch(e) {}
     if (_isAndroidSrc) {
       // 安卓：过滤掉百度/谷歌（Referer/UA 问题必失败），保留有道 + Edge（server 端合成不受影响）
-      DEFAULT_ORDER = DEFAULT_ORDER.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk' || id === 'edge_us_jenny'; });
+      DEFAULT_ORDER = DEFAULT_ORDER.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk'; });
     }
     var vn = '';
     try { if (self.getSettings) vn = self.getSettings().voiceName || ''; } catch(e) {}
@@ -1201,7 +1201,7 @@ _markOnlineBroken: function() {
         if (ids[0] !== 'youdao_us') ids.push('youdao_us');
         if (ids.indexOf('youdao_uk') === -1) ids.push('youdao_uk');
         if (ids.indexOf('edge_us_jenny') === -1) ids.push('edge_us_jenny');
-        ids = ids.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk' || id === 'edge_us_jenny'; });
+        ids = ids.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk'; });
       } else {
         var fb = ['youdao_us', 'youdao_uk', 'baidu', 'edge_us_jenny'];
         for (var fi = 0; fi < fb.length; fi++) {
@@ -1831,14 +1831,20 @@ var ThemeToggle = {
   _syncNativeBars: function(theme) {
     if (!window.Capacitor) return;
     var isDark = theme === 'dark';
-    if (window.Capacitor.Plugins.StatusBar) {
-      window.Capacitor.Plugins.StatusBar.setStyle({ style: isDark ? 'DARK' : 'LIGHT' });
-      window.Capacitor.Plugins.StatusBar.setBackgroundColor({ color: isDark ? '#1A1B1E' : '#FFFFFF' });
-    }
-    if (window.Capacitor.Plugins.NavigationBar) {
-      window.Capacitor.Plugins.NavigationBar.setStyle({ style: isDark ? 'DARK' : 'LIGHT' });
-      window.Capacitor.Plugins.NavigationBar.setColor({ color: isDark ? '#1A1B1E' : '#FFFFFF' });
-    }
+    try {
+      if (window.Capacitor.Plugins.StatusBar) {
+        window.Capacitor.Plugins.StatusBar.setStyle({ style: isDark ? 'DARK' : 'LIGHT' });
+        window.Capacitor.Plugins.StatusBar.setBackgroundColor({ color: isDark ? '#1A1B1E' : '#FFFFFF' });
+      }
+    } catch (e) {}
+    try {
+      if (window.Capacitor.Plugins.NavigationBar) {
+        window.Capacitor.Plugins.NavigationBar.setNavigationBarColor({
+          color: isDark ? '#1A1B1E' : '#FFFFFF',
+          darkButtons: !isDark
+        });
+      }
+    } catch (e) {}
   },
   _syncMetaThemeColor: function(theme) {
     var meta = document.querySelector('meta[name="theme-color"]');
@@ -7143,7 +7149,8 @@ App.prototype.exportMistakes = function() {
 document.addEventListener('DOMContentLoaded', function() {
   ThemeToggle.init();
   ThemeColor.init();
-  if (window.AndroidUIInit) AndroidUIInit.init();
+  try { if (window.AndroidUIInit) AndroidUIInit.init(); } catch(e) { console.error('AndroidUIInit failed:', e); }
+  try { if (window.NativeTTSBridge) NativeTTSBridge.init(); } catch(e) { console.error('NativeTTSBridge init failed:', e); }
   KeyboardShortcuts.init();
   LearningReminder.init();
 

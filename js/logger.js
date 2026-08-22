@@ -218,8 +218,11 @@
       error: function(mod, msg, data, stack) { logEntry('error', mod, msg, data, stack); },
       warn:  function(mod, msg, data) { logEntry('warn',  mod, msg, data); },
       info:  function(mod, msg, data) { logEntry('info',  mod, msg, data); },
-      debug: function(mod, msg, data) { logEntry('debug', mod, msg, data); } // debug 不上报 server（见 server.js）
+      debug: function(mod, msg, data) { logEntry('debug', mod, msg, data); }, // debug 不上报 server（见 server.js）
+      log:   function(mod, msg, data) { logEntry('info',  mod, msg, data); }   // Logger.log() 兼容（映射到 info）
     };
+    // 兼容别名：android-ui-init / notification-manager 等模块用 Logger.log()
+    window.Logger = window.Log;
 
     window.__msLoggerOK = true;
 

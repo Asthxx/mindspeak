@@ -17,6 +17,7 @@ const jsOrder = [
   'js/nativetts-bridge.js', // Capacitor 原生 TTS 桥接层（Android 端由 tts-manager 调用）
   'js/android-ui-init.js', // Android UI 初始化（StatusBar、NavigationBar、触摸反馈、启动屏）
   'js/notification-manager.js', // Android 本地通知管理（学习提醒、复习调度）
+  'js/responsive-layout.js', // 响应式断点布局（手机/平板/桌面自适应）
   'js/app.js',
   'js/badges.js',
   'js/daily-plan.js',
@@ -71,17 +72,23 @@ async function bundleJs(BUILD_TIME) {
   }
   try {
     const terser = require('terser');
-    const result = await terser.minify(combined, {
-      compress: { drop_console: true, dead_code: true },
-      mangle: true,
-      output: { beautify: false },
-    });
-    if (result.error) {
-      console.log('[warn] terser failed, plain concat:', result.error.message);
+    const debugMode = process.env.MS_DEBUG === '1';
+    if (debugMode) {
+      console.log('[debug] skip terser, output unminified bundle');
       fs.writeFileSync(path.join(DIST, 'js', 'bundle.js'), combined, 'utf8');
     } else {
-      fs.writeFileSync(path.join(DIST, 'js', 'bundle.js'), result.code, 'utf8');
-      console.log('[ok] JS 混淆压缩 (' + toKB(combined.length) + ' -> ' + toKB(result.code.length) + ')');
+      const result = await terser.minify(combined, {
+        compress: { drop_console: true, dead_code: true },
+        mangle: true,
+        output: { beautify: false },
+      });
+      if (result.error) {
+        console.log('[warn] terser failed, plain concat:', result.error.message);
+        fs.writeFileSync(path.join(DIST, 'js', 'bundle.js'), combined, 'utf8');
+      } else {
+        fs.writeFileSync(path.join(DIST, 'js', 'bundle.js'), result.code, 'utf8');
+        console.log('[ok] JS 混淆压缩 (' + toKB(combined.length) + ' -> ' + toKB(result.code.length) + ')');
+      }
     }
   } catch (e) {
     console.log('[info] terser 未安装，使用原始合并（代码可读但结构完整）');
