@@ -63,3 +63,384 @@ html.platform-android .page-group-growth .page {
 html.platform-android .page-group-growth .page.active {
   display: block;
 }
+
+/* ============================================================
+   页面布局重构（Task 3：首页 / 学习 / 练习 / AI / 设置）
+   说明：实施计划中的部分类名（.dashboard/.daily-report/.word-card-container/
+   .vocab-card/.practice-header/.chat-container/.chat-input-container/
+   .settings-group-title/.setting-item 等）在现有 DOM 中并不存在，
+   实际 DOM 使用 .dash-greeting/.card-area+.word-card/.section-header/
+   .ai-chat-window/.ai-chat-input-row/.settings-group+h3 等类名。
+   因此每个页面分两段：
+   ① 计划原文规则——原样保留；选择器无匹配时自动失效、无副作用；
+   ② DOM 映射规则——把同样的设计意图映射到真实类名，保证 Android 上真正生效。
+   两段全部带 html.platform-android 前缀，非 Android 平台零影响。
+   ============================================================ */
+
+/* ============ 首页：全屏日报 + 底部快捷入口 ============ */
+/* ① 计划原文 */
+html.platform-android #page-home {
+  padding: 0;
+}
+
+html.platform-android #page-home .dashboard {
+  padding: 16px;
+}
+
+html.platform-android #page-home .daily-report {
+  background: linear-gradient(135deg, var(--primary, #5B82A6), var(--primary-dark, #3E5F7F));
+  color: white;
+  padding: 24px 16px;
+  border-radius: 0 0 24px 24px;
+  margin: -16px -16px 16px -16px;
+}
+
+html.platform-android #page-home .quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 0 16px;
+}
+
+html.platform-android #page-home .quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  background: var(--bg-card, #fff);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ② DOM 映射：问候卡 → 渐变日报头
+   （负外边距抵消 .content 的 16px 内边距，实现通栏出血） */
+html.platform-android #page-home .dash-greeting {
+  background: linear-gradient(135deg, var(--primary, #5B82A6), var(--primary-dark, #3E5F7F));
+  color: #fff;
+  padding: 24px 16px;
+  border-radius: 0 0 24px 24px;
+  margin: calc(-1 * var(--sp-4, 1rem)) calc(-1 * var(--sp-4, 1rem)) 16px;
+}
+
+html.platform-android #page-home .dash-greeting h2,
+html.platform-android #page-home .dash-greeting .dash-date {
+  color: #fff;
+}
+
+html.platform-android #page-home .dash-greeting .btn-primary {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--primary-dark, #3E5F7F);
+}
+
+/* 卡片 Material 化 + 小屏单列堆叠 */
+html.platform-android #page-home .dash-stat-card,
+html.platform-android #page-home .dash-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+html.platform-android #page-home .dash-grid {
+  grid-template-columns: 1fr;
+}
+
+/* 快捷入口 → 4 列网格（对应计划 .quick-actions / .quick-action-btn） */
+html.platform-android #page-home .dash-quick {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+html.platform-android #page-home .dash-quick-btn {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-width: 0;
+  padding: 12px 8px;
+  min-height: var(--android-touch-target);
+}
+
+/* ============ 学习页（背单词）：全屏卡片堆叠 ============ */
+/* ① 计划原文 */
+html.platform-android #page-word {
+  padding: 0;
+  overflow: hidden;
+}
+
+html.platform-android #page-word .word-card-container {
+  position: relative;
+  height: calc(100vh - var(--android-nav-height) - 60px);
+  padding: 16px;
+}
+
+html.platform-android #page-word .vocab-card {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s ease;
+}
+
+html.platform-android #page-word .vocab-card.swipe-left {
+  transform: translateX(-120%) rotate(-15deg);
+  opacity: 0;
+}
+
+html.platform-android #page-word .vocab-card.swipe-right {
+  transform: translateX(120%) rotate(15deg);
+  opacity: 0;
+}
+
+/* ② DOM 映射：.card-area 即卡片容器（含导航条/记忆环/单词卡/操作按钮）。
+   计划的绝对定位会把单词卡叠在按钮上，故改用 flex 纵向布局：
+   卡片占满剩余高度，导航条与操作按钮保持在卡片上下方 */
+html.platform-android #page-word > .card-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--android-nav-height) - 60px);
+  max-width: none;
+}
+
+html.platform-android #page-word .word-card {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  flex: 1 1 auto;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* 左右滑动出/入场（swipe-left/right 类由后续手势任务 JS 添加） */
+html.platform-android #page-word .word-card.swipe-left {
+  transform: translateX(-120%) rotate(-15deg);
+  opacity: 0;
+}
+
+html.platform-android #page-word .word-card.swipe-right {
+  transform: translateX(120%) rotate(15deg);
+  opacity: 0;
+}
+
+/* ============ 练习组页面：全屏沉浸式 ============ */
+/* ① 计划原文（现有 DOM 未使用 .page-group-practice 包裹，保留备用） */
+html.platform-android .page-group-practice .page {
+  padding: 0;
+}
+
+html.platform-android .page-group-practice .page .practice-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card, #fff);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border, #e0e0e0);
+  z-index: 10;
+}
+
+html.platform-android .page-group-practice .page .practice-progress {
+  height: 4px;
+  background: var(--border, #e0e0e0);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+html.platform-android .page-group-practice .page .practice-progress-bar {
+  height: 100%;
+  background: var(--primary, #5B82A6);
+  transition: width 0.3s ease;
+}
+
+/* ② DOM 映射：练习组实际为独立页面 grammar/spelling/pk/context/speak */
+html.platform-android #page-grammar,
+html.platform-android #page-spelling,
+html.platform-android #page-pk,
+html.platform-android #page-context,
+html.platform-android #page-speak {
+  padding: 0;
+}
+
+/* 筛选区作为吸顶练习头（负外边距实现通栏出血） */
+html.platform-android #page-grammar .section-header,
+html.platform-android #page-spelling .section-header,
+html.platform-android #page-pk .section-header,
+html.platform-android #page-context .section-header,
+html.platform-android #page-speak .section-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface, #fff);
+  padding: 12px 16px;
+  margin: calc(-1 * var(--sp-4, 1rem)) calc(-1 * var(--sp-4, 1rem)) 16px;
+  border: none;
+  border-bottom: 1px solid var(--border, #E5E2DC);
+  border-radius: 0;
+}
+
+/* 进度条细化（对应计划 .practice-progress/-bar，各练习页通用结构） */
+html.platform-android #page-grammar .progress-bar,
+html.platform-android #page-spelling .progress-bar,
+html.platform-android #page-pk .progress-bar,
+html.platform-android #page-context .progress-bar,
+html.platform-android #page-speak .progress-bar {
+  height: 4px;
+  background: var(--border, #E5E2DC);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+html.platform-android #page-grammar .progress-fill,
+html.platform-android #page-spelling .progress-fill,
+html.platform-android #page-pk .progress-fill,
+html.platform-android #page-context .progress-fill,
+html.platform-android #page-speak .progress-fill {
+  height: 100%;
+  background: var(--primary, #5B82A6);
+  transition: width 0.3s ease;
+}
+
+/* ============ AI 页面：全屏对话 + 底部固定输入框 ============ */
+/* ① 计划原文
+   （修正：display:flex 必须限定在 .active 态——否则 ID 选择器优先级
+     高于 .page{display:none}，AI 页会在其它标签页时也常驻显示） */
+html.platform-android #page-ai {
+  padding: 0;
+}
+
+html.platform-android #page-ai.active {
+  display: flex;
+  flex-direction: column;
+}
+
+html.platform-android #page-ai .chat-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+html.platform-android #page-ai .chat-input-container {
+  position: fixed;
+  bottom: var(--android-nav-height);
+  left: 0;
+  right: 0;
+  background: var(--bg-card, #fff);
+  border-top: 1px solid var(--border, #e0e0e0);
+  padding: 8px 16px;
+  padding-bottom: calc(8px + var(--android-safe-bottom));
+}
+
+html.platform-android #page-ai .chat-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 24px;
+  font-size: 16px;
+  min-height: var(--android-touch-target);
+}
+
+/* ② DOM 映射：对话窗口为 .ai-chat-card > .ai-chat-window，
+   输入行 .ai-chat-input-row 在窗口内部，改为固定在底部导航上方
+   （仅 AI 页激活时生效，避免其它页面残留悬浮输入行） */
+html.platform-android #page-ai.active .ai-chat-input-row {
+  position: fixed;
+  bottom: var(--android-nav-height);
+  left: 0;
+  right: 0;
+  margin: 0;
+  background: var(--surface, #fff);
+  border-top: 1px solid var(--border, #E5E2DC);
+  padding: 8px 16px;
+  padding-bottom: calc(8px + var(--android-safe-bottom));
+  z-index: 500;
+}
+
+/* 输入框：胶囊圆角 + ≥44px 触摸高度 + 16px 字号（防移动端聚焦缩放） */
+html.platform-android #page-ai.active #ai-chat-input {
+  width: 100%;
+  min-height: var(--android-touch-target);
+  padding: 10px 16px;
+  border: 1px solid var(--border, #E5E2DC);
+  border-radius: 24px;
+  font-size: 16px;
+}
+
+/* 消息区让出固定输入行的空间并内部滚动 */
+html.platform-android #page-ai.active .ai-chat-window {
+  padding-bottom: calc(var(--android-touch-target) + 40px);
+}
+
+html.platform-android #page-ai.active .ai-chat-msgs {
+  max-height: 55dvh;
+  overflow-y: auto;
+}
+
+/* ============ 设置页面：分组卡片 ============ */
+/* ① 计划原文（.settings-group 为真实类名，直接生效） */
+html.platform-android #page-settings {
+  padding: 16px;
+}
+
+html.platform-android #page-settings .settings-group {
+  background: var(--bg-card, #fff);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+html.platform-android #page-settings .settings-group-title {
+  padding: 12px 16px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  text-transform: uppercase;
+}
+
+html.platform-android #page-settings .setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  min-height: var(--android-touch-target);
+  border-bottom: 1px solid var(--border, #e0e0e0);
+}
+
+html.platform-android #page-settings .setting-item:last-child {
+  border-bottom: none;
+}
+
+/* ② DOM 映射：分组标题为 .settings-group > h3，设置行为 label 行 */
+html.platform-android #page-settings .settings-group > h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+/* 设置项行（label）：flex 对齐 + ≥44px 触摸高度 + 分隔线 */
+html.platform-android #page-settings .settings-group > label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 10px 16px;
+  min-height: var(--android-touch-target);
+  border-bottom: 1px solid var(--border, #E5E2DC);
+  margin: 0;
+}
+
+html.platform-android #page-settings .settings-group > label:last-child {
+  border-bottom: none;
+}
