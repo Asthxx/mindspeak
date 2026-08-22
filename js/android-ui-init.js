@@ -9,6 +9,7 @@
       this._initSwipeBack();
       this._initPullToRefresh();
       this._initLongPress();
+      this._initBottomSheet();
       if (window.Logger) {
         Logger.log(TAG, 'Android UI 初始化完成');
       }
@@ -293,6 +294,120 @@
           if (window.Toast && Toast.success) Toast.success('已复制到剪贴板');
         }).catch(function() {});
       }
+    },
+
+    _initBottomSheet: function() {
+      // 练习（能力测评）完成 → 弹出结果底部 Sheet
+      if (!(window.EventBus && window.MS && window.MS.EVENTS)) return;
+      var self = this;
+      window.EventBus.on(window.MS.EVENTS.ASSESSMENT_COMPLETED, function(data) {
+        self._showPracticeResultSheet(data || {});
+      });
+    },
+
+    _escapeHtml: function(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    },
+
+    _showPracticeResultSheet: function(data) {
+      var hasScore = data && typeof data.score !== 'undefined' && data.score !== null;
+      var level = this._escapeHtml(data && data.level ? data.level : '');
+      var html =
+        '<div class="bottom-sheet-title">练习完成 🎉</div>' +
+        (hasScore ? '<div class="bottom-sheet-score">' + this._escapeHtml(data.score) + '</div>' : '') +
+        '<div class="bottom-sheet-level">' + (level ? '等级：' + level : '继续加油！') + '</div>' +
+        '<button type="button" class="bottom-sheet-btn" data-action="close">好的</button>';
+      this._showBottomSheet(html);
+    },
+
+    _showBottomSheet: function(content) {
+      var self = this;
+
+      // 防止重复叠加：先移除已有 Sheet/遮罩
+      this._hideBottomSheet(null, null, true);
+
+      var sheet = document.createElement('div');
+      sheet.className = 'bottom-sheet';
+      sheet.innerHTML =
+        '<div class="bottom-sheet-handle"></div>' +
+        '<div class="bottom-sheet-content">' + (content || '') + '</div>';
+
+      var overlay = document.createElement('div');
+      overlay.className = 'bottom-sheet-overlay';
+
+      document.body.appendChild(overlay);
+      document.body.appendChild(sheet);
+
+      // 下一帧再加 active，触发入场过渡
+      setTimeout(function() {
+        sheet.classList.add('active');
+        overlay.classList.add('active');
+      }, 10);
+
+      // 点击遮罩关闭
+      overlay.addEventListener('click', function() {
+        self._hideBottomSheet(sheet, overlay);
+      });
+
+      // Sheet 内关闭按钮（如结果页的"好的"）
+      sheet.addEventListener('click', function(e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-action="close"]') : null;
+        if (btn) self._hideBottomSheet(sheet, overlay);
+      });
+
+      // 下滑关闭：拖动跟手，松手超过阈值则关闭
+      var startY = 0;
+      var dragging = false;
+      sheet.addEventListener('touchstart', function(e) {
+        startY = e.touches[0].clientY;
+        dragging = true;
+        sheet.style.transition = 'none';
+      }, { passive: true });
+
+      sheet.addEventListener('touchmove', function(e) {
+        if (!dragging) return;
+        var deltaY = e.touches[0].clientY - startY;
+        if (deltaY > 0) {
+          sheet.style.transform = 'translateY(' + deltaY + 'px)';
+        }
+      }, { passive: true });
+
+      sheet.addEventListener('touchend', function(e) {
+        if (!dragging) return;
+        dragging = false;
+        sheet.style.transition = '';
+        var deltaY = e.changedTouches[0].clientY - startY;
+        if (deltaY > 100) {
+          self._hideBottomSheet(sheet, overlay);
+        } else {
+          sheet.style.transform = '';
+        }
+      }, { passive: true });
+
+      return sheet;
+    },
+
+    _hideBottomSheet: function(sheet, overlay, immediate) {
+      sheet = sheet || document.querySelector('.bottom-sheet');
+      overlay = overlay || document.querySelector('.bottom-sheet-overlay');
+      if (!sheet && !overlay) return;
+      if (sheet) {
+        // 清除拖动残留的内联位移，让 CSS 过渡自然滑出
+        sheet.style.transform = '';
+        sheet.classList.remove('active');
+      }
+      if (overlay) overlay.classList.remove('active');
+      if (immediate) {
+        if (sheet && sheet.parentNode) sheet.parentNode.removeChild(sheet);
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        return;
+      }
+      setTimeout(function() {
+        if (sheet && sheet.parentNode) sheet.parentNode.removeChild(sheet);
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }, 300);
     },
   };
 

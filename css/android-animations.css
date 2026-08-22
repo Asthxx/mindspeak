@@ -18,14 +18,88 @@ html.platform-android .swipe-back {
   to { transform: translateX(0); }
 }
 
-/* 底部 Sheet 动画 */
+/* 底部 Sheet（练习结果） */
 html.platform-android .bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-card, #fff);
+  border-radius: 16px 16px 0 0;
+  padding: 16px;
+  padding-bottom: calc(16px + var(--android-safe-bottom, 0px));
+  z-index: 1003;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
   transform: translateY(100%);
   transition: transform 0.3s ease-out;
 }
 
 html.platform-android .bottom-sheet.active {
   transform: translateY(0);
+}
+
+html.platform-android .bottom-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border, #e0e0e0);
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+
+html.platform-android .bottom-sheet-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  text-align: center;
+}
+
+html.platform-android .bottom-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1002;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+}
+
+html.platform-android .bottom-sheet-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html.platform-android .bottom-sheet-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  margin-bottom: 12px;
+}
+
+html.platform-android .bottom-sheet-score {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--primary, #5B82A6);
+  line-height: 1.2;
+}
+
+html.platform-android .bottom-sheet-level {
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+  margin: 8px 0 16px;
+}
+
+html.platform-android .bottom-sheet-btn {
+  display: block;
+  width: 100%;
+  min-height: var(--android-touch-target, 44px);
+  border: none;
+  border-radius: 12px;
+  background: var(--primary, #5B82A6);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
 }
 
 /* 下拉刷新指示器 */
