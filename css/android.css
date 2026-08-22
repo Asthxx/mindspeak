@@ -27,3 +27,39 @@ html.platform-android .page {
 html.platform-android .page.active {
   display: block;
 }
+
+/* 页面分组隐藏/显示 */
+html.platform-android .page-group {
+  display: none;
+}
+
+html.platform-android .page-group.active {
+  display: block;
+}
+
+/* 学习组页面 */
+html.platform-android .page-group-learn .page {
+  display: none;
+}
+
+html.platform-android .page-group-learn .page.active {
+  display: block;
+}
+
+/* 练习组页面 */
+html.platform-android .page-group-practice .page {
+  display: none;
+}
+
+html.platform-android .page-group-practice .page.active {
+  display: block;
+}
+
+/* 成长组页面 */
+html.platform-android .page-group-growth .page {
+  display: none;
+}
+
+html.platform-android .page-group-growth .page.active {
+  display: block;
+}

@@ -40,3 +40,65 @@ html.platform-android .bottom-nav-btn span {
   font-size: 11px;
   line-height: 1;
 }
+
+/* 二级菜单容器 */
+html.platform-android .nav-submenu {
+  position: fixed;
+  bottom: var(--android-nav-height);
+  left: 0;
+  right: 0;
+  background: var(--bg-card, #fff);
+  border-top: 1px solid var(--border, #e0e0e0);
+  padding: 8px 0;
+  display: none;
+  z-index: 999;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+}
+
+html.platform-android .nav-submenu.active {
+  display: block;
+}
+
+html.platform-android .nav-submenu-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  min-height: var(--android-touch-target);
+  color: var(--text-primary, #333);
+  text-decoration: none;
+  background: none;
+  border: none;
+  width: 100%;
+  font-size: 15px;
+  text-align: left;
+}
+
+html.platform-android .nav-submenu-item:active {
+  background: var(--bg-hover, #f5f5f5);
+}
+
+html.platform-android .nav-submenu-item.active {
+  color: var(--primary, #5B82A6);
+}
+
+html.platform-android .nav-submenu-item .icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 12px;
+}
+
+/* 遮罩层 */
+html.platform-android .nav-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 998;
+  display: none;
+}
+
+html.platform-android .nav-overlay.active {
+  display: block;
+}

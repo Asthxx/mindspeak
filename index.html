@@ -83,7 +83,8 @@
   <script>
     // 防止深色模式闪烁：在页面渲染前应用主题
     (function() {
-      var theme = localStorage.getItem('theme') || 'light';
+      var theme = 'light';
+      try { theme = localStorage.getItem('theme') || 'light'; } catch(e) {}
       document.documentElement.setAttribute('data-theme', theme);
     })();
   </script>
@@ -1574,7 +1575,7 @@
         <h3>主题颜色</h3>
         <div class="theme-colors">
           <button class="color-btn active" data-color="sage" style="background:#5B82A6" title="sage绿"></button>
-          <button class="color-btn" data-color="blue" style="background:#5B82A6" title="雾霾蓝"></button>
+          <button class="color-btn" data-color="blue" style="background:#3B82F6" title="宝蓝"></button>
           <button class="color-btn" data-color="purple" style="background:#8B5CF6" title="薰衣草紫"></button>
           <button class="color-btn" data-color="rose" style="background:#F43F5E" title="玫瑰红"></button>
           <button class="color-btn" data-color="amber" style="background:#F59E0B" title="琥珀黄"></button>
@@ -1774,13 +1775,17 @@
   </main>
 
   <!-- 移动端底部导航（App 级，仅 ≤768px 显示，桌面端隐藏） -->
-  <nav class="bottom-nav" aria-label="底部导航">
-    <button type="button" class="bottom-nav-btn" data-tab="home"><svg class="icon"><use href="#i-chart" xlink:href="#i-chart"/></svg><span>首页</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="word"><svg class="icon"><use href="#i-translate" xlink:href="#i-translate"/></svg><span>背单词</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="ai"><svg class="icon"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg><span>AI</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="items"><svg class="icon"><use href="#i-shop" xlink:href="#i-shop"/></svg><span>商店</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="settings"><svg class="icon"><use href="#i-settings" xlink:href="#i-settings"/></svg><span>设置</span></button>
+  <nav class="bottom-nav" id="bottom-nav" aria-label="底部导航">
+    <button type="button" class="bottom-nav-btn active" data-tab="home"><svg class="icon"><use href="#i-chart" xlink:href="#i-chart"/></svg><span>首页</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="word"><svg class="icon"><use href="#i-book" xlink:href="#i-book"/></svg><span>学习</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="grammar"><svg class="icon"><use href="#i-edit" xlink:href="#i-edit"/></svg><span>练习</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="badges"><svg class="icon"><use href="#i-trophy" xlink:href="#i-trophy"/></svg><span>成长</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="settings"><svg class="icon"><use href="#i-user" xlink:href="#i-user"/></svg><span>我的</span></button>
   </nav>
+
+  <!-- Android 二级菜单容器（仅 platform-android 时由样式控制显示） -->
+  <div class="nav-submenu" id="nav-submenu" role="menu"></div>
+  <div class="nav-overlay" id="nav-overlay"></div>
 
   <!-- 主动回忆弹窗 -->
   <div class="modal hidden" id="modal-recall">
