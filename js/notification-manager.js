@@ -9,7 +9,7 @@
 
     init: function() {
       if (!this._isAndroid()) return;
-      this._requestPermission();
+      this._ensurePermission();
       this._createChannel();
     },
 
@@ -17,19 +17,45 @@
       return App.detectPlatform() === 'android';
     },
 
-    _requestPermission: function() {
+    // 只在"从未询问过"(prompt) 时弹系统授权框：
+    // 每次冷启动都直接 requestPermissions()，用户拒绝过后 Android 仍会再弹窗
+    //（连拒两次才永久静默），表现为"清后台重开就又问一次"。先 checkPermissions：
+    // 已授权静默通过；曾拒绝不再自动骚扰（用户可去系统设置开启）；仅首次询问。
+    _ensurePermission: function() {
       var self = this;
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-        window.Capacitor.Plugins.LocalNotifications.requestPermissions().then(function(result) {
+      var P = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) || null;
+      if (!P) return;
+      if (!P.checkPermissions) { this._requestPermission(P); return; } // 旧插件兼容回退
+      P.checkPermissions().then(function(status) {
+        if (status && status.display === 'granted') {
+          self._permissionGranted = true;
+          Logger.log(TAG, '通知权限已授予');
+          return undefined;
+        }
+        if (status && status.display === 'denied') {
+          self._permissionGranted = false;
+          Logger.log(TAG, '通知权限此前被拒绝，不再自动询问');
+          return undefined;
+        }
+        return P.requestPermissions().then(function(result) {
           self._permissionGranted = result.display === 'granted';
           Logger.log(TAG, '通知权限状态: ' + result.display);
-          if (!self._permissionGranted) {
-            Logger.log(TAG, '通知权限被拒绝，提醒功能不可用');
-          }
-        }).catch(function(err) {
-          Logger.log(TAG, '权限请求失败: ' + (err.message || err));
         });
-      }
+      }).catch(function(err) {
+        Logger.log(TAG, '权限检查失败: ' + (err.message || err));
+      });
+    },
+
+    _requestPermission: function(P) {
+      var self = this;
+      P = P || (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications);
+      if (!P) return;
+      P.requestPermissions().then(function(result) {
+        self._permissionGranted = result.display === 'granted';
+        Logger.log(TAG, '通知权限状态: ' + result.display);
+      }).catch(function(err) {
+        Logger.log(TAG, '权限请求失败: ' + (err.message || err));
+      });
     },
 
     _createChannel: function() {

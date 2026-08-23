@@ -192,12 +192,48 @@ var StoryModule = (function() {
   };
 
   StoryModule.prototype.speakAll = function() {
+    var self = this;
     if (!this.generated || !this.words.length) this.generate();
     var box = document.getElementById('story-box');
     if (!box) return;
     var texts = [];
     box.querySelectorAll('.story-en').forEach(function(el) { texts.push(el.textContent); });
-    SpeechUtil.speak(texts.join(' '));
+    if (!texts.length) return;
+    var btn = document.getElementById('btn-story-speak');
+    // 整篇（300+ 字符）一次性合成要等全文 MP3/整段合成完才出第一声，明显延迟。
+    // 复用 SpeechUtil._chunkRemoteText 按句边界切成 ≤170 字符的小块，
+    // 第一块先出声，后续块经 onend 接力，总延迟 ≈ 单块合成耗时。
+    var full = texts.join(' ');
+    var chunks = (SpeechUtil && SpeechUtil._chunkRemoteText) ? SpeechUtil._chunkRemoteText(full, 170) : [full];
+    // 代次守卫：再次点击 = 停止（作废旧接力链），防止旧链路继续出声
+    this._speakSeqId = (this._speakSeqId || 0) + 1;
+    var seqId = this._speakSeqId;
+    var playing = !!btn && btn.disabled;
+    var restoreBtn = function() {
+      if (!btn) return;
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="icon"><use href="#i-volume"/></svg> 朗读全文';
+    };
+    if (playing) {
+      // 正在朗读 → 本次点击是"停止"
+      try { TTSManager.cancel(); } catch(e) {}
+      try { SpeechUtil._stopLocalAudio(); } catch(e) {}
+      try { window.speechSynthesis.cancel(); } catch(e) {}
+      restoreBtn();
+      return;
+    }
+    var speakNext = function(idx) {
+      if (seqId !== self._speakSeqId) return; // 已被新一轮/停止接管
+      if (idx >= chunks.length) { restoreBtn(); return; }
+      var advanced = false;
+      var advance = function() { if (!advanced) { advanced = true; speakNext(idx + 1); } };
+      SpeechUtil.speak(chunks[idx], 'en-US', { onend: advance, onerror: function() { advance(); } });
+    };
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="icon"><use href="#i-volume"/></svg> 停止朗读';
+    }
+    speakNext(0);
   };
 
   return StoryModule;

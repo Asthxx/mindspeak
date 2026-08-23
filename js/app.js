@@ -4135,6 +4135,8 @@ ContextModule.prototype.start = function() {
     document.getElementById('context-result').classList.add('hidden');
     document.getElementById('context-actions').style.display = 'none';
     document.getElementById('context-card').style.display = 'block';
+    // 进入练习态：隐藏下方"开始练习"入口（完成页已有"再来一轮"负责重开）
+    document.getElementById('btn-start-context').style.display = 'none';
     this.answered = false;
     if (window.app && window.app.itemSystem) {
       var self = this;
