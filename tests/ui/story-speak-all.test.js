@@ -26,9 +26,14 @@ describe('词文串学 朗读全文 流式分块', () => {
     expect(body).toContain('onend');
   });
 
-  it('朗读期间按钮要有状态反馈，结束后恢复', () => {
+  it('朗读期间按钮必须保持可点击（禁止用 disabled 挡点击），结束后恢复', () => {
     expect(body).toContain('btn-story-speak');
-    expect(body).toContain('disabled');
+    // disabled 按钮收不到 click 事件：朗读中若禁用，"停止朗读"就是死按钮，
+    // 用户永远无法中途停止。播放态必须用数据属性标记。
+    expect(body).not.toContain('btn.disabled = true');
+    expect(body).toMatch(/dataset\.speaking/);
+    expect(body).toContain('朗读全文');
+    expect(body).toContain('停止朗读');
   });
 
   it('朗读中再次点击应停止（代次守卫防旧链路续播）', () => {

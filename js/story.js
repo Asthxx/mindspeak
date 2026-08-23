@@ -208,10 +208,11 @@ var StoryModule = (function() {
     // 代次守卫：再次点击 = 停止（作废旧接力链），防止旧链路继续出声
     this._speakSeqId = (this._speakSeqId || 0) + 1;
     var seqId = this._speakSeqId;
-    var playing = !!btn && btn.disabled;
+    var playing = !!btn && btn.dataset.speaking === '1';
     var restoreBtn = function() {
       if (!btn) return;
       btn.disabled = false;
+      delete btn.dataset.speaking;
       btn.innerHTML = '<svg class="icon"><use href="#i-volume"/></svg> 朗读全文';
     };
     if (playing) {
@@ -230,7 +231,8 @@ var StoryModule = (function() {
       SpeechUtil.speak(chunks[idx], 'en-US', { onend: advance, onerror: function() { advance(); } });
     };
     if (btn) {
-      btn.disabled = true;
+      // 保持可点击：朗读中按钮即"停止"开关，禁用会让它收不到点击
+      btn.dataset.speaking = '1';
       btn.innerHTML = '<svg class="icon"><use href="#i-volume"/></svg> 停止朗读';
     }
     speakNext(0);
