@@ -15,7 +15,6 @@
 html.platform-android body {
   padding-bottom: var(--android-nav-height);
   padding-top: var(--android-safe-top);
-  overflow-x: hidden;
 }
 
 html.platform-android .page {
@@ -84,22 +83,21 @@ html.platform-android #page-home {
 }
 
 html.platform-android #page-home .dashboard {
-  padding: 16px;
+  padding: 0;
 }
 
 html.platform-android #page-home .daily-report {
   background: linear-gradient(135deg, var(--primary, #5B82A6), var(--primary-dark, #3E5F7F));
   color: white;
   padding: 24px 16px;
-  border-radius: 0 0 24px 24px;
-  margin: -16px -16px 16px -16px;
+  border-radius: 16px;
+  margin-bottom: 16px;
 }
 
 html.platform-android #page-home .quick-actions {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  padding: 0 16px;
 }
 
 html.platform-android #page-home .quick-action-btn {
@@ -112,19 +110,24 @@ html.platform-android #page-home .quick-action-btn {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* ② DOM 映射：问候卡 → 渐变日报头
-   （负外边距抵消 .content 的 16px 内边距，实现通栏出血） */
+/* ② DOM 映射：问候卡 → 渐变日报头 */
 html.platform-android #page-home .dash-greeting {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: linear-gradient(135deg, var(--primary, #5B82A6), var(--primary-dark, #3E5F7F));
   color: #fff;
-  padding: 24px 16px;
-  border-radius: 0 0 24px 24px;
-  margin: calc(-1 * var(--sp-4, 1rem)) calc(-1 * var(--sp-4, 1rem)) 16px;
+  padding: 20px 16px;
+  border-radius: 16px;
+  margin-bottom: 16px;
 }
 
 html.platform-android #page-home .dash-greeting h2,
 html.platform-android #page-home .dash-greeting .dash-date {
   color: #fff;
+  margin: 0;
 }
 
 html.platform-android #page-home .dash-greeting .btn-primary {
@@ -137,6 +140,31 @@ html.platform-android #page-home .dash-stat-card,
 html.platform-android #page-home .dash-card {
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+html.platform-android #page-home .dash-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+html.platform-android #page-home .dash-stat-card {
+  padding: 14px 14px;
+  gap: 10px;
+}
+
+html.platform-android #page-home .dash-stat-icon {
+  width: 38px;
+  height: 38px;
+}
+
+html.platform-android #page-home .dash-stat-num {
+  font-size: 1.25rem;
+}
+
+html.platform-android #page-home .dash-stat-label {
+  font-size: 0.72rem;
 }
 
 html.platform-android #page-home .dash-grid {
@@ -201,8 +229,9 @@ html.platform-android #page-word > .card-area {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - var(--android-nav-height) - 60px);
+  min-height: calc(100vh - var(--android-nav-height) - 120px);
   max-width: none;
+  margin-bottom: 16px;
 }
 
 html.platform-android #page-word .word-card {
@@ -265,21 +294,30 @@ html.platform-android #page-speak {
   padding: 0;
 }
 
-/* 筛选区作为吸顶练习头（负外边距实现通栏出血） */
-html.platform-android #page-grammar .section-header,
+/* 筛选区不吸顶：≤768px 时筛选区纵向堆叠高约 250-280px，
+   吸顶会在下滑时遮挡题目内容（与下方语法页修复一致） */
 html.platform-android #page-spelling .section-header,
 html.platform-android #page-pk .section-header,
 html.platform-android #page-context .section-header,
 html.platform-android #page-speak .section-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  position: static;
   background: var(--surface, #fff);
   padding: 12px 16px;
-  margin: calc(-1 * var(--sp-4, 1rem)) calc(-1 * var(--sp-4, 1rem)) 16px;
   border: none;
   border-bottom: 1px solid var(--border, #E5E2DC);
   border-radius: 0;
+  box-shadow: none;
+}
+
+/* 语法页筛选区不吸顶，避免遮挡题目 */
+html.platform-android #page-grammar .section-header {
+  position: static;
+  background: var(--surface, #fff);
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border, #E5E2DC);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* 进度条细化（对应计划 .practice-progress/-bar，各练习页通用结构） */
@@ -302,6 +340,108 @@ html.platform-android #page-speak .progress-fill {
   height: 100%;
   background: var(--primary, #5B82A6);
   transition: width 0.3s ease;
+}
+
+/* ============ 语法练习页面 Android 适配 ============ */
+html.platform-android #page-grammar h2 {
+  padding: 12px 16px 0;
+}
+
+html.platform-android #page-grammar .grammar-area {
+  width: 100%;
+  max-width: none;
+  padding: 16px 16px 0;
+  box-sizing: border-box;
+  scroll-margin-top: 60px;
+}
+
+html.platform-android #page-grammar .grammar-progress {
+  margin-bottom: 16px;
+}
+
+html.platform-android #page-grammar .grammar-progress span {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+html.platform-android #page-grammar .q-text {
+  font-size: 1rem;
+  line-height: 1.8;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: none;
+  box-shadow: none;
+}
+
+html.platform-android #page-grammar .grammar-question {
+  scroll-margin-top: 60px;
+}
+
+html.platform-android #page-grammar #gq-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+html.platform-android #page-grammar .option-btn {
+  min-height: var(--android-touch-target);
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+}
+
+html.platform-android #page-grammar #gq-answer,
+html.platform-android #page-grammar #gq-transform-answer {
+  width: 100%;
+  min-height: var(--android-touch-target);
+  padding: 12px 16px;
+  font-size: 1rem;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+html.platform-android #page-grammar #gq-input,
+html.platform-android #page-grammar #gq-transform {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+html.platform-android #page-grammar #gq-input button,
+html.platform-android #page-grammar #gq-transform button,
+html.platform-android #page-grammar #btn-submit-choice,
+html.platform-android #page-grammar #btn-next-grammar {
+  width: 100%;
+  min-height: var(--android-touch-target);
+  padding: 12px;
+  font-size: 1rem;
+  border-radius: 12px;
+}
+
+html.platform-android #page-grammar .grammar-explanation {
+  padding: 16px;
+  border-radius: 12px;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+html.platform-android #page-grammar .grammar-score {
+  padding: 32px 16px;
+  margin: 16px;
+}
+
+html.platform-android #page-grammar .grammar-score h3 {
+  font-size: 1.3rem;
+}
+
+html.platform-android #page-grammar .grammar-score p {
+  font-size: 1rem;
+  margin: 8px 0;
 }
 
 /* ============ AI 页面：全屏对话 + 底部固定输入框 ============ */
@@ -387,10 +527,22 @@ html.platform-android #page-settings {
 
 html.platform-android #page-settings .settings-group {
   background: var(--bg-card, #fff);
+  border: none;
   border-radius: 12px;
   margin-bottom: 16px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+html.platform-android #page-settings .chart-container,
+html.platform-android #page-settings .analysis-card,
+html.platform-android #page-settings .report-card {
+  border: none;
+}
+
+html.platform-android #page-settings .analysis-grid {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
 html.platform-android #page-settings .settings-group-title {
@@ -485,4 +637,122 @@ html.platform-android .long-press-menu-item .icon {
   width: 24px;
   margin-right: 12px;
   text-align: center;
+}
+
+/* ============================================================
+   弹窗层级修复：确保 modal 在底部导航栏(z-index:1000)之上
+   ============================================================ */
+html.platform-android .modal {
+  z-index: 1100;
+}
+
+html.platform-android .modal-content {
+  z-index: 1101;
+}
+
+/* ============================================================
+   顶栏安全区：状态栏不遮住标题和主题切换按钮
+   ============================================================ */
+html.platform-android .app-header {
+  padding-top: env(safe-area-inset-top, 24px);
+  height: calc(var(--header-h) + env(safe-area-inset-top, 24px));
+}
+
+/* ============================================================
+   侧边栏层级：确保侧边栏在顶栏(z-index:100)之上
+   ============================================================ */
+html.platform-android .sidebar {
+  z-index: 150;
+}
+
+html.platform-android .sidebar-scrim {
+  z-index: 140;
+}
+
+/* ============================================================
+   平板模式：隐藏底部导航，侧边栏常驻显示
+   ============================================================ */
+html.platform-android.platform-tablet .bottom-nav {
+  display: none !important;
+}
+
+html.platform-tablet .sidebar {
+  position: fixed;
+  left: 0;
+  top: var(--header-h, 48px);
+  width: 220px;
+  height: calc(100vh - var(--header-h, 48px));
+  transform: none;
+  background: var(--sidebar-bg, linear-gradient(180deg, #06283F 0%, #0C4A6E 55%, #155E75 100%));
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-3) var(--sp-2);
+  gap: 2px;
+  overflow-y: auto;
+  z-index: 10;
+  border-right: 1px solid var(--border, #E5E2DC);
+}
+
+html.platform-tablet .sidebar-scrim {
+  display: none !important;
+}
+
+html.platform-tablet .btn-menu {
+  display: none !important;
+}
+
+html.platform-tablet .content {
+  margin-left: 220px;
+  margin-top: var(--header-h, 48px);
+  padding-bottom: 20px;
+  height: calc(100vh - var(--header-h, 48px));
+  overflow-y: auto;
+}
+
+html.platform-tablet body {
+  padding-bottom: 0;
+  padding-top: 0;
+  overflow-x: hidden;
+}
+
+html.platform-tablet .app-header {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+html.platform-tablet .nav-btn {
+  color: rgba(255, 255, 255, 0.8);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  min-height: 40px;
+}
+
+html.platform-tablet .nav-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.platform-tablet .nav-btn.active {
+  background: var(--sidebar-active, rgba(255, 255, 255, 0.2));
+  color: #fff;
+  font-weight: 600;
+}
+
+/* 平板 AI 聊天输入栏：避开侧边栏 */
+html.platform-tablet #page-ai .chat-input-container {
+  left: 220px;
+  bottom: 0;
+}
+
+html.platform-tablet #page-ai.active .ai-chat-input-row {
+  left: 220px;
+  bottom: 0;
+}
+
+/* 平板词卡页：无底栏，高度计算去掉 --android-nav-height */
+html.platform-tablet #page-word .word-card-container {
+  height: calc(100vh - 60px);
+}
+
+html.platform-tablet #page-word > .card-area {
+  min-height: calc(100vh - 120px);
 }

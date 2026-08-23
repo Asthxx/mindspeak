@@ -99,8 +99,11 @@
     var ua=(navigator.userAgent||'').toLowerCase();
     var isIOS=/iphone|ipad|ipod/.test(ua)||(/macintosh/.test(ua)&&navigator.maxTouchPoints>1);
     var isAndroid=/android/.test(ua);
+    // 平板判定：UA 提示或短边>=700px（与横竖屏无关——横屏手机短边~390px 不会误判）
+    var isTablet=isAndroid&&(/tablet|pad/.test(ua)||Math.min(window.innerWidth,window.innerHeight)>=700);
     var html=document.documentElement;
     if(isIOS){html.classList.add('platform-ios');html.setAttribute('data-platform','ios');}
+    else if(isAndroid&&isTablet){html.classList.add('platform-android','platform-tablet');html.setAttribute('data-platform','tablet');}
     else if(isAndroid){html.classList.add('platform-android');html.setAttribute('data-platform','android');}
     // Android WebView 声音预热：Android 的 speechSynthesis 必须"加载语音列表"才可出声
     //（getVoices 首次返回空，要等 voiceschanged），且首次点击会激活音频输出通道。
@@ -504,6 +507,10 @@
           <div class="dash-stat-icon icon-today"><svg class="icon"><use href="#i-book" xlink:href="#i-book"/></svg></div>
           <div class="dash-stat-main"><div class="dash-stat-num" id="dash-today">0</div><div class="dash-stat-label">今日学习（词）</div></div>
         </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-icon icon-review"><svg class="icon"><use href="#i-psychology" xlink:href="#i-psychology"/></svg></div>
+          <div class="dash-stat-main"><div class="dash-stat-num" id="dash-due">0</div><div class="dash-stat-label">待复习（词）</div></div>
+        </div>
       </div>
 
       <div class="dash-grid">
@@ -517,7 +524,7 @@
           </div>
           <div class="dash-row">
             <span class="dash-label">待复习</span>
-            <span class="dash-val"><b id="dash-due">0</b> 词 · 已复习 <b id="dash-done">0</b> 词</span>
+            <span class="dash-val"><b id="dash-due-analysis">0</b> 词 · 已复习 <b id="dash-done-analysis">0</b> 词</span>
           </div>
           <div class="dash-row">
             <span class="dash-label">总词库</span>
@@ -628,6 +635,43 @@
         <button class="btn-sm" id="btn-reset-card-pos" title="把当前词库的翻页位置重置到第 1 张"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 重置翻页进度</button>
       </div>
 
+      <div class="card-area">
+        <div class="word-nav">
+          <button class="nav-arrow" id="prev-word">&lt;</button>
+          <button class="btn btn-sm btn-speak" id="btn-speak" title="朗读单词"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读</button>
+          <span id="word-progress">0/0</span>
+          <button class="nav-arrow" id="next-word">&gt;</button>
+          <input type="number" id="word-jump-input" min="1" placeholder="跳转" title="输入序号后回车跳转到对应卡片" style="width:64px;padding:4px 6px;font-size:0.85rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+          <button class="btn btn-sm" id="btn-jump-word" title="跳转到输入的卡片序号">跳转</button>
+        </div>
+        <div class="ebbinghaus-ring" id="ebbinghaus-ring">
+          <svg viewBox="0 0 36 36">
+            <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+            <path class="ring-fill" id="ring-fill" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+          </svg>
+          <span class="ring-text" id="ring-text">0/8</span>
+        </div>
+        <div class="word-card" id="word-card">
+          <div class="word-front" id="word-front">
+            <div class="word-main" id="current-word">Abandon</div>
+            <div class="word-phonetic" id="current-phonetic">/əˈbændən/</div><span class="phoneme-play-all" id="phoneme-play-all" title="连续播放所有音素">▶</span>
+            <div class="word-pos" id="current-pos">v.</div>
+          </div>
+          <div class="word-back hidden" id="word-back">
+            <div class="chinese-meaning" id="current-chinese">放弃，遗弃</div>
+            <div class="example-en" id="current-example" title="点击朗读">He abandoned his wife and children.</div>
+            <div class="example-cn" id="current-example-cn">他抛弃了妻子和孩子。</div>
+          </div>
+        </div>
+        <div class="word-actions">
+          <button class="btn btn-fav" id="btn-fav-word" title="收藏"><svg class="icon"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg></button>
+          <button class="btn btn-difficult" id="btn-forgot"><svg class="icon"><use href="#i-thumb-down" xlink:href="#i-thumb-down"/></svg> 不认识</button>
+          <button class="btn btn-uncertain" id="btn-hesitate"><svg class="icon"><use href="#i-help" xlink:href="#i-help"/></svg> 有点印象</button>
+          <button class="btn btn-know" id="btn-known"><svg class="icon"><use href="#i-thumb-up" xlink:href="#i-thumb-up"/></svg> 认识</button>
+          <button class="btn btn-secondary" id="btn-flip"><svg class="icon"><use href="#i-flip" xlink:href="#i-flip"/></svg> 翻转</button>
+        </div>
+      </div>
+
       <div class="daily-plan-card" id="daily-plan-card">
         <div class="dp-header">
           <span class="dp-title"><svg class="icon icon-sm icon-sage"><use href="#i-calendar" xlink:href="#i-calendar"/></svg> 今日学习计划</span>
@@ -661,43 +705,6 @@
         <div class="stat-card">
           <div class="stat-num" id="ws-due">0</div>
           <div class="stat-label">待复习</div>
-        </div>
-      </div>
-
-      <div class="card-area">
-        <div class="word-nav">
-          <button class="nav-arrow" id="prev-word">&lt;</button>
-          <button class="btn btn-sm btn-speak" id="btn-speak" title="朗读单词"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读</button>
-          <span id="word-progress">0/0</span>
-          <button class="nav-arrow" id="next-word">&gt;</button>
-          <input type="number" id="word-jump-input" min="1" placeholder="跳转" title="输入序号后回车跳转到对应卡片" style="width:64px;padding:4px 6px;font-size:0.85rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
-          <button class="btn btn-sm" id="btn-jump-word" title="跳转到输入的卡片序号">跳转</button>
-        </div>
-        <div class="ebbinghaus-ring" id="ebbinghaus-ring">
-          <svg viewBox="0 0 36 36">
-            <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-            <path class="ring-fill" id="ring-fill" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-          </svg>
-          <span class="ring-text" id="ring-text">0/8</span>
-        </div>
-        <div class="word-card" id="word-card">
-          <div class="word-front" id="word-front">
-            <div class="word-main" id="current-word">Abandon</div>
-            <div class="word-phonetic" id="current-phonetic">/əˈbændən/</div>
-            <div class="word-pos" id="current-pos">v.</div>
-          </div>
-          <div class="word-back hidden" id="word-back">
-            <div class="chinese-meaning" id="current-chinese">放弃，遗弃</div>
-            <div class="example-en" id="current-example" title="点击朗读">He abandoned his wife and children.</div>
-            <div class="example-cn" id="current-example-cn">他抛弃了妻子和孩子。</div>
-          </div>
-        </div>
-        <div class="word-actions">
-          <button class="btn btn-fav" id="btn-fav-word" title="收藏"><svg class="icon"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg></button>
-          <button class="btn btn-difficult" id="btn-forgot"><svg class="icon"><use href="#i-thumb-down" xlink:href="#i-thumb-down"/></svg> 不认识</button>
-          <button class="btn btn-uncertain" id="btn-hesitate"><svg class="icon"><use href="#i-help" xlink:href="#i-help"/></svg> 有点印象</button>
-          <button class="btn btn-know" id="btn-known"><svg class="icon"><use href="#i-thumb-up" xlink:href="#i-thumb-up"/></svg> 认识</button>
-          <button class="btn btn-secondary" id="btn-flip"><svg class="icon"><use href="#i-flip" xlink:href="#i-flip"/></svg> 翻转</button>
         </div>
       </div>
 

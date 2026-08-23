@@ -35,8 +35,10 @@ src-tauri/node-runtime/
 *.dmg
 *.AppImage
 
-# Android rebuild（android/ 由 npx cap add android 自动生成，不入库）
-android/
+# Android rebuild（android/ 由 npx cap add android 自动生成，不入库）。
+# 必须锚定根目录：裸 android/ 会连 tests/android/ 一起忽略
+/android/
+*.apk
 *.jks
 *.keystore
 !android-template/

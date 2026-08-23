@@ -462,8 +462,8 @@ _speakLetterTTS: function(up, opts) {
   //  4. 全部失败才 Toast 提示，绝不静默无声。
 _speakTTS: function(text, lang, opts) {
     var self = this;
-    this._diag('tts-enter', String(text).slice(0, 20) + ' serverDown=' + this._serverDown);
     var settings = this.getSettings();
+    this._diag('tts-enter', String(text).slice(0, 20) + ' serverDown=' + this._serverDown + ' voice=' + (settings.voiceName || '(default)'));
     // 上一次在线声朗读还挂在队列里没 START（连接慢/断线），用户又点了新朗读：
     // 直接判定在线声已坏（本会话不再尝试），本次立即走 Google 合成/SAPI 出声。
     // 健康连接经 prime 预热后 START 实测仅 ~360ms，4s 内没 START 基本就是连不上。
@@ -608,8 +608,7 @@ _speakTTS: function(text, lang, opts) {
     var failedVoices = [];
 var attempt = function() {
       if (self._speakSeq !== mySeq) return;
-      // 网页部署（无 server）：voices 加载失败/没有英文声/在线声连不通时，
-      // 一律交给远程发音/系统默认语音（_speakServerless），不再请求 /api/*（那必然 404）。
+      // 网页部署（无 server）：server 不可达时，交由远程发音/系统默认语音兜底。
       var useDeviceVoice = (self._serverDown === true);
       if (useDeviceVoice) {
         self._burstMode = 'device';
@@ -735,6 +734,9 @@ if (online) { self._onlineAttemptActive = true; self._onlineStarted = false; }
         if (finished || self._speakSeq !== mySeq) return;
         // interrupted：被 cancel/换声打断，不算失败
         if (e && e.error === 'interrupted') return;
+        // native-unavailable：TTSManager 原生降级信号（已自动切 web 播放），
+        // 不是当前声音失败 —— 当失败处理会触发重试换声，与降级播放叠加出双声
+        if (e && e.error === 'native-unavailable') return;
         fail((e && e.error) || 'synthesis-failed');
       };
 var u;
@@ -1160,7 +1162,7 @@ _markOnlineBroken: function() {
     try { _isAndroidSrc = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase()); } catch(e) {}
     if (_isAndroidSrc) {
       // 安卓：过滤掉百度/谷歌（Referer/UA 问题必失败），保留有道 + Edge（server 端合成不受影响）
-      DEFAULT_ORDER = DEFAULT_ORDER.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk'; });
+      DEFAULT_ORDER = DEFAULT_ORDER.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk' || id.indexOf('edge_') === 0; });
     }
     var vn = '';
     try { if (self.getSettings) vn = self.getSettings().voiceName || ''; } catch(e) {}
@@ -1201,7 +1203,10 @@ _markOnlineBroken: function() {
         if (ids[0] !== 'youdao_us') ids.push('youdao_us');
         if (ids.indexOf('youdao_uk') === -1) ids.push('youdao_uk');
         if (ids.indexOf('edge_us_jenny') === -1) ids.push('edge_us_jenny');
-        ids = ids.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk'; });
+        if (ids.indexOf('edge_us_guy') === -1) ids.push('edge_us_guy');
+        if (ids.indexOf('edge_gb_sonia') === -1) ids.push('edge_gb_sonia');
+        // 保留有道（直连稳定）+ Edge（server 端合成不受 UA/Referer 影响）
+        ids = ids.filter(function(id) { return id === 'youdao_us' || id === 'youdao_uk' || id.indexOf('edge_') === 0; });
       } else {
         var fb = ['youdao_us', 'youdao_uk', 'baidu', 'edge_us_jenny'];
         for (var fi = 0; fi < fb.length; fi++) {
@@ -2139,7 +2144,12 @@ var LearningReminder = {
     this.timer = setInterval(function() {
       var now = new Date();
       if (now.getHours() === h && now.getMinutes() === m) {
-        Toast.info('该学习啦！今天还没背单词哦');
+        // 触发锁：日期存进值而不是键名，避免按天累积出无数 localStorage 键
+        var lockKey = 'reminder_fired_' + h + '_' + m;
+        if (Storage.get(lockKey) !== now.toDateString()) {
+          Storage.set(lockKey, now.toDateString());
+          Toast.info('\u8be5\u5b66\u4e60\u5566\uff01\u4eca\u5929\u8fd8\u6ca1\u80cc\u5355\u8bcd\u54e6');
+        }
       }
     }, 60000);
     if (!silent) Toast.success('提醒已开启，每天 ' + time);
@@ -2205,6 +2215,15 @@ function WordModule() {
     safeBind('btn-hesitate', 'click', function() { self.markWord('hesitate'); });
     safeBind('btn-known', 'click', function() { self.markWord('known'); });
     safeBind('btn-fav-word', 'click', function() { self.favoriteCurrent(); });
+    safeBind('phoneme-play-all', 'click', function() {
+      var el = document.getElementById('current-phonetic');
+      if (!el) return;
+      var spans = el.querySelectorAll('.clickable-phoneme');
+      if (!spans.length) return;
+      var segs = [];
+      for (var i = 0; i < spans.length; i++) segs.push(spans[i].textContent);
+      self._playPhonemeQueue(segs);
+    });
     safeBind('word-category', 'change', function(e) { self.selectCategory(e.target.value); });
     safeBind('btn-add-word', 'click', function() { self.showAddModal(); });
     safeBind('btn-reset-card-pos', 'click', function() { self.resetCardPos(); });
@@ -2433,6 +2452,78 @@ cat.words = merged;
     if (this.currentCategoryIndex >= this.categories.length) return [];
     return this.categories[this.currentCategoryIndex].words;
   };
+  // 音标解析：将 "/həˈloʊ/" 拆成 ["h","ə","ˈl","oʊ"] 等音素段
+  WordModule.parsePhonetic = function(str) {
+    if (!str) return [];
+    var inner = str.replace(/^\/|\/$/g, '');
+    if (!inner) return [];
+    var parts = inner.split(/(?=[ˈˌ])/);
+    if (parts.length <= 1) {
+      parts = inner.match(/[^ˈˌ]+|./g) || [inner];
+    }
+    return parts.filter(function(s) { return s.length > 0; });
+  };
+
+  WordModule._phonemeQueue = [];
+  WordModule._phonemeQueueTimer = null;
+
+  WordModule.prototype._renderPhonetic = function(phonetic) {
+    WordModule._phonemeQueue = [];
+    if (WordModule._phonemeQueueTimer) { clearTimeout(WordModule._phonemeQueueTimer); WordModule._phonemeQueueTimer = null; }
+    var el = document.getElementById('current-phonetic');
+    // 无音标/无法分音素时隐藏"连续播放"按钮，避免出现点了没反应的死按钮
+    var playAllBtn = document.getElementById('phoneme-play-all');
+    var setPlayAllVisible = function(on) { if (playAllBtn) playAllBtn.style.display = on ? '' : 'none'; };
+    if (!el) return;
+    if (!phonetic) { el.textContent = ''; setPlayAllVisible(false); return; }
+    var segments = WordModule.parsePhonetic(phonetic);
+    if (!segments.length) { el.textContent = phonetic; setPlayAllVisible(false); return; }
+    el.innerHTML = '';
+    el.style.fontStyle = 'normal';
+    setPlayAllVisible(true);
+    var self = this;
+    segments.forEach(function(seg, idx) {
+      var span = document.createElement('span');
+      span.className = 'clickable-phoneme';
+      span.textContent = seg;
+      span.setAttribute('data-idx', idx);
+      span.addEventListener('click', function() { self._onPhonemeClick(idx, seg, segments); });
+      el.appendChild(span);
+    });
+  };
+
+  WordModule.prototype._onPhonemeClick = function(idx, seg, segments) {
+    var self = this;
+    var el = document.getElementById('current-phonetic');
+    if (el) {
+      var spans = el.querySelectorAll('.clickable-phoneme');
+      if (spans[idx]) {
+        var span = spans[idx];
+        span.classList.add('phoneme-active');
+        setTimeout(function() { span.classList.remove('phoneme-active'); }, 200);
+      }
+    }
+    WordModule._phonemeQueue.push(seg);
+    if (WordModule._phonemeQueueTimer) clearTimeout(WordModule._phonemeQueueTimer);
+    WordModule._phonemeQueueTimer = setTimeout(function() {
+      var queue = WordModule._phonemeQueue.slice();
+      WordModule._phonemeQueue = [];
+      WordModule._phonemeQueueTimer = null;
+      self._playPhonemeQueue(queue);
+    }, 800);
+  };
+
+  WordModule.prototype._playPhonemeQueue = function(queue) {
+    if (!queue.length) return;
+    var i = 0;
+    function next() {
+      if (i >= queue.length) return;
+      var seg = queue[i++];
+      SpeechUtil.speak(seg, 'en-US', { rate: 0.7, onend: next, onerror: next });
+    }
+    next();
+  };
+
   WordModule.prototype.showCurrentWord = function() {
     var words = this.getCurrentWords();
     if (!words.length) return;
@@ -2440,7 +2531,7 @@ cat.words = merged;
     if (this.currentIndex < 0 || this.currentIndex >= words.length) this.currentIndex = 0;
     var w = words[this.currentIndex];
     document.getElementById('current-word').textContent = w.word;
-    document.getElementById('current-phonetic').textContent = w.phonetic || '';
+    this._renderPhonetic(w.phonetic || '');
     document.getElementById('current-pos').textContent = w.pos || '';
     document.getElementById('current-chinese').textContent = w.chinese;
     document.getElementById('current-example').textContent = w.example || '';
@@ -3544,7 +3635,7 @@ SearchModule.prototype.doSearch = function() {
     var scored = [];
     this.allWords.forEach(function(w) {
       var wordL = w.word.toLowerCase();
-      var chnL = w.chinese.toLowerCase();
+      var chnL = (w.chinese || '').toLowerCase();
       var score = -1;
       if (isLatin) {
         // 英文：精确 > 前缀 > 包含 > 音标，同分按词长（短词优先）
@@ -3779,7 +3870,7 @@ PKModule.prototype.startTimer = function() {
     if (this.currentIndex >= this.words.length || !this.isRunning) { this.endGame(); return; }
     var w = this.words[this.currentIndex];
     document.getElementById('pk-progress-fill').style.width = (this.currentIndex / this.words.length * 100) + '%';
-    document.getElementById('pk-prompt').textContent = w.chinese;
+    document.getElementById('pk-prompt').textContent = w.chinese || '';
     document.getElementById('pk-result').classList.add('hidden');
     document.getElementById('pk-actions').style.display = 'none';
     var optionsEl = document.getElementById('pk-options');
@@ -4652,7 +4743,10 @@ document.getElementById('speak-card').style.display = 'block';
   };
   SpeakModule.prototype.playAudio = function() {
     if (this.words.length === 0) return;
-    SpeechUtil.speakWord(this.words[this.currentIndex].word);
+    // 统一经 TTSManager 出声：原生 TTS 优先（Android），失败自动降级 web 合成，
+    // 全程同一引擎同一音色；不再走 SpeechUtil 的远程多源竞速
+    // （有道美音/Edge 英音等谁先出声用谁，导致每个单词音色不一致）
+    TTSManager.speak(this.words[this.currentIndex].word, { lang: 'en-US', rate: 0.9 });
   };
   SpeakModule.prototype.startRecord = function() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -4665,36 +4759,69 @@ document.getElementById('speak-card').style.display = 'block';
       this.recognition = null;
     }
     var self = this;
-    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var btn = document.getElementById('btn-speak-record');
+    // 权限弹窗期间先禁用按钮防连点；失败/识别结束(onend)时恢复
+    if (btn) btn.disabled = true;
     // 捕获开始录音时的目标单词：录音结果异步返回，期间用户可能已点"下一题"，
-    // 若用 this.words[this.currentIndex] 会把新一题的词拿去判分
+    // 若用 this.words[this.currentIndex] 会把新一题的词拿去判分。
+    // 权限弹窗也异步耗时，必须在点击当下捕获，授权后仍朗读点击时的那个词。
     var target = this.words[this.currentIndex];
-    this.recognition = new SpeechRecognition();
-    this.recognition.lang = 'en-US';
-    this.recognition.continuous = false;
-    this.recognition.interimResults = false;
-    this.recognition.onresult = function(event) {
-      var transcript = event.results[0][0].transcript;
-      self.checkPronunciation(transcript, target);
+    var begin = function() {
+      var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      self.recognition = new SpeechRecognition();
+      self.recognition.lang = 'en-US';
+      self.recognition.continuous = false;
+      self.recognition.interimResults = false;
+      self.recognition.onresult = function(event) {
+        var transcript = event.results[0][0].transcript;
+        self.checkPronunciation(transcript, target);
+      };
+      self.recognition.onerror = function(e) {
+        var err = (e && e.error) || '';
+        // 权限/设备/网络类错误必须立即告知用户，不受 grace period 影响：
+        // getUserMedia 被拒后的兜底启动会在 <2s 内收到 not-allowed，
+        // 若被窗口吞掉，用户只看到"请开始朗读..."却永远等不到失败反馈
+        if (err === 'not-allowed' || err === 'service-not-allowed') { Toast.error('麦克风权限被拒绝，请在系统设置中允许后重试'); return; }
+        if (err === 'audio-capture') { Toast.error('未检测到麦克风设备'); return; }
+        if (err === 'network') { Toast.error('语音识别服务网络异常，请检查网络后重试'); return; }
+        // grace period：start 后 2s 内的其余错误（aborted/no-speech 等残留触发）静默忽略
+        if (self._recStartedAt && Date.now() - self._recStartedAt < 2000) { console.warn('[Speak] ignored early recognition error:', err); return; }
+        // 未检测到语音 / 手动中断：静默处理，不打扰用户，可直接再点重录
+        if (err === 'no-speech' || err === 'aborted') { console.warn('[Speak] recognition:', err || '(no error type)'); return; }
+        console.warn('[Speak] recognition error:', err);
+      };
+      self.recognition.onend = function() {
+        // 识别结束、释放实例
+        if (self.recognition === this) self.recognition = null;
+        var btn2 = document.getElementById('btn-speak-record');
+        if (btn2) btn2.disabled = false;
+      };
+      try {
+        self._recStartedAt = Date.now();
+        self.recognition.start();
+        Toast.info('请开始朗读...');
+      } catch(e) {
+        Toast.error('无法启动语音识别，请稍后再试');
+        self.recognition = null;
+        if (btn) btn.disabled = false;
+      }
     };
-    this.recognition.onerror = function(e) {
-      Toast.error('语音识别失败' + (e.error ? '：' + e.error : ''));
-    };
-    this.recognition.onend = function() {
-      // 识别结束、释放实例
-      if (self.recognition === this) self.recognition = null;
-      var btn = document.getElementById('btn-speak-record');
-      if (btn) btn.disabled = false;
-    };
-    try {
-      this.recognition.start();
-      var btn = document.getElementById('btn-speak-record');
-      if (btn) btn.disabled = true;
-      Toast.info('请开始朗读...');
-    } catch(e) {
-      Toast.error('无法启动语音识别，请稍后再试');
-      this.recognition = null;
+    // 先取一次麦克风权限再启动识别：权限弹窗期间 recognition 尚未 start，
+    // 引擎的内部计时器不会在无输入状态下空转，避免"允许麦克风后还没读就报错"。
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        // 只为触发权限弹窗；拿到流立即释放轨道，不占用麦克风、录音指示灯即刻熄灭
+        try { var tracks = stream.getTracks(); for (var i = 0; i < tracks.length; i++) tracks[i].stop(); } catch(e) {}
+        begin();
+      }).catch(function() {
+        // getUserMedia 被拒/不支持时不直接判死：部分 WebView（未桥接该 API）底层
+        // 识别引擎仍可用 —— 继续尝试启动识别，由 onerror 分类与 grace period 兜住误报
+        console.warn('[Speak] getUserMedia rejected/unavailable, trying recognition anyway');
+        begin();
+      });
+      return;
     }
+    begin();
   };
 SpeakModule.prototype.checkPronunciation = function(transcript, target) {
     var w = target || this.words[this.currentIndex];
@@ -5379,15 +5506,21 @@ App.detectPlatform = function() {
   var html = document.documentElement;
   var isIOS = /iphone|ipad|ipod/.test(ua) || (/macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   var isAndroid = /android/.test(ua);
-  html.classList.remove('platform-ios', 'platform-android');
+  // 平板判定：UA 提示或短边 >=700px（与横竖屏无关——横屏手机短边 ~390px 不会误判，
+  // Chrome 移动 UA 的安卓平板虽无 tablet 字样也能命中）
+  var isTablet = isAndroid && (/tablet|pad/.test(ua) || Math.min(window.innerWidth || 0, window.innerHeight || 0) >= 700);
+  html.classList.remove('platform-ios', 'platform-android', 'platform-tablet');
   if (isIOS) {
     html.classList.add('platform-ios');
     html.setAttribute('data-platform', 'ios');
+  } else if (isAndroid && isTablet) {
+    html.classList.add('platform-android', 'platform-tablet');
+    html.setAttribute('data-platform', 'tablet');
   } else if (isAndroid) {
     html.classList.add('platform-android');
     html.setAttribute('data-platform', 'android');
   }
-  return isIOS ? 'ios' : isAndroid ? 'android' : 'desktop';
+  return isIOS ? 'ios' : isAndroid ? (isTablet ? 'tablet' : 'android') : 'desktop';
 };
 
 App.prototype.initNav = function() {
@@ -5587,6 +5720,7 @@ App.prototype.showTab = function(tab) {
   if (tab !== 'listen-along' && this.listenAlongModule) this.listenAlongModule.stop();
 };
 App.prototype.updateGlobalStats = function() {
+  if (!this.gamification) return;
   var gami = this.gamification.getStats();
   document.getElementById('stat-level').textContent = 'Lv.' + gami.level;
   document.getElementById('stat-points').textContent = gami.points;
@@ -5897,10 +6031,11 @@ function fillVoiceOptions() {
         { v: '__online_google_in__', label: '谷歌·印度口音（需网络）' }
       ];
       var html = '<option value="">系统默认（自动选本地语音）</option>';
-      var isAndroid = App.detectPlatform() === 'android';
+      var isAndroid = /platform-android/.test(document.documentElement.className || '') || /android/.test((navigator.userAgent || '').toLowerCase());
       if (isAndroid) {
+        // 安卓端保留 Edge（server 端合成可用）+ 有道（直连），去掉百度/谷歌（Referer/UA 问题）
         ONLINE_STATIC = ONLINE_STATIC.filter(function(o) {
-          return o.v === '__online_youdao_us__' || o.v === '__online_youdao_uk__';
+          return o.v.indexOf('__online_edge_') === 0 || o.v === '__online_youdao_us__' || o.v === '__online_youdao_uk__';
         });
       }
       var localHint = isAndroid ? '（手机版不可用，需电脑 + server 运行）' : '（离线 SAPI，需 server 运行）';
@@ -5934,7 +6069,13 @@ function fillVoiceOptions() {
       for (var k = 0; k < pool.length; k++) {
         var opt = document.createElement('option');
         opt.value = pool[k].name;
-        opt.textContent = voiceLabel(pool[k]) + (SpeechUtil._isOnlineVoice(pool[k]) ? '（在线，点击朗读会慢）' : '');
+        // 安卓系统声音不再禁用：原生 TTS 失败会自动降级 web 链路，选项均可正常选择
+        var _isSysOnAndroid = isAndroid && !SpeechUtil._isOnlineVoice(pool[k]);
+        if (_isSysOnAndroid) {
+          opt.textContent = voiceLabel(pool[k]) + '（建议选在线音色）';
+        } else {
+          opt.textContent = voiceLabel(pool[k]) + (SpeechUtil._isOnlineVoice(pool[k]) ? '（在线，点击朗读会慢）' : '');
+        }
         voiceSelect.appendChild(opt);
       }
       if (cur) voiceSelect.value = cur;
@@ -5981,6 +6122,9 @@ if (name) {
         SpeechUtil._onlineStarted = false;
         SpeechUtil._burstMode = null;
         SpeechUtil._burstUntil = 0;
+        // 清除源健康缓存：之前失败过的发音源（如 Edge/谷歌/百度）在切换声音后
+        // 应重新尝试，避免被旧会话的失败记录跳过导致"切了声音还是那个"。
+        SpeechUtil._srcHealth = {};
       }
       SpeechUtil.updateSettings(voiceSettings);
       // 切换声音后重新预热新的在线声：primeVoices 每会话只预热一次（_primeDone），
@@ -6709,8 +6853,8 @@ var base = window.API_BASE || '';
       }
       var rowId = 'log-det-' + n;
       out += '<tr data-row="1" data-detail-id="' + rowId + '" class="log-row" style="background:' + (lvl === 'error' ? '#fff7f8' : (n % 2 ? '#fbfcfb' : '#fff')) + '">'
-        + '<td class="log-cell-time">' + ts + '</td>'
-        + '<td class="log-cell-lv"><span class="log-cell-tag" style="background:' + c[1] + ';color:' + c[0] + '">' + lvl + '</span></td>'
+        + '<td class="log-cell-time">' + escapeHtml(ts) + '</td>'
+        + '<td class="log-cell-lv"><span class="log-cell-tag" style="background:' + c[1] + ';color:' + c[0] + '">' + escapeHtml(lvl) + '</span></td>'
         + '<td class="log-cell-src">' + escapeHtml(src) + '</td>'
         + '<td class="log-cell-mod">' + escapeHtml(mod) + '</td>'
         + '<td class="log-cell-msg">' + escapeHtml(msg)
@@ -6895,8 +7039,8 @@ App.prototype.initCustomBg = function() {
   }
 
   var savedBgOpacity = DataStore.getProgress('custom_bg_opacity', 30);
-  bgOpacitySlider.value = savedBgOpacity;
-  bgOpacityValue.textContent = savedBgOpacity + '%';
+  if (bgOpacitySlider) bgOpacitySlider.value = savedBgOpacity;
+  if (bgOpacityValue) bgOpacityValue.textContent = savedBgOpacity + '%';
   // 背景图存 IndexedDB（不再占 localStorage 配额）。先从 IDB 读；读不到再读旧版
   // localStorage 里的残留并迁移过去。
   var that = this;
@@ -6910,9 +7054,9 @@ App.prototype.initCustomBg = function() {
       DataStore.setProgress('custom_bg', null);
     }
     that.applyCustomBg(bg, savedBgOpacity);
-    bgPreviewImg.src = bg;
-    bgPreviewContainer.style.display = 'block';
-    bgOpacityControl.style.display = 'flex';
+    if (bgPreviewImg) bgPreviewImg.src = bg;
+    if (bgPreviewContainer) bgPreviewContainer.style.display = 'block';
+    if (bgOpacityControl) bgOpacityControl.style.display = 'flex';
   }).catch(function() {});
   var self = this;
   safeBind('btn-select-bg', 'click', function() { bgFileInput.click(); });
@@ -6981,13 +7125,13 @@ App.prototype.applyCustomBg = function(bgData, opacity) {
     if (oldSideOverlay) oldSideOverlay.remove();
   }
   if (headerEl) headerEl.style.background = 'rgba(255,255,255,0.6)';
-  contentEl.style.background = 'transparent';
-  var overlay = contentEl.querySelector('.bg-overlay');
+  if (contentEl) contentEl.style.background = 'transparent';
+  var overlay = contentEl ? contentEl.querySelector('.bg-overlay') : null;
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.className = 'bg-overlay';
     overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,' + (opacity / 100) + ');pointer-events:none;z-index:0;';
-    contentEl.prepend(overlay);
+    if (contentEl) contentEl.prepend(overlay);
   } else {
     overlay.style.background = 'rgba(255,255,255,' + (opacity / 100) + ')';
   }
@@ -7003,7 +7147,8 @@ App.prototype.removeCustomBg = function() {
   bodyEl.style.backgroundRepeat = '';
   bodyEl.style.backgroundAttachment = '';
   if (headerEl) headerEl.style.background = '';
-  contentEl.style.background = '';
+  if (contentEl) contentEl.style.background = '';
+  if (!contentEl) return;
   var overlay = contentEl.querySelector('.bg-overlay');
   if (overlay) overlay.remove();
   if (sidebarEl) {
@@ -7053,7 +7198,7 @@ App.prototype.generateShareCard = function() {
   
   // 统计数据
   var progress = DataStore.getProgress("word_progress", {});
-  var mastered = Object.keys(progress).filter(function(k) { return progress[k].status === "mastered"; }).length;
+  var mastered = Object.keys(progress).filter(function(k) { return progress[k] && progress[k].status === "mastered"; }).length;
   var gami = DataStore.getProgress("gamification", { points: 0, level: 1, streak: 0 });
   var mistakes = DataStore.getProgress("mistakes", []);
   var favs = DataStore.getProgress("favorites", []);
@@ -7103,6 +7248,12 @@ App.prototype.downloadShareCard = function() {
   Toast.success("图片已保存");
 };
 
+// ==================== CSV 辅助 ====================
+function csvEscape(val) {
+  var s = String(val || '');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
 
 // ==================== 导出单词本和错题本 ====================
 App.prototype.exportFavorites = function() {
@@ -7111,7 +7262,7 @@ App.prototype.exportFavorites = function() {
     if (favs.length === 0) { Toast.warning('收藏夹为空'); return; }
     var csv = '\u5e8f\u53f7,\u5355\u8bcd,\u97f3\u6807,\u8bcd\u6027,\u4e2d\u6587\u91ca\u4e49\n';
     favs.forEach(function(f, i) {
-      csv += (i + 1) + ',"' + (f.word || '') + '","' + (f.phonetic || '') + '","' + (f.pos || '') + '","' + (f.chinese || '') + '"\n';
+      csv += (i + 1) + ',' + csvEscape(f.word) + ',' + csvEscape(f.phonetic) + ',' + csvEscape(f.pos) + ',' + csvEscape(f.chinese) + '\n';
     });
     var bom = '\uFEFF';
     var blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
@@ -7131,7 +7282,7 @@ App.prototype.exportMistakes = function() {
     if (mistakes.length === 0) { Toast.warning('\u9519\u9898\u672c\u4e3a\u7a7a'); return; }
     var csv = '\u5e8f\u53f7,\u5355\u8bcd,\u97f3\u6807,\u8bcd\u6027,\u4e2d\u6587\u91ca\u4e49,\u6765\u6e90,\u65e5\u671f\n';
     mistakes.forEach(function(m, i) {
-      csv += (i + 1) + ',"' + (m.word || '') + '","' + (m.phonetic || '') + '","' + (m.pos || '') + '","' + (m.chinese || '') + '","' + (m.source || '') + '","' + (m.date || '') + '"\n';
+      csv += (i + 1) + ',' + csvEscape(m.word) + ',' + csvEscape(m.phonetic) + ',' + csvEscape(m.pos) + ',' + csvEscape(m.chinese) + ',' + csvEscape(m.source) + ',' + csvEscape(m.date) + '\n';
     });
     var bom = '\uFEFF';
     var blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });

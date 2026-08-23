@@ -46,7 +46,7 @@ var AiCoachModule = (function() {
   AiCoachModule.prototype.renderOverview = function() {
     var checkins = DataStore.getProgress('checkins', {});
     var progress = this._progress();
-    var mastered = Object.keys(progress).filter(function(k) { return progress[k].status === 'mastered'; }).length;
+    var mastered = Object.keys(progress).filter(function(k) { return progress[k] && progress[k].status === 'mastered'; }).length;
     var now = new Date();
     var weekWords = 0;
     for (var i = 0; i < 7; i++) {

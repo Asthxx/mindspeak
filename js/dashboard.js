@@ -6,7 +6,15 @@ var DashboardModule = (function() {
     { tab: 'word', icon: 'translate', label: '背单词' },
     { tab: 'listening', icon: 'headphones', label: '听力' },
     { tab: 'reading', icon: 'article', label: '阅读' },
-    { tab: 'grammar', icon: 'edit', label: '语法' }
+    { tab: 'grammar', icon: 'edit', label: '语法' },
+    { tab: 'spelling', icon: 'spellcheck', label: '拼写' },
+    { tab: 'speak', icon: 'mic', label: '跟读' },
+    { tab: 'pk', icon: 'flip', label: 'PK对战' },
+    { tab: 'mistakes', icon: 'error', label: '错题本' },
+    { tab: 'favorites', icon: 'bookmark', label: '收藏' },
+    { tab: 'story', icon: 'text', label: '故事' },
+    { tab: 'pomodoro', icon: 'timer', label: '番茄钟' },
+    { tab: 'ai', icon: 'robot', label: 'AI助手' }
   ];
 
   function DashboardModule() {
@@ -101,7 +109,8 @@ var DashboardModule = (function() {
     this._set('dash-new', newCount);
     this._set('dash-goal', goal);
     this._set('dash-due', dueCount);
-    this._set('dash-done', doneCount);
+    this._set('dash-due-analysis', dueCount);
+    this._set('dash-done-analysis', doneCount);
     this._set('dash-total', total);
     this._set('dash-total-mastered', mastered);
     var bar = this._el('dash-new-bar');

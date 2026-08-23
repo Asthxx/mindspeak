@@ -274,7 +274,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   /* ================= 弹窗全屏化（App 底部抽屉式） ================= */
   .modal{align-items:flex-end;justify-content:center}
   .modal-content{
-    width:100%;max-width:100%;max-height:88dvh;
+    width:100%;max-width:100%;max-height:88vh;max-height:88dvh; /* 双声明：旧 WebView 不识别 dvh 时回退 vh */
     overflow-y:auto;-webkit-overflow-scrolling:touch;
     border-radius:var(--radius-lg) var(--radius-lg) 0 0;
     padding:var(--sp-5);
@@ -287,7 +287,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   }
   .modal-actions{flex-direction:column-reverse}
   .modal-actions .btn{width:100%;padding:12px;min-height:48px}
-  .assess-modal-content{width:100%;max-width:100%;max-height:92dvh}
+  .modal-content.assess-modal-content{width:100%;max-width:100%;max-height:92vh;max-height:92dvh}
   .assess-modal-content,.ob-modal-content, .modal-content[style*="width:860px"],
   .modal-content[style*="width:550px"], .modal-content[style*="width:500px"]{
     width:100%!important;max-width:100%!important;
@@ -519,7 +519,18 @@ html.platform-android{
 .platform-android .vocab-card { border-radius: 12px; }
 .platform-android .theme-item { border-radius: 16px; }
 .platform-android .setting-item { border-radius: 8px; }
-.platform-android .assess-modal-content{border-radius:0;max-height:100dvh;height:100dvh}
+/* Android 手机测评弹窗全屏化：
+   ① 限定 ≤768px（旧版无媒体查询在所有宽度生效，会破坏宽屏布局）
+   ② vh 兜底 + @supports 升级 dvh（老 WebView 不支持 dvh 时整条声明被丢弃 → 高度无界 → flex 滚动链断裂）
+   ③ 特异性 (0,3,0)：压过 html.forced-mobile .modal-content (0,2,1) 的 max-height:88dvh，消除高度不一致 */
+@media (max-width:768px){
+  .platform-android .modal-content.assess-modal-content{border-radius:0;max-height:100vh;height:100vh}
+}
+@supports (height:100dvh){
+  @media (max-width:768px){
+    .platform-android .modal-content.assess-modal-content{max-height:100dvh;height:100dvh}
+  }
+}
 .platform-android .assess-option{-webkit-tap-highlight-color:transparent}
 .platform-android .ar-num{-webkit-tap-highlight-color:transparent}
 
