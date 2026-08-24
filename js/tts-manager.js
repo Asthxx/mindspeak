@@ -217,7 +217,14 @@ var TTSManager = (function() {
       //   ③ 代价：即使原生健康，每会话首次朗读最迟 3s 后也会切到 web 音色
       //      （解锁时的音量预热通常充当这次探测，用户基本无感知）——这是 JS 层
       //      无引擎回调可依赖时的唯一可靠判定方式。
-      if (window.NativeTTSBridge && window.NativeTTSBridge.available && this._nativeDead !== true) {
+      // 用户显式选择过声音（tts_voice 非空）时必须绕过原生引擎：
+      // 原生插件只支持 text/lang/rate、无法指定音色，而本方法的原生分支
+      // 优先于 _speakWeb 的 voice_name 路由——若放行拦截，手机上设置里
+      // 选的任何音色（Piper/Edge/有道/具体系统声）都听不到，永远读系统
+      // 引擎默认声。仅"系统默认（自动选本地语音）"才走原生快速路径。
+      var _explicitVoice = '';
+      try { _explicitVoice = this._getVoiceName(); } catch (_e) {}
+      if (!_explicitVoice && window.NativeTTSBridge && window.NativeTTSBridge.available && this._nativeDead !== true) {
         try { window.NativeTTSBridge.stop(); } catch (_e) {}
         const self = this;
         const token = {};              // 会话令牌：新一轮 speak / cancel 使旧看门狗失效
@@ -271,6 +278,9 @@ var TTSManager = (function() {
     // web TTS 兜底链路：voice_name 路由（本地 SAPI / Piper / 在线音色）→ speechSynthesis。
     // 正常路径与原生降级共用，保证"设置页选了什么声音，降级后还是什么声音"。
     _speakWeb(text, opts) {
+      // 注意：lang 必须在本作用域内解析。此前依赖打包拼接出的跨文件全局
+      // （bundle 里恰有同名 var），单文件加载/测试环境下是 ReferenceError。
+      var lang = (opts && opts.lang) || (this.voice && this.voice.lang) || 'en-US';
       // voice_name 路由：读取 localStorage 中用户选择的声音名，委托给 SpeechUtil 的对应路径。
       // 保证"设置页选了什么声音，所有入口（TTSManager.speak / SpeechUtil.speak / listen-along 等）
       // 都用该声音"。SpeechUtil 在运行时已就绪（tts-manager.js 先加载，speak() 后调用）。
