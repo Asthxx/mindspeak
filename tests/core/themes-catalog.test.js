@@ -67,12 +67,34 @@ describe('THEMES 目录结构', () => {
 });
 
 describe('theme-fx.css 特效', () => {
-  it('8 个主题各有独立隔离段与 @keyframes', () => {
+  it('8 个主题各有独立隔离段，且每款 ≥3 个自有前缀 @keyframes（多层次场景）', () => {
     for (const [id] of EXPECTED) {
       expect(fxCss).toContain('[data-theme-id="' + id + '"]');
-      expect(fxCss).toMatch(new RegExp('@keyframes ' + id));
+      const own = (fxCss.match(new RegExp('@keyframes ' + id + '-\\w+', 'g')) || []).length;
+      expect(own, id + ' keyframes count').toBeGreaterThanOrEqual(3);
     }
-    expect((fxCss.match(/@keyframes/g) || []).length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('keyframes 命名全部带主题前缀（跨主题零污染）', () => {
+    const names = fxCss.match(/@keyframes ([\w-]+)/g) || [];
+    for (const n of names) {
+      const bare = n.replace('@keyframes ', '');
+      expect(EXPECTED.some(([id]) => bare.indexOf(id + '-') === 0), bare + ' 未带主题前缀').toBe(true);
+    }
+  });
+
+  it('每款主题必须改造整套界面表面（不只是背景）：卡片/按钮/输入框/选中色/滚动条/导航激活态 + dark 卡片', () => {
+    for (const [id] of EXPECTED) {
+      const sec = fxCss.slice(fxCss.indexOf('/* ---------- 0', fxCss.indexOf('· ' + id + ' ') === -1 ? 0 : fxCss.indexOf('· ' + id + ' ')));
+      const own = fxCss.indexOf('[data-theme-id="' + id + '"] .word-card');
+      expect(own, id + ' 卡片个性').toBeGreaterThan(-1);
+      expect(fxCss.indexOf('[data-theme-id="' + id + '"] .btn-primary,'), id + ' 按钮个性').toBeGreaterThan(-1);
+      expect(fxCss.indexOf('[data-theme-id="' + id + '"] input:focus'), id + ' 输入焦点').toBeGreaterThan(-1);
+      expect(fxCss.indexOf('[data-theme-id="' + id + '"] ::selection'), id + ' 选中色').toBeGreaterThan(-1);
+      expect(fxCss.indexOf('[data-theme-id="' + id + '"] ::-webkit-scrollbar-thumb'), id + ' 滚动条').toBeGreaterThan(-1);
+      expect(fxCss.indexOf('[data-theme-id="' + id + '"] .nav-btn.active'), id + ' 导航激活态').toBeGreaterThan(-1);
+      expect(fxCss.indexOf('[data-theme-id="' + id + '"][data-theme="dark"] .word-card'), id + ' dark 卡片').toBeGreaterThan(-1);
+    }
   });
 
   it('dark 模式覆盖与 stats-bar/header/sidebar 触点齐备', () => {
