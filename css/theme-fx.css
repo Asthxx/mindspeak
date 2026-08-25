@@ -2,7 +2,6 @@
    Theme FX — 专属主题界面特效
    通过 [data-theme-id] 为每款商城主题注入全局 UI 特效。
    仅对启用中的主题生效。
-   主题特效已全部下架（THEMES = []），本文件仅保留公共基础样式。
    ============================================================ */
 
 /* ---------- 公共 ---------- */
@@ -20,6 +19,527 @@
   color: var(--sage);
 }
 
+/* ---------- 01 极光 · aurora：三色光带水平漂移 ---------- */
+@keyframes aurora-drift {
+  0%   { transform: translateX(-6%) skewX(-4deg); }
+  50%  { transform: translateX(6%) skewX(3deg); }
+  100% { transform: translateX(-6%) skewX(-4deg); }
+}
+[data-theme-id="aurora"] body {
+  background: #EAF4F0;
+}
+[data-theme-id="aurora"] body::before {
+  content: '';
+  position: fixed;
+  inset: -20% -30%;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(42% 30% at 20% 22%, rgba(52,211,153,0.20) 0%, rgba(52,211,153,0) 70%),
+    radial-gradient(46% 34% at 62% 14%, rgba(167,139,250,0.16) 0%, rgba(167,139,250,0) 70%),
+    radial-gradient(40% 28% at 84% 40%, rgba(34,211,238,0.14) 0%, rgba(34,211,238,0) 72%);
+  animation: aurora-drift 16s ease-in-out infinite;
+}
+[data-theme-id="aurora"] .app-header {
+  background: rgba(234,244,240,0.72);
+}
+[data-theme-id="aurora"] .sidebar {
+  box-shadow: inset 0 0 60px rgba(52,211,153,0.10);
+}
+[data-theme-id="aurora"] .btn-primary {
+  box-shadow: 0 4px 16px rgba(16,185,129,0.30);
+}
+[data-theme-id="aurora"] h2,
+[data-theme-id="aurora"] h3 {
+  background: linear-gradient(92deg, #059669 0%, #0D9488 45%, #7C3AED 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme-id="aurora"] .stats-bar span {
+  box-shadow: 0 0 10px rgba(52,211,153,0.35);
+}
+[data-theme-id="aurora"][data-theme="dark"] body { background: #081511; }
+[data-theme-id="aurora"][data-theme="dark"] .app-header { background: rgba(8,21,17,0.78); }
+[data-theme-id="aurora"][data-theme="dark"] body::before {
+  background:
+    radial-gradient(42% 30% at 20% 22%, rgba(52,211,153,0.24) 0%, rgba(52,211,153,0) 70%),
+    radial-gradient(46% 34% at 62% 14%, rgba(167,139,250,0.20) 0%, rgba(167,139,250,0) 70%),
+    radial-gradient(40% 28% at 84% 40%, rgba(34,211,238,0.18) 0%, rgba(34,211,238,0) 72%);
+}
+
+/* ---------- 02 余烬 · ember：底部辉光脉冲 + 火星上升 ---------- */
+@keyframes ember-glow {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.95; }
+}
+@keyframes ember-rise {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  12%  { opacity: 0.9; }
+  100% { transform: translateY(-72vh) translateX(3vw); opacity: 0; }
+}
+[data-theme-id="ember"] body {
+  background: #FBF6F0;
+}
+[data-theme-id="ember"] body::before {
+  content: '';
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 42vh;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(60% 100% at 50% 100%, rgba(245,147,32,0.20) 0%, rgba(194,64,42,0.10) 46%, rgba(194,64,42,0) 78%);
+  animation: ember-glow 5s ease-in-out infinite;
+}
+[data-theme-id="ember"] body::after {
+  content: '';
+  position: fixed;
+  left: 8vw; bottom: -8px;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: #F5A94E;
+  box-shadow:
+    14vw  0 2px 1px rgba(224,106,80,0.85),
+    31vw -12px 1px 0 rgba(245,169,78,0.8),
+    52vw  4px 2px 1px rgba(224,106,80,0.7),
+    74vw -6px 1px 0 rgba(245,169,78,0.85),
+    88vw  8px 2px 1px rgba(224,106,80,0.65);
+  animation: ember-rise 9s linear infinite;
+}
+[data-theme-id="ember"] .app-header {
+  background: rgba(251,246,240,0.74);
+}
+[data-theme-id="ember"] .sidebar {
+  box-shadow: inset 0 -40px 70px rgba(194,64,42,0.10);
+}
+[data-theme-id="ember"] .btn-primary {
+  background: linear-gradient(180deg, #F59320 0%, #C96D05 100%);
+  box-shadow: 0 4px 14px rgba(232,131,12,0.35);
+}
+[data-theme-id="ember"] h2,
+[data-theme-id="ember"] h3 {
+  background: linear-gradient(92deg, #C96D05 0%, #E8830C 50%, #C2402A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme-id="ember"] .stats-bar span {
+  box-shadow: 0 0 10px rgba(245,147,32,0.35);
+}
+[data-theme-id="ember"][data-theme="dark"] body { background: #120A05; }
+[data-theme-id="ember"][data-theme="dark"] .app-header { background: rgba(18,10,5,0.8); }
+[data-theme-id="ember"][data-theme="dark"] body::before {
+  background: radial-gradient(60% 100% at 50% 100%, rgba(245,147,32,0.26) 0%, rgba(194,64,42,0.14) 46%, rgba(194,64,42,0) 78%);
+}
+
+/* ---------- 03 禅意 · zen：同心圆呼吸 + 涟漪扩散 ---------- */
+@keyframes zen-breath {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50%      { transform: scale(1.12); opacity: 0.85; }
+}
+@keyframes zen-ripple {
+  0%   { transform: scale(0.4); opacity: 0.35; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+[data-theme-id="zen"] body {
+  background: #F4F3EC;
+}
+[data-theme-id="zen"] body::before {
+  content: '';
+  position: fixed;
+  right: -18vh; bottom: -18vh;
+  width: 64vh; height: 64vh;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(122,155,109,0.16) 0%, rgba(122,155,109,0.05) 55%, rgba(122,155,109,0) 72%);
+  animation: zen-breath 9s ease-in-out infinite;
+}
+[data-theme-id="zen"] body::after {
+  content: '';
+  position: fixed;
+  right: -18vh; bottom: -18vh;
+  width: 64vh; height: 64vh;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  border: 1.5px solid rgba(122,155,109,0.30);
+  animation: zen-ripple 7s ease-out infinite;
+}
+[data-theme-id="zen"] .app-header {
+  background: rgba(244,243,236,0.76);
+}
+[data-theme-id="zen"] .sidebar {
+  box-shadow: inset 0 0 50px rgba(122,155,109,0.08);
+}
+[data-theme-id="zen"] .btn-primary {
+  box-shadow: 0 4px 12px rgba(122,155,109,0.28);
+}
+[data-theme-id="zen"] h2,
+[data-theme-id="zen"] h3 {
+  background: linear-gradient(92deg, #5F7F53 0%, #7A9B6D 60%, #918E82 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme-id="zen"] .stats-bar span {
+  box-shadow: 0 0 8px rgba(122,155,109,0.30);
+}
+[data-theme-id="zen"][data-theme="dark"] body { background: #0D0F0B; }
+[data-theme-id="zen"][data-theme="dark"] .app-header { background: rgba(13,15,11,0.8); }
+[data-theme-id="zen"][data-theme="dark"] body::before {
+  background: radial-gradient(circle, rgba(143,186,127,0.14) 0%, rgba(143,186,127,0.04) 55%, rgba(143,186,127,0) 72%);
+}
+[data-theme-id="zen"][data-theme="dark"] body::after {
+  border-color: rgba(143,186,127,0.24);
+}
+
+/* ---------- 04 赛博朋克 · cyberpunk：扫描线 + 故障偏移 ---------- */
+@keyframes cyberpunk-scan {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes cyberpunk-glitch {
+  0%, 92%, 100% { text-shadow: none; transform: translateX(0); }
+  93% { text-shadow: -2px 0 rgba(34,211,238,0.85), 2px 0 rgba(244,114,182,0.85); transform: translateX(1px); }
+  95% { text-shadow: 2px 0 rgba(34,211,238,0.85), -2px 0 rgba(244,114,182,0.85); transform: translateX(-1px); }
+  97% { text-shadow: -1px 0 rgba(34,211,238,0.7), 1px 0 rgba(244,114,182,0.7); transform: translateX(0); }
+}
+[data-theme-id="cyberpunk"] body {
+  background: #EEF2F5;
+}
+[data-theme-id="cyberpunk"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: repeating-linear-gradient(180deg, rgba(8,145,178,0.05) 0 1px, rgba(0,0,0,0) 1px 4px);
+}
+[data-theme-id="cyberpunk"] body::after {
+  content: '';
+  position: fixed;
+  left: 0; right: 0; top: 0;
+  height: 90px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(8,145,178,0) 0%, rgba(8,145,178,0.05) 50%, rgba(8,145,178,0) 100%);
+  animation: cyberpunk-scan 7s linear infinite;
+}
+[data-theme-id="cyberpunk"] .app-header {
+  background: rgba(238,242,245,0.82);
+  border-bottom: 1px solid rgba(8,145,178,0.22);
+}
+[data-theme-id="cyberpunk"] .sidebar {
+  box-shadow: inset -1px 0 0 rgba(219,39,119,0.16), inset 0 0 60px rgba(8,145,178,0.04);
+}
+[data-theme-id="cyberpunk"] .btn-primary {
+  background: linear-gradient(92deg, #0891B2 0%, #DB2777 100%);
+  box-shadow: 0 0 16px rgba(8,145,178,0.3);
+}
+[data-theme-id="cyberpunk"] h2,
+[data-theme-id="cyberpunk"] h3 {
+  background: linear-gradient(92deg, #0891B2 0%, #7C3AED 55%, #BE185D 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: cyberpunk-glitch 6s steps(1) infinite;
+}
+[data-theme-id="cyberpunk"] .stats-bar span {
+  box-shadow: 0 0 10px rgba(8,145,178,0.35);
+}
+[data-theme-id="cyberpunk"][data-theme="dark"] body { background: #0C1119; }
+[data-theme-id="cyberpunk"][data-theme="dark"] .app-header { background: rgba(12,17,25,0.8); border-bottom-color: rgba(34,211,238,0.25); }
+[data-theme-id="cyberpunk"][data-theme="dark"] body::before {
+  background: repeating-linear-gradient(180deg, rgba(34,211,238,0.035) 0 1px, rgba(0,0,0,0) 1px 4px);
+}
+[data-theme-id="cyberpunk"][data-theme="dark"] body::after {
+  background: linear-gradient(180deg, rgba(34,211,238,0) 0%, rgba(34,211,238,0.06) 50%, rgba(34,211,238,0) 100%);
+}
+[data-theme-id="cyberpunk"][data-theme="dark"] .sidebar {
+  box-shadow: inset -1px 0 0 rgba(244,114,182,0.22), inset 0 0 60px rgba(34,211,238,0.05);
+}
+[data-theme-id="cyberpunk"][data-theme="dark"] .btn-primary {
+  background: linear-gradient(92deg, #0891B2 0%, #EC4899 100%);
+  box-shadow: 0 0 16px rgba(34,211,238,0.35);
+}
+[data-theme-id="cyberpunk"][data-theme="dark"] h2,
+[data-theme-id="cyberpunk"][data-theme="dark"] h3 {
+  background: linear-gradient(92deg, #22D3EE 0%, #A78BFA 55%, #F472B6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+[data-theme-id="cyberpunk"][data-theme="dark"] .stats-bar span {
+  box-shadow: 0 0 10px rgba(34,211,238,0.4);
+}
+
+/* ---------- 05 北欧 · nordic：对角几何线条缓慢平移 ---------- */
+@keyframes nordic-drift {
+  0%   { background-position: 0 0, 0 0; }
+  100% { background-position: 56px 56px, -56px -56px; }
+}
+[data-theme-id="nordic"] body {
+  background: #F2F5F6;
+}
+[data-theme-id="nordic"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    repeating-linear-gradient(45deg, rgba(79,138,123,0.05) 0 1px, rgba(0,0,0,0) 1px 28px),
+    repeating-linear-gradient(-45deg, rgba(201,123,93,0.04) 0 1px, rgba(0,0,0,0) 1px 28px);
+  animation: nordic-drift 22s linear infinite;
+}
+[data-theme-id="nordic"] .app-header {
+  background: rgba(242,245,246,0.78);
+}
+[data-theme-id="nordic"] .sidebar {
+  box-shadow: inset 0 0 50px rgba(79,138,123,0.07);
+}
+[data-theme-id="nordic"] .btn-primary {
+  box-shadow: 0 4px 12px rgba(79,138,123,0.26);
+}
+[data-theme-id="nordic"] h2,
+[data-theme-id="nordic"] h3 {
+  background: linear-gradient(92deg, #3D6F62 0%, #4F8A7B 55%, #B05F42 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme-id="nordic"] .stats-bar span {
+  box-shadow: 0 0 8px rgba(79,138,123,0.28);
+}
+[data-theme-id="nordic"][data-theme="dark"] body { background: #0B1113; }
+[data-theme-id="nordic"][data-theme="dark"] .app-header { background: rgba(11,17,19,0.8); }
+[data-theme-id="nordic"][data-theme="dark"] body::before {
+  background:
+    repeating-linear-gradient(45deg, rgba(111,181,163,0.06) 0 1px, rgba(0,0,0,0) 1px 28px),
+    repeating-linear-gradient(-45deg, rgba(216,154,126,0.05) 0 1px, rgba(0,0,0,0) 1px 28px);
+}
+
+/* ---------- 06 复古 · vintage：胶片颗粒 + 暗角 ---------- */
+@keyframes vintage-grain {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-2%, 1%); }
+  50%  { transform: translate(1%, -2%); }
+  75%  { transform: translate(-1%, 2%); }
+  100% { transform: translate(0, 0); }
+}
+[data-theme-id="vintage"] body {
+  background: #F4EFE4;
+}
+[data-theme-id="vintage"] body::before {
+  content: '';
+  position: fixed;
+  inset: -4%;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+  animation: vintage-grain 0.9s steps(4) infinite;
+}
+[data-theme-id="vintage"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(120% 90% at 50% 42%, rgba(0,0,0,0) 52%, rgba(58,42,26,0.16) 100%);
+}
+[data-theme-id="vintage"] .app-header {
+  background: rgba(244,239,228,0.8);
+}
+[data-theme-id="vintage"] .sidebar {
+  box-shadow: inset 0 0 50px rgba(58,42,26,0.12);
+}
+[data-theme-id="vintage"] .btn-primary {
+  background: linear-gradient(180deg, #B5654A 0%, #96482F 100%);
+  box-shadow: 0 3px 10px rgba(150,72,47,0.3);
+}
+[data-theme-id="vintage"] h2,
+[data-theme-id="vintage"] h3 {
+  background: linear-gradient(92deg, #96482F 0%, #B5654A 45%, #6E6F45 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme-id="vintage"] .stats-bar span {
+  box-shadow: 0 0 8px rgba(181,101,74,0.3);
+}
+[data-theme-id="vintage"][data-theme="dark"] body { background: #0F0B07; }
+[data-theme-id="vintage"][data-theme="dark"] .app-header { background: rgba(15,11,7,0.82); }
+[data-theme-id="vintage"][data-theme="dark"] body::after {
+  background: radial-gradient(120% 90% at 50% 42%, rgba(0,0,0,0) 46%, rgba(0,0,0,0.5) 100%);
+}
+
+/* ---------- 07 太空 · space：星云漂移旋转 + 星点闪烁 ---------- */
+@keyframes space-nebula {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(8deg) scale(1.08); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+@keyframes space-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 1; }
+}
+[data-theme-id="space"] body {
+  background: #EEF1F6;
+}
+[data-theme-id="space"] body::before {
+  content: '';
+  position: fixed;
+  inset: -25%;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(34% 28% at 26% 30%, rgba(79,125,217,0.12) 0%, rgba(79,125,217,0) 70%),
+    radial-gradient(30% 26% at 74% 62%, rgba(124,58,237,0.09) 0%, rgba(124,58,237,0) 70%),
+    radial-gradient(26% 22% at 56% 18%, rgba(232,160,32,0.07) 0%, rgba(232,160,32,0) 70%);
+  animation: space-nebula 26s ease-in-out infinite;
+}
+[data-theme-id="space"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%, #3A63B8 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.1px 1.1px at 34% 64%, #3A63B8 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.6px 1.6px at 58% 12%, #C98606 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.1px 1.1px at 76% 42%, #3A63B8 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.4px 1.4px at 90% 78%, #4F7DD9 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1px 1px at 22% 86%, #3A63B8 50%, rgba(0,0,0,0) 51%);
+  opacity: 0.4;
+  animation: space-twinkle 4.5s ease-in-out infinite;
+}
+[data-theme-id="space"] .app-header {
+  background: rgba(238,241,246,0.82);
+}
+[data-theme-id="space"] .sidebar {
+  box-shadow: inset 0 0 60px rgba(79,125,217,0.05);
+}
+[data-theme-id="space"] .btn-primary {
+  background: linear-gradient(92deg, #3A63B8 0%, #4F7DD9 100%);
+  box-shadow: 0 4px 16px rgba(79,125,217,0.32);
+}
+[data-theme-id="space"] h2,
+[data-theme-id="space"] h3 {
+  background: linear-gradient(92deg, #3A63B8 0%, #7C3AED 55%, #C98606 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme-id="space"] .stats-bar span {
+  box-shadow: 0 0 10px rgba(79,125,217,0.32);
+}
+[data-theme-id="space"][data-theme="dark"] body { background: #0A0F1E; }
+[data-theme-id="space"][data-theme="dark"] .app-header { background: rgba(10,15,30,0.78); }
+[data-theme-id="space"][data-theme="dark"] body::before {
+  background:
+    radial-gradient(34% 28% at 26% 30%, rgba(127,163,232,0.16) 0%, rgba(127,163,232,0) 70%),
+    radial-gradient(30% 26% at 74% 62%, rgba(167,139,250,0.13) 0%, rgba(167,139,250,0) 70%),
+    radial-gradient(26% 22% at 56% 18%, rgba(245,188,71,0.08) 0%, rgba(245,188,71,0) 70%);
+}
+[data-theme-id="space"][data-theme="dark"] body::after {
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%, #E4EBF7 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.1px 1.1px at 34% 64%, #E4EBF7 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.6px 1.6px at 58% 12%, #F5BC47 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.1px 1.1px at 76% 42%, #E4EBF7 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1.4px 1.4px at 90% 78%, #A5C0F2 50%, rgba(0,0,0,0) 51%),
+    radial-gradient(1px 1px at 22% 86%, #E4EBF7 50%, rgba(0,0,0,0) 51%);
+  opacity: 1;
+}
+[data-theme-id="space"][data-theme="dark"] .sidebar {
+  box-shadow: inset 0 0 60px rgba(127,163,232,0.07);
+}
+[data-theme-id="space"][data-theme="dark"] .btn-primary {
+  box-shadow: 0 4px 16px rgba(79,125,217,0.4);
+}
+[data-theme-id="space"][data-theme="dark"] h2,
+[data-theme-id="space"][data-theme="dark"] h3 {
+  background: linear-gradient(92deg, #7FA3E8 0%, #A78BFA 55%, #F5BC47 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+[data-theme-id="space"][data-theme="dark"] .stats-bar span {
+  box-shadow: 0 0 10px rgba(127,163,232,0.4);
+}
+
+/* ---------- 08 糖果 · candy：四色气泡上浮 + 彩虹描边 ---------- */
+@keyframes candy-float {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  10%  { opacity: 0.8; }
+  100% { transform: translateY(-78vh) translateX(-4vw); opacity: 0; }
+}
+@keyframes candy-rainbow {
+  0%   { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+[data-theme-id="candy"] body {
+  background: #FFF5F8;
+}
+[data-theme-id="candy"] body::before {
+  content: '';
+  position: fixed;
+  left: 10vw; bottom: -30px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: rgba(255,111,165,0.30);
+  box-shadow:
+    18vw -6vh 0 -4px rgba(127,220,192,0.35),
+    39vw 2vh 0 -7px rgba(179,157,255,0.32),
+    61vw -3vh 0 -3px rgba(255,170,140,0.30),
+    82vw 4vh 0 -6px rgba(127,220,192,0.30);
+  animation: candy-float 11s linear infinite;
+}
+[data-theme-id="candy"] .app-header {
+  background: rgba(255,245,248,0.78);
+}
+[data-theme-id="candy"] .sidebar {
+  box-shadow: inset 0 0 55px rgba(255,111,165,0.08);
+}
+[data-theme-id="candy"] .btn-primary {
+  background: linear-gradient(92deg, #FF6FA5 0%, #B39DFF 100%);
+  box-shadow: 0 4px 14px rgba(255,111,165,0.35);
+  animation: candy-rainbow 9s linear infinite;
+}
+[data-theme-id="candy"] h2,
+[data-theme-id="candy"] h3 {
+  background: linear-gradient(92deg, #F0528D 0%, #B39DFF 50%, #35B18E 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme-id="candy"] .stats-bar span {
+  box-shadow: 0 0 12px rgba(255,111,165,0.35);
+}
+[data-theme-id="candy"][data-theme="dark"] body { background: #1A1018; }
+[data-theme-id="candy"][data-theme="dark"] .app-header { background: rgba(26,16,24,0.82); }
+[data-theme-id="candy"][data-theme="dark"] body::before {
+  background: rgba(255,138,184,0.24);
+  box-shadow:
+    18vw -6vh 0 -4px rgba(127,220,192,0.26),
+    39vw 2vh 0 -7px rgba(179,157,255,0.24),
+    61vw -3vh 0 -3px rgba(255,170,140,0.22),
+    82vw 4vh 0 -6px rgba(127,220,192,0.24);
+}
+
 /* ---------- 减弱动效偏好 ---------- */
 @media (prefers-reduced-motion: reduce) {
   [data-theme-id] body,
@@ -27,5 +547,10 @@
   [data-theme-id] body::after {
     animation: none !important;
     transform: none !important;
+  }
+  [data-theme-id] .btn-primary,
+  [data-theme-id] h2,
+  [data-theme-id] h3 {
+    animation: none !important;
   }
 }
