@@ -286,7 +286,7 @@ var AiChatModule = (function() {
     var plan = [];
     if (due > 0) plan.push('① 先做 <b>艾宾浩斯复习</b>：今日待复习 <b>' + due + '</b> 词（建议 10-15 分钟）');
     if (newLeft > 0) plan.push('② 背单词：今天再学 <b>' + newLeft + '</b> 个新词即可完成今日目标 (' + (todayNew) + '/' + goal + ')');
-    if (weak) plan.push('③ 专项强化：错题集中在「' + weak.name + '」，用错词强化练一练');
+    if (weak) plan.push('③ 专项强化：错题集中在「' + escapeHtml(weak.name) + '」，用错词强化练一练');
     plan.push('④ 番茄钟：用 25 分钟学习 + 5 分钟休息，效率更高');
     return '给你制定今日学习计划：<br><br>' + plan.join('<br>') + '<br><br>'
       + '<button type="button" class="ai-reply-btn" data-goto="word">立即去背单词</button>'

@@ -155,7 +155,7 @@ var DashboardModule = (function() {
     });
     if (due > 0) tips.push('有 ' + due + ' 个单词待复习，先复习再学新词效率更高');
     if (tips.length === 0) tips.push('学习状态良好，继续保持！');
-    list.innerHTML = tips.map(function(tip) { return '<li>' + tip + '</li>'; }).join('');
+    list.innerHTML = tips.map(function(tip) { return '<li>' + escapeHtml(tip) + '</li>'; }).join('');
   };
 
   DashboardModule.prototype._set = function(id, val) {

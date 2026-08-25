@@ -197,21 +197,18 @@ getSettings: function() {
       var _isCapGlobal = !!(window.Capacitor && window.Capacitor.isNative);
       if (_isAndroid || _isCap || _isCapGlobal) {
         this._serverDown = true;
-        this._diag('probe', 'android/capacitor => serverDown=true (APK 内无后端)');
         this._syncInstantDefault();
         return;
       }
     } catch(e) {}
     var self = this;
     var base = window.API_BASE || '';
-    this._diag('probe', 'base=' + base + ' href=' + location.href);
     if (!base) { this._serverDown = true; this._syncInstantDefault(); return; }
     var ctrl = null, to = null;
     try { if (typeof AbortController !== 'undefined') ctrl = new AbortController(); } catch(e) {}
     if (ctrl) to = setTimeout(function() {
       try { ctrl.abort(); } catch(e) {}
       self._serverDown = true;
-      self._diag('probe', 'timeout-after-3000ms serverDown=true');
       self._syncInstantDefault();
     }, 3000);
     var done = function() { if (to) clearTimeout(to); self._syncInstantDefault(); };
@@ -220,7 +217,6 @@ getSettings: function() {
         .then(function(r) {
           if (!r || !r.ok) {
             self._serverDown = true;
-            self._diag('probe', 'http ' + (r && r.status) + ' serverDown=true');
             throw new Error('health-not-ok');
           }
           return r.json();
@@ -228,17 +224,14 @@ getSettings: function() {
         .then(function(j) {
           if (j && typeof j.ok === 'boolean') {
             self._serverDown = !j.ok;
-            self._diag('probe', 'json ok=' + j.ok + ' serverDown=' + self._serverDown);
           } else {
             self._serverDown = false;
-            self._diag('probe', 'json-no-ok serverDown=false');
           }
         })
         .catch(function(e) {
           // health-not-ok：404 时上面已正确置 serverDown=true，这里不能再覆盖回 false
           if (!(e && e.message === 'health-not-ok')) {
             self._serverDown = true;
-            self._diag('probe', 'catch ' + (e && e.message || '?') + ' serverDown=true');
           }
         })
         .then(function() { done(); });
@@ -266,7 +259,6 @@ getSettings: function() {
   },
 speak: function(text, lang, opts) {
     var self = this;
-    this._diag('speak-enter', String(text).slice(0, 20));
     // 单词（无空格）且有自定义录音 → 优先播真人录音（不依赖 speechSynthesis）
     var key = (text || '').trim().toLowerCase();
     var custom = this.getCustomVoice();
@@ -463,7 +455,6 @@ _speakLetterTTS: function(up, opts) {
 _speakTTS: function(text, lang, opts) {
     var self = this;
     var settings = this.getSettings();
-    this._diag('tts-enter', String(text).slice(0, 20) + ' serverDown=' + this._serverDown + ' voice=' + (settings.voiceName || '(default)'));
     // 上一次在线声朗读还挂在队列里没 START（连接慢/断线），用户又点了新朗读：
     // 直接判定在线声已坏（本会话不再尝试），本次立即走 Google 合成/SAPI 出声。
     // 健康连接经 prime 预热后 START 实测仅 ~360ms，4s 内没 START 基本就是连不上。
@@ -619,15 +610,12 @@ var attempt = function() {
       // voices 列表是异步加载的：未就绪时最多等 3 次（共约 2.4s），仍无则先裸 speak
       var voices;
       try { voices = window.speechSynthesis.getVoices() || []; } catch(e) { voices = []; }
-      self._diag('voices', 'count=' + voices.length + ' wait=' + voiceWait);
       if (!voices.length && voiceWait > 0) { voiceWait--; setTimeout(attempt, 800); return; }
       // 选声：speakLetter 等注入的 opts.voice（当前所选声音）在首次朗读时优先，
       // 确保 utterance.voice 就是当前选择；失败重试时不再用注入的声音，改为依次跳过
       // failedVoices 换声。否则按 用户保存的 → 本地离线英文声 → 任一英文声 顺序选。
       var voice = (opts && opts.voice && !failedVoices.length) ? opts.voice : self._pickVoice(settings.voiceName, failedVoices);
-      self._diag('voice-pick', (voice && voice.name) || 'null');
       var online = voice ? self._isOnlineVoice(voice) : false;
-      self._diag('online?', online ? 'yes' : 'no');
       // 在线声刚失败（15s 冷却期内）：不再干等超时重试，直接落 HTTPS 在线合成
       // （Google 自然女声）保住"在线音色"，保证点击即出声，避免"多点几下就没声"。
       // 冷却期过后会重新尝试所选在线声——一旦网络恢复，自动回到用户选的音色。
@@ -669,7 +657,6 @@ if (online) { self._onlineAttemptActive = true; self._onlineStarted = false; }
       var fail = function(reason) {
         if (finished || self._speakSeq !== mySeq) return;
         finished = true;
-        self._diag('online-fail', reason);
         self._onlineAttemptActive = false;
         if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
         // cancel 清队列：卡住/排队的朗读必须先清掉，否则下一次 speak 排不进去
@@ -741,7 +728,6 @@ if (online) { self._onlineAttemptActive = true; self._onlineStarted = false; }
       };
 var u;
       try {
-        self._diag('speech-speak', (voice && voice.name) || 'no-voice');
         // 统一经 TTSManager.speak 朗读（内部 cancel + 100ms 后 speak，套用全局
         // 声音/语速/音调/音量）；重试换声时用 voice 覆盖。返回 null = 同步失败。
         u = TTSManager.speak(text, {
@@ -799,7 +785,6 @@ var u;
   // 合成 WAV 播放，确保"点击朗读一定有声音"。只有保底也失败才提示用户。
 _speakLocal: function(text, lang, opts) {
     var self = this;
-    this._diag('local-enter', String(text).slice(0, 20) + ' serverDown=' + this._serverDown);
     // 网页部署（无 server）不得请求 /api/tts（必然 404）：走远程发音/系统语音兜底
     if (this._serverDown === true) {
       this._speakServerless(text, lang, opts);
@@ -841,8 +826,7 @@ _speakLocal: function(text, lang, opts) {
     };
 audio.onerror = function() {
       // 已被下一次点击取代（pause+清 src 会触发 onerror）→ 正常现象，不算失败
-      if (self._localAudio !== audio) { self._diag('local-old-abort', String(text).slice(0, 20)); self._detachAudioEl(audio); return; }
-      self._diag('local-onerror', 'code=' + (audio.error ? audio.error.code : '?'));
+      if (self._localAudio !== audio) { self._detachAudioEl(audio); return; }
       self._detachAudioEl(audio);
       failOnce();
     };
@@ -853,16 +837,14 @@ audio.onerror = function() {
     // 同步抛错（NotSupportedError 等）同样处理。绝不静默。
 var waFallback = function() {
       self._unlockAudio();
-      self._diag('local-wa-fallback', String(text).slice(0, 20));
       self._speakLocalWA(url, opts);
     };
     var pr;
-    try { pr = audio.play(); } catch(e) { self._diag('local-play-throw', String(e)); waFallback(); return; }
+    try { pr = audio.play(); } catch(e) { waFallback(); return; }
     // play() 是异步的：Promise 拒绝（自动播放被拦/服务器未启动）也改走 Web Audio。
     // 被下一次点击的 pause 打断（AbortError）是正常现象，不算失败，不弹 Toast。
     if (pr && pr.catch) pr.catch(function(e) {
-      if (e && e.name === 'AbortError') { self._diag('local-abort', String(text).slice(0, 20)); return; }
-      self._diag('local-play-rej', (e && e.name) || String(e));
+      if (e && e.name === 'AbortError') { return; }
       waFallback();
     });
   },
@@ -903,13 +885,11 @@ var failOnce = function() {
       failed = true;
       if (self._localAudio === audio) self._localAudio = null;
       self._detachAudioEl(audio);
-      self._diag('google-fail', String(text).slice(0, 20));
       self._speakLocal(text, lang, opts);
     };
     audio.onended = function() {
       if (self._localAudio === audio) self._localAudio = null;
       self._detachAudioEl(audio);
-      self._diag('local-ended', String(text).slice(0, 20));
       fireEnd();
     };
     audio.onerror = function() {
@@ -923,16 +903,14 @@ var failOnce = function() {
     // 同步抛错（NotSupportedError 等）同样处理。绝不静默。
 var waFallback = function() {
       self._unlockAudio();
-      self._diag('google-wa-fallback', String(text).slice(0, 20));
       self._speakGoogleWA(url, text, lang, opts);
     };
     var pr;
-    try { pr = audio.play(); } catch(e) { self._diag('google-play-throw', String(e)); waFallback(); return; }
+    try { pr = audio.play(); } catch(e) { waFallback(); return; }
     // play() 是异步的：Promise 拒绝（自动播放被拦/服务器未启动）也改走 Web Audio。
     // 被下一次点击的 pause 打断（AbortError）是正常现象，不算失败，不弹 Toast。
     if (pr && pr.catch) pr.catch(function(e) {
       if (e && e.name === 'AbortError') return;
-      self._diag('google-play-rej', (e && e.name) || String(e));
       waFallback();
     });
   },
@@ -980,7 +958,6 @@ var waFallback = function() {
   // 与 <audio> 路径同样的语义：onstart/onend 回调、失败只报一次、可被新点击打断。
 _speakLocalWA: function(url, opts) {
     var self = this;
-    this._diag('wa-local-enter', url.slice(-80));
     this._stopLocalAudio();
     var seq = (this._waSeq || 0) + 1;
     this._waSeq = seq;
@@ -988,7 +965,6 @@ _speakLocalWA: function(url, opts) {
     var fireEnd = opts && opts.onend ? function() { try { opts.onend(); } catch(e) {} } : function() {};
     var failOnce = function() {
       if (seq !== self._waSeq) return;
-      self._diag('wa-local-fail', 'tts-local-fail');
       self._ttsLocalFail(opts);
     };
     fireStart();
@@ -1005,7 +981,6 @@ _speakLocalWA: function(url, opts) {
           src.connect(ac.destination);
           src.onended = function() {
             if (self._waSrc === src) self._waSrc = null;
-            self._diag('wa-local-end', 'ok');
             fireEnd();
           };
           self._waSrc = src;
@@ -1016,7 +991,6 @@ _speakLocalWA: function(url, opts) {
       })
       .catch(function(e) {
         if (seq !== self._waSeq) return;
-        self._diag('wa-local-catch', (e && e.message) || String(e));
         failOnce();
       });
   },
@@ -1072,11 +1046,10 @@ _markOnlineBroken: function() {
     u.pitch = settings.pitch || 1;
     u.volume = settings.volume || 1;
     var started = false, finished = false;
-    u.onstart = function() { started = true; this._diag && this._diag('device-start', String(text).slice(0,20)); fireStart(); }.bind(this);
+    u.onstart = function() { started = true; fireStart(); }.bind(this);
     u.onend = function() { if (finished) return; finished = true; fireEnd(); };
     var failed = false, isFinal = (opts && opts._noRemoteRetry) === true;
     var deviceNext = function() {
-      self._diag('device-fail', isFinal ? 'final' : '->remote');
       if (isFinal) { self._deviceFail(); return; }
       self._speakRemoteFallback(text, lang, opts);
     };
@@ -1235,7 +1208,6 @@ _markOnlineBroken: function() {
       }
       // 当前块所有源都用尽 → 该块失败，跳到下一块继续（网络波动不中断整篇）
       while (ci < chunks.length && src >= SRC_COUNT) {
-        self._diag('remote-chunk-skip', 'chunk=' + ci);
         ci++;
         src = 0;
       }
@@ -1248,7 +1220,6 @@ _markOnlineBroken: function() {
       var srcs = pickSrcs();
       // 没有可用源（本会话所有源都失败过）：不空等，直接判该块失败
       if (!srcs.length) {
-        self._diag('remote-no-src', 'chunk=' + ci);
         src++;
         playChunk();
         return;
@@ -1257,7 +1228,6 @@ _markOnlineBroken: function() {
       // 相比旧的"每源 8s 串行换源"，手机网络下首选源不可达时不再干等，最多 ~3s 就换块/降级。
       var win = null, resolved = false;
       var to = setTimeout(function() {
-        self._diag('remote-timeout', 'chunk=' + ci);
         if (seq !== self._waSeq || done || resolved) return;
         var els = self._pendingAudio = self._pendingAudio || [];
         for (var pi = 0; pi < els.length; pi++) {
@@ -1273,7 +1243,7 @@ _markOnlineBroken: function() {
       for (var si = 0; si < srcs.length; si++) {
         (function(srcObj) {
           var audio;
-          try { audio = new Audio(srcObj.url(chunks[ci], tl)); } catch(e) { self._diag('remote-ctr', String(e)); return; }
+          try { audio = new Audio(srcObj.url(chunks[ci], tl)); } catch(e) { return; }
           // 百度源校验 Referer（非 fanyi.baidu.com 会返回空 HTML → 错误码4）。
           // <audio> 默认带页面来源 Referer（github.io），会被拒播；设 no-referrer 绕过。
           // 有道源不受 Referer 限制，设此属性也无副作用。
@@ -1313,7 +1283,6 @@ _markOnlineBroken: function() {
               // ② 700ms 仍无推进：播放无声/卡住（WebView 兼容问题），同样换源兜底。
               var bad = (audio.ended && t === 0) || (!audio.ended && t === 0 && (Date.now() - claimAt) >= 700);
               if (bad) {
-                self._diag('remote-empty', 'chunk=' + ci + ' src=' + srcObj.id + ' (空/损坏/卡住音频，换源)');
                 resolved = false;
                 win = null;
                 if (self._localAudio === audio) self._localAudio = null;
@@ -1340,7 +1309,6 @@ _markOnlineBroken: function() {
             var t = 0;
             try { t = audio.currentTime || 0; } catch(e) {}
             if (win === audio && t === 0) {
-              self._diag('remote-empty-end', 'chunk=' + ci + ' src=' + srcObj.id + ' (空音频直接 ended，换源)');
               resolved = false;
               win = null;
               markSrcFail(srcObj.id);
@@ -1350,7 +1318,6 @@ _markOnlineBroken: function() {
             if (!done) { anyPlayed = true; ci++; src = 0; playChunk(); }
           };
           audio.onerror = function() {
-            self._diag('remote-err', 'chunk=' + ci + ' src=' + srcObj.id + ' ' + (audio.error ? audio.error.code : '?'));
             // 败者被 pause/清 src 触发的 AbortError 不算失败（健康标记只记真实源问题）；
             // 只有"generate 阶段已决定不是胜者"的源才跳过。resolved 后其它源全是被主动停的。
             self._detachAudioEl(audio);
@@ -1360,9 +1327,8 @@ _markOnlineBroken: function() {
           var pr;
           var attemptPlay = function(retries) {
             var p;
-            try { p = audio.play(); } catch(e) { self._diag('remote-play-ctr', String(e)); if (!resolved) markSrcFail(srcObj.id); return; }
+            try { p = audio.play(); } catch(e) { if (!resolved) markSrcFail(srcObj.id); return; }
             if (p && p.catch) p.catch(function(e) {
-              self._diag('remote-play-rej', e && e.name ? e.name : String(e));
               // 自动播放策略拒绝（NotAllowedError）：Android WebView 首次远程播放常被拦，
               // 解锁后重试通常可过。重试 ≤2 次，间隔 250ms，仍失败才按源失败处理。
               if (e && e.name === 'NotAllowedError' && retries > 0 && !resolved) {
@@ -1442,7 +1408,6 @@ _markOnlineBroken: function() {
     var self = this;
     try { window.speechSynthesis.cancel(); } catch(e) {}
     this._stopLocalAudio();
-    this._diag('serverless', String(text).slice(0, 20));
     var o = {};
     if (opts) for (var k in opts) o[k] = opts[k];
     o.noFailToast = true; // 远程失败时先不弹 Toast，交给设备语音兜底
@@ -1454,14 +1419,6 @@ _markOnlineBroken: function() {
     };
     this._speakRemoteFallback(text, lang, o);
   },
-  // 朗读诊断记录：写入 window.__speechDiag，设置页可显示，便于排查手机无声问题
-  _diag: function(tag, msg) {
-    try {
-      window.__speechDiag = window.__speechDiag || [];
-      window.__speechDiag.push(Date.now() + ' [' + tag + '] ' + msg);
-      if (window.__speechDiag.length > 200) window.__speechDiag.shift();
-    } catch(e) {}
-  },
   _deviceFail: function(opts) {
     this._stopLocalAudio();
     if (opts && opts.onerror) opts.onerror(new Error('device-voice-fail'));
@@ -1471,7 +1428,6 @@ _markOnlineBroken: function() {
   },
   _ttsLocalFail: function(opts) {
     this._stopLocalAudio();
-    this._diag('local-fail', 'tts-local-fail');
     if (opts && opts.onerror) opts.onerror(new Error('tts-local-fail'));
     // 即时语音模式下 server 不可用由调用方回退在线声，不弹 Toast
     if (!(opts && opts.noFailToast)) {
@@ -2583,15 +2539,12 @@ cat.words = merged;
   };
 WordModule.prototype.speakCurrent = function() {
     var self = this;
-    SpeechUtil._diag('speakCurrent-btn', 'words=' + (this.getCurrentWords ? this.getCurrentWords().length : '?') + ' idx=' + this.currentIndex);
     try {
       var words = this.getCurrentWords();
-      if (!words.length) { SpeechUtil._diag('speakCurrent-empty', 'no words'); return; }
+      if (!words.length) { return; }
       var w = words[this.currentIndex];
-      SpeechUtil._diag('speakCurrent-word', w ? String(w.word).slice(0, 20) : 'undefined');
       SpeechUtil.speakWord(w.word);
     } catch(e) {
-      SpeechUtil._diag('speakCurrent-err', String(e));
     }
   };
   WordModule.prototype.favoriteCurrent = function() {
@@ -5267,7 +5220,7 @@ var CalendarModule = (function() {
       var level = count === 0 ? 0 : (count <= 5 ? 1 : (count <= 15 ? 2 : 3));
       var isToday = dateStr === today;
       var missed = (!count && dateStr < today) ? ' cal-missed' : '';
-      html += '<div class="cal-day cal-dot-' + level + (isToday ? ' today' : '') + missed + '" data-date="' + dateStr + '" title="' + dateStr + (missed ? '：漏签，点击可用补签卡补签' : ': ' + count + '词') + '">' + d + '</div>';
+      html += '<div class="cal-day cal-dot-' + level + (isToday ? ' today' : '') + missed + '" data-date="' + dateStr + '" title="' + dateStr + (missed ? '：漏签，点击可用补签卡补签' : ': ' + escapeHtml(count) + '词') + '">' + d + '</div>';
     }
     grid.innerHTML = html;
   };
@@ -5339,7 +5292,7 @@ var ChartModule = (function() {
         + '<div class="week-row-left"><span class="week-row-label">' + (d.isToday ? '今天' : d.label) + '</span>'
         + '<span class="week-row-date">' + d.date + '</span></div>'
         + '<div class="week-row-bar"><div class="week-row-fill" style="width:' + pct + '%"></div></div>'
-        + '<span class="week-row-count' + (d.isToday ? ' week-row-count-today' : '') + '">' + d.count + ' 词</span>'
+        + '<span class="week-row-count' + (d.isToday ? ' week-row-count-today' : '') + '">' + escapeHtml(d.count) + ' 词</span>'
         + '</div>';
     });
     listEl.innerHTML = html;
@@ -5656,7 +5609,12 @@ App.prototype._initAndroidBackHandler = function() {
       modal.classList.remove('active');
       return;
     }
-    if (window.history.length > 1) {
+    // 不能用 history.length 判断"还能不能退"：它只增不减，抽屉用过一次后
+    // 永远 >1，双击退出分支从此不可达（首页按返回变成静默无效操作）。
+    // 改看当前历史条目的状态标记：只有我们自己压入的抽屉状态才需要 history.back()。
+    var _hState = null;
+    try { _hState = window.history.state; } catch (e) {}
+    if (_hState && _hState.msDrawer) {
       window.history.back();
       return;
     }
@@ -5881,37 +5839,6 @@ App.prototype.bindSettings = function() {
   safeBind('btn-export-data', 'click', function() { self.exportData(); });
 safeBind('btn-import-data', 'click', function() { self.importData(); });
   safeBind('btn-open-logs', 'click', function() { self.openLogs(); });
-  // 朗读诊断：把 window.__speechDiag 的链路信息弹窗显示，用于排查手机无声
-  safeBind('btn-open-speech-diag', 'click', function() { self.openSpeechDiag(); });
-  App.prototype.openSpeechDiag = function() {
-    var lines = (window.__speechDiag || []);
-    var pre = null;
-    if (!lines.length) {
-      pre = '（尚无朗读记录：请先点一次任意单词/字母的朗读按钮，再回来点此按钮）\n\n提示：口腔没有当前离线/本地 TTS 时，朗读会走「远程在线发音」：\n点单词后应立即出声，若没声音可能是自动播放被浏览器拦截或网络不通。';
-    } else {
-      pre = lines.join('\n');
-    }
-    // 自绘弹窗（手机浏览器 `prompt()` 常被禁用），方便复制诊断内容
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(8,12,10,.6);padding:20px;font-family:-apple-system,Segoe UI,Microsoft YaHei,sans-serif';
-    var box = document.createElement('div');
-    box.style.cssText = 'width:min(720px,96vw);max-height:86vh;overflow:auto;background:#fff;border-radius:12px;padding:18px;font-size:13px;';
-    var btn = document.createElement('button');
-    btn.textContent = '关闭';
-    btn.style.cssText = 'margin-top:14px;padding:8px 22px;border:0;border-radius:8px;background:#2f8f6b;color:#fff;font-size:14px;cursor:pointer';
-    btn.onclick = function() { try { document.body.removeChild(wrap); } catch(e) {} };
-    var title = document.createElement('div');
-    title.style.cssText = 'font-weight:700;font-size:15px;margin-bottom:10px;color:#2f3b36';
-    title.textContent = '朗读诊断';
-    var t = document.createElement('div');
-    t.textContent = pre;
-    t.style.cssText = 'background:#f6f8f7;border:1px solid #e3e8e5;border-radius:8px;padding:12px;margin:8px 0;max-height:420px;overflow:auto';
-    box.appendChild(title);
-    box.appendChild(t);
-    box.appendChild(btn);
-    wrap.appendChild(box);
-    document.body.appendChild(wrap);
-  };
   // 事件委托兜底：即使旧缓存 HTML 里按钮绑定时序异常，点击同样生效
   // （但依赖按钮 ID 存在；HTML 必定包含该按钮，旧版也有）
   var settingsEl = document.getElementById('page-settings');
@@ -6482,6 +6409,48 @@ if (name) {
     }
     if (Array.isArray(data.customWords)) {
       sanitized.customWords = data.customWords.slice(0, 50);
+    }
+    // —— 深度清洗：导入的备份 JSON 是存储型 XSS 的唯一污染源。
+    // 渲染层各汇点已补 escapeHtml，这里再做类型收敛，双层防御 ——
+    // checkins：键必须是日期、值必须是有限非负数（日历 title / 统计条直接拼接）
+    if (sanitized.checkins && typeof sanitized.checkins === 'object' && !Array.isArray(sanitized.checkins)) {
+      var _ckIn = sanitized.checkins, _ckOut = {}, _ckN = 0;
+      for (var _ckKey in _ckIn) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(_ckKey)) continue;
+        var _cv = Number(_ckIn[_ckKey]);
+        if (!isFinite(_cv) || _cv < 0) _cv = 0;
+        if (_cv > 9999) _cv = 9999;
+        _ckOut[_ckKey] = _cv;
+        if (++_ckN >= 1000) break;
+      }
+      sanitized.checkins = _ckOut;
+    }
+    // mistakes：source 收敛到已知模块白名单，文本字段截断（保留其余字段兼容旧数据）
+    if (Array.isArray(sanitized.mistakes)) {
+      var _SRC_OK = ['word', 'spelling', 'grammar', 'reading', 'listening', 'context', 'speak', 'pk'];
+      sanitized.mistakes = sanitized.mistakes.slice(0, 500).map(function(m) {
+        if (!m || typeof m !== 'object') return { word: '', chinese: '', example: '', source: 'word' };
+        var out = {};
+        for (var mk in m) out[mk] = m[mk];
+        var src = String(out.source == null ? '' : out.source);
+        out.source = _SRC_OK.indexOf(src) !== -1 ? src : 'word';
+        out.word = String(out.word == null ? '' : out.word).substring(0, 100);
+        out.chinese = String(out.chinese == null ? '' : out.chinese).substring(0, 200);
+        out.example = String(out.example == null ? '' : out.example).substring(0, 300);
+        return out;
+      });
+    }
+    // assessment：level 白名单 + score 数字化 + 文本截断（引导页/计划页直接拼接）
+    if (sanitized.assessment && typeof sanitized.assessment === 'object' && !Array.isArray(sanitized.assessment)) {
+      var _a = sanitized.assessment;
+      var _LV = ['newcomer', 'beginner', 'basic', 'intermediate', 'advanced'];
+      _a.level = _LV.indexOf(_a.level) !== -1 ? _a.level : 'beginner';
+      var _sc = Number(_a.score);
+      _a.score = isFinite(_sc) ? Math.min(100, Math.max(0, _sc)) : 0;
+      if (_a.weakName != null) _a.weakName = String(_a.weakName).substring(0, 20);
+      if (_a.weakDim != null) _a.weakDim = String(_a.weakDim).substring(0, 20);
+      if (_a.recommendName != null) _a.recommendName = String(_a.recommendName).substring(0, 50);
+      sanitized.assessment = _a;
     }
     return sanitized;
   };

@@ -134,7 +134,7 @@ var OnboardingModule = (function() {
     var done = DataStore.getProgress('assessment', null);
     if (done && done.score !== undefined && done.level) {
       var lv = { newcomer: '零基础', beginner: '入门', basic: '基础', intermediate: '进阶', advanced: '挑战' }[done.level] || '入门';
-      box.innerHTML = '你已完成过一次测评（能力等级：<b>' + lv + '</b>，得分 <b>' + done.score + '</b> 分）。可以重新测评获得最新数据。';
+      box.innerHTML = '你已完成过一次测评（能力等级：<b>' + lv + '</b>，得分 <b>' + escapeHtml(done.score) + '</b> 分）。可以重新测评获得最新数据。';
     } else {
       box.innerHTML = '通过 15 道题快速了解你的词汇 / 语法 / 听力 / 发音 / 阅读水平，测评结果将用于生成个性化学习计划。';
     }
@@ -170,9 +170,9 @@ var OnboardingModule = (function() {
     var lv = res ? { newcomer: '零基础', beginner: '入门', basic: '基础', intermediate: '进阶', advanced: '挑战' }[res.level] || res.level : '入门';
     if (res) {
       var plan = AssessmentEngine.buildPlan(res, goal);
-      var weak = res.weakName ? '<div class="ob-plan-weak">薄弱项：' + res.weakName + '，建议优先强化</div>' : '';
-      box.innerHTML = '<div class="ob-plan-title">你的能力等级：<b>' + lv + '</b>（综合 ' + res.score + ' 分）</div>'
-        + '<ul class="ob-plan-list">' + plan.lines.map(function(l) { return '<li>' + l + '</li>'; }).join('') + '</ul>'
+      var weak = res.weakName ? '<div class="ob-plan-weak">薄弱项：' + escapeHtml(res.weakName) + '，建议优先强化</div>' : '';
+      box.innerHTML = '<div class="ob-plan-title">你的能力等级：<b>' + escapeHtml(lv) + '</b>（综合 ' + escapeHtml(res.score) + ' 分）</div>'
+        + '<ul class="ob-plan-list">' + plan.lines.map(function(l) { return '<li>' + escapeHtml(l) + '</li>'; }).join('') + '</ul>'
         + weak;
     } else {
       var plan2 = AssessmentEngine.buildPlan({ level: 'beginner', score: 0, vector: { vocab: 0, grammar: 0, listening: 0, pron: 0, reading: 0 }, weakDim: null, weakName: '', recommendName: '' }, goal);
