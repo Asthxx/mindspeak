@@ -4053,10 +4053,18 @@ ContextModule.prototype.start = function() {
       var i, pool = [];
       for (i = 0; i < cats.length; i++) {
         var cat = cats[i];
-        if (!cat || !cat.words) continue; // 防单分类数据损坏
+        if (!cat || !cat.words) continue; // 防御：词库缺类别
         for (var j = 0; j < cat.words.length; j++) {
           var w = cat.words[j];
-          if (w && w.example) pool.push(w);
+          if (!w || !w.example) continue;
+          // 数据质量守卫：12 万词典里有残片词条（例句为 'n. See Camlet.' 式
+          // 交叉引用、或例句根本不含该词），挖空替换无效会出"没有空可填"的怪题。
+          var _ex = String(w.example);
+          if (_ex.length < 12) continue;                       // 过短例句无语境价值
+          if (/^\s*(?:[a-z]{1,3}\.\s*)?see\s/i.test(_ex)) continue; // "See X" 交叉引用残片
+          var _sw = String(w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          if (!new RegExp('\\b' + _sw + '\\b', 'i').test(_ex)) continue; // 例句必须含该词
+          pool.push(w);
         }
       }
       this._pool = pool;
