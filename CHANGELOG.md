@@ -12,6 +12,29 @@
 
 ---
 
+## [1.1.0] - 2026-09-05
+
+### 安全（本轮重点）
+
+- **安全审计 7 项修复（F1-F7）**：
+  1. **静态文件路径穿越（F1）**：拒绝 `/js/..%5cserver/config.js` 等反斜杠/双编码穿越，白名单前缀 + 原始/解码双校验。
+  2. **备份导入存储型 XSS（F2/F3）**：`items`、`gamification`、`badges`、`customBg` 四块做白名单/数字收敛消毒；道具商店、AI 概况、徽章渲染与日志输出全部 escapeHtml 转义。
+  3. **CORS null 豁免（F4）**：默认拒绝 `Origin: null`（沙箱 iframe/本地网页滥用），可 `ALLOW_NULL_ORIGIN=1` 显式开启。
+  4. **局域网访问令牌（F5）**：`HOST=0.0.0.0` 时非回环来源默认拒绝，需 `MS_TOKEN`（`X-Ms-Token` 头 / `?token=` 入口 / HttpOnly 会话 cookie 三种通道）。
+  5. **徽章默认值数组 bug（F6）**：`badges` 默认值由 `[]` 改 `{}`，导入时字符串日期徽章原样保留，恢复备份不再清零/重复发奖。
+  6. **自定义背景图丢失（F7）**：`customBg` 的 `data:image` dataURL 跨备份完整保留。
+- **加固**：TTS 四端点限流（默认 60 次/60s，HEAD 预热不计数）；Piper 二进制下载后冒烟自检（上游 release 无 SHA256 附件，已核查并记录）；桌面打包时校验 meta CSP 防漂移；`gamification` 读取路径统一封顶（level ≤ 99 / points ≤ 999999）。
+
+### 数据
+
+- 词库清洗：移除 39 条非词垃圾条目。
+
+### 发布
+
+- `.gh-pages` 在线快照刷新至 v1.1.0；README 版本号与 VERSION 对齐。
+
+---
+
 ## [1.0.0] - 2026-08-15
 
 ### 修复
