@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>闻道 MindSpeak - AI 英语学习助手</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; }
+.container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+.card { background: #fff; border-radius: 20px; padding: 40px; margin-bottom: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+.hero { text-align: center; }
+.hero h1 { font-size: 2.5em; margin-bottom: 8px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero .subtitle { font-size: 1.2em; color: #666; margin-bottom: 24px; }
+.hero .version { display: inline-block; background: #f0f0f0; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; color: #888; }
+.features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+.feature { background: #f8f9ff; border-radius: 12px; padding: 20px; }
+.feature h3 { color: #667eea; margin-bottom: 8px; font-size: 1em; }
+.feature p { color: #666; font-size: 0.9em; line-height: 1.5; }
+.download-section { text-align: center; }
+.download-btn { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 16px 48px; border-radius: 30px; text-decoration: none; font-size: 1.2em; font-weight: 600; transition: transform 0.2s, box-shadow 0.2s; }
+.download-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102,126,234,0.4); }
+.download-info { margin-top: 12px; color: #999; font-size: 0.85em; }
+.screenshots { display: flex; gap: 12px; overflow-x: auto; padding: 8px 0; }
+.screenshots img { height: 300px; border-radius: 12px; border: 1px solid #eee; }
+.footer { text-align: center; color: rgba(255,255,255,0.7); margin-top: 24px; font-size: 0.85em; }
+@media (max-width: 600px) {
+  .hero h1 { font-size: 1.8em; }
+  .features { grid-template-columns: 1fr; }
+  .card { padding: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card hero">
+    <h1>闻道 MindSpeak</h1>
+    <p class="subtitle">AI 驱动的沉浸式英语学习助手</p>
+    <span class="version">v1.1.0 · Android</span>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px; font-size:1.3em;">核心功能</h2>
+    <div class="features">
+      <div class="feature">
+        <h3>语音评测</h3>
+        <p>AI 发音评估，实时纠正，支持多种口音</p>
+      </div>
+      <div class="feature">
+        <h3>词汇训练</h3>
+        <p>智能艾宾浩斯复习，根据遗忘曲线安排学习</p>
+      </div>
+      <div class="feature">
+        <h3>情景对话</h3>
+        <p>AI 角色扮演，模拟真实对话场景</p>
+      </div>
+      <div class="feature">
+        <h3>游戏化学习</h3>
+        <p>徽章系统、每日签到、学习排行</p>
+      </div>
+      <div class="feature">
+        <h3>智能错题本</h3>
+        <p>自动记录易错词汇，针对性强化</p>
+      </div>
+      <div class="feature">
+        <h3>多端同步</h3>
+        <p>Web / Android / 桌面版数据互通</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card download-section">
+    <h2 style="margin-bottom:20px; font-size:1.3em;">立即下载</h2>
+    <a href="app-debug.apk" class="download-btn" download>📥 下载 Android APK</a>
+    <p class="download-info">Android 8.0+ · 12 MB · 无需 Google Play</p>
+    <p class="download-info" style="margin-top:8px;">下载后需在设置中允许"安装未知来源应用"</p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px; font-size:1.3em;">使用方式</h2>
+    <ol style="padding-left:20px; line-height:2; color:#555;">
+      <li>点击上方按钮下载 APK 文件</li>
+      <li>在手机文件管理器中找到下载的 <code>app-debug.apk</code></li>
+      <li>点击安装（首次需允许"未知来源"）</li>
+      <li>打开 <strong>闻道 MindSpeak</strong>，开始学习！</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px; font-size:1.3em;">关于</h2>
+    <p style="color:#666; line-height:1.8;">
+      闻道 MindSpeak 是一款开源的英语学习工具，融合了 AI 语音评测、游戏化机制和科学记忆算法。
+      旨在让英语学习变得高效、有趣、随时随地。
+    </p>
+    <p style="margin-top:12px;">
+      <a href="https://github.com/Asthxx/mindspeak" style="color:#667eea;">GitHub 仓库</a>
+    </p>
+  </div>
+
+  <div class="footer">
+    <p>© 2026 闻道 MindSpeak · Made with ❤️</p>
+  </div>
+</div>
+</body>
+</html>

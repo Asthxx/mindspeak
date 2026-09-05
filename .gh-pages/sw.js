@@ -1,6 +1,6 @@
 // MindSpeak Service Worker — App 壳预缓存 + 网络优先/离线回退
 // 版本号在构建时注入（见 build.js），每次发布强制刷新缓存
-const CACHE = 'mindspeak-v20260815070909';
+const CACHE = 'mindspeak-v20260905041730';
 const APP_SHELL = [
   './',
   'index.html',
@@ -40,6 +40,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // Capacitor 环境跳过：origin 为 https://localhost 表示 Capacitor 打包环境
+  if (location.origin === 'https://localhost' && location.protocol === 'https:') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
