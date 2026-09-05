@@ -14,7 +14,7 @@ beforeEach(async () => {
     setProgress: vi.fn(),
   };
   globalThis.app = {
-    gamification: { addPoints: vi.fn(), getStats: vi.fn(() => ({ points: 200 })) },
+    gamification: { addPoints: vi.fn(() => true), getStats: vi.fn(() => ({ points: 200 })) },
     showTab: vi.fn(),
     updateGlobalStats: vi.fn(),
   };
@@ -44,14 +44,28 @@ describe('ItemSystem — buy() 积分扣除', () => {
   });
 
   // BUG: buy() 中 addPoints 和 data[id]++ 不是原子的
-  // 在同步环境中不会出问题，但 addPoints 返回 false 时应阻止后续操作
-  it('should_not_increment_if_addPoints_fails', () => {
+  it('should_not_increment_if_addPoints_returns_false', () => {
     globalThis.app.gamification.addPoints = vi.fn(() => false);
     const is = new ItemSystem();
     is.buy('hint');
-    // 当前实现：即使 addPoints 返回 false，库存仍然 +1
-    // 期望：应该检查返回值
-    expect(is.count('hint')).toBe(0); // 期望修复后为 0
+    expect(is.count('hint')).toBe(0);
+  });
+
+  // BUG#4: 生产 addPoints 无 return 语句 → undefined !== false → guard 不触发
+  it('should_not_increment_if_addPoints_returns_undefined', () => {
+    globalThis.app.gamification.addPoints = vi.fn(() => undefined);
+    const is = new ItemSystem();
+    is.buy('hint');
+    expect(is.count('hint')).toBe(0);
+  });
+
+  // BUG#4: save() 失败时 buy 应阻止
+  it('should_not_increment_when_save_fails', () => {
+    globalThis.app.gamification.addPoints = vi.fn(() => false);
+    const is = new ItemSystem();
+    is.buy('hint');
+    expect(is.count('hint')).toBe(0);
+    expect(globalThis.DataStore.setProgress).not.toHaveBeenCalledWith('items', expect.anything());
   });
 });
 

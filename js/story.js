@@ -22,7 +22,6 @@ var StoryModule = (function() {
     return arr;
   }
   function randomOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-  function escapeReg(str) { return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
   function StoryModule() {
     this.words = [];

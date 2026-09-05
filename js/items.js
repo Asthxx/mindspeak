@@ -72,7 +72,7 @@ var ItemSystem = (function() {
       return;
     }
     var ok = window.app.gamification.addPoints(-it.price);
-    if (ok === false) return; // 积分扣除失败，不发放道具
+    if (!ok) return; // 积分扣除失败，不发放道具
     this.data[id] = this.count(id) + 1;
     this.save();
     Toast.success('获得「' + it.name + '」×1');
@@ -541,7 +541,7 @@ var ThemeShop = (function() {
       Toast.warning('积分不足！需要 ' + t.price + ' 积分');
       return;
     }
-    window.app.gamification.addPoints(-t.price);
+    if (!window.app.gamification.addPoints(-t.price)) return;
     this.owned[id] = true;
     DataStore.setProgress('owned_themes', this.owned);
     this.apply(id, true);

@@ -7,6 +7,11 @@ function escapeHtml(str) {
   if (str == null) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+// 正则转义：把字符串转成可在 RegExp 中字面匹配的形态。全局统一用这个，
+// 避免各模块内联同一段逻辑（修复前 app.js 4 处 + story.js 1 处重复）。
+function escapeReg(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 function safeNumber(val, fallback) {
   var n = parseInt(val, 10);
   return isNaN(n) ? (fallback || 0) : n;
@@ -3308,7 +3313,7 @@ this.mode = document.getElementById('listening-mode').value;
     document.getElementById('listening-progress-text').textContent = '第 ' + (this.currentIndex + 1) + '/' + this.words.length + ' 题';
     document.getElementById('listening-progress-fill').style.width = ((this.currentIndex + 1) / this.words.length * 100) + '%';
     if (this.mode === 'sentence' && w.example) {
-      var safeWord = String(w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var safeWord = escapeReg(w.word || '');
       var hint = w.example.replace(new RegExp('\\b' + safeWord + '\\b', 'gi'), '______');
       document.getElementById('listening-hint').textContent = hint;
     } else {
@@ -4062,7 +4067,7 @@ ContextModule.prototype.start = function() {
           var _ex = String(w.example);
           if (_ex.length < 12) continue;                       // 过短例句无语境价值
           if (/^\s*(?:[a-z]{1,3}\.\s*)?see\s/i.test(_ex)) continue; // "See X" 交叉引用残片
-          var _sw = String(w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var _sw = escapeReg(w.word || '');
           if (!new RegExp('\\b' + _sw + '\\b', 'i').test(_ex)) continue; // 例句必须含该词
           pool.push(w);
         }
@@ -4073,7 +4078,7 @@ ContextModule.prototype.start = function() {
     var picked = shuffleSample(this._pool, 20);
     this.exercises = picked.map(function(w) {
       var sentence = w.example;
-      var safeWord = String(w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var safeWord = escapeReg(w.word || '');
       var blank = sentence.replace(new RegExp('\\b' + safeWord + '\\b', 'i'), '______');
       return { sentence: blank, answer: w.word, chinese: w.chinese, translation: w.example_cn, wordObj: w };
     });
@@ -4422,7 +4427,7 @@ function syncWordMasteredToProgress(word) {
   try {
     var wp = (window.UserState && window.UserState.getWordProgress()) || DataStore.getProgress('word_progress', {});
     // key 形如 "word-分类序号"：精确匹配末尾数字，避免 "run" 误伤 "run-on"
-    var wordRe = new RegExp('^' + String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-\\d+$');
+    var wordRe = new RegExp('^' + escapeReg(word) + '-\\d+$');
     Object.keys(wp).forEach(function(k) {
       if (wordRe.test(k) && wp[k].status === 'failed') {
         wpTouched.push({ key: k, snapshot: JSON.parse(JSON.stringify(wp[k])) });
@@ -5022,7 +5027,7 @@ var GamificationSystem = (function() {
       this.data.level = newLevel;
       Toast.success('🎉 升级到 Lv.' + newLevel + '！');
     }
-    this.save();
+    var saved = this.save();
     // 同步顶栏统计
     if (window.app) window.app.updateGlobalStats();
     // P0-04 事件通知：积分/等级变化由事件广播（业务模块不再轮询/互调）
@@ -5032,6 +5037,7 @@ var GamificationSystem = (function() {
       });
       if (leveledUp) window.EventBus.emit(window.MS.EVENTS.LEVEL_UP, { level: newLevel, from: oldLevel });
     }
+    return saved;
   };
   GamificationSystem.prototype.recordActivity = function(type) {
     // 兼容各模块上报的 type 字符串，统一归到两条总计数上
@@ -5061,7 +5067,7 @@ var GamificationSystem = (function() {
       window.EventBus.emit(window.MS.EVENTS.STREAK_CHANGED, { streak: this.data.streak || 0 });
     }
   };
-  GamificationSystem.prototype.save = function() { DataStore.setProgress('gamification', this.data); };
+  GamificationSystem.prototype.save = function() { return DataStore.setProgress('gamification', this.data); };
   GamificationSystem.prototype.getStats = function() { return this.data; };
   return GamificationSystem;
 })();
@@ -5799,43 +5805,46 @@ App.prototype.recordActivity = function(type, count, isNewWord, wordKey) {
     if (this.dailyChallenge) this.dailyChallenge.updateProgress(type, count, isNewWord, wordKey);
     if (this.badgeSystem) this.badgeSystem.checkAll();
     this.updateGlobalStats();
-  } catch(e) { /* 桥接失败不影响业务 */ }
+  } catch(e) { console.error('[recordActivity] bridge failed:', e); }
 };
 App.prototype.addMistake = function(w, source) {
   if (!w) return;
+  var mistakes = DataStore.getProgress('mistakes', []);
+  var entry = {
+    word: w.word, phonetic: w.phonetic || '', pos: w.pos || '',
+    chinese: w.chinese || '', example: w.example || '',
+    source: source || 'unknown', date: getLocalDateStr(),
+    reviewed: false
+  };
+  var exists = false;
+  var needWrite = false;
+  for (var i = 0; i < mistakes.length; i++) {
+    var m = mistakes[i];
+    if (m.word === entry.word && m.date === entry.date) {
+      exists = true;
+      if (m.reviewed) {
+        m.reviewed = false;
+        m.source = entry.source;
+        needWrite = true;
+      }
+      break;
+    }
+  }
+  if (!exists) {
+    mistakes.push(entry);
+    needWrite = true;
+  }
+  // 仅在数据变化时写入 — 失败即抛出，不静默吞掉
+  if (needWrite) {
+    DataStore.setProgress('mistakes', mistakes);
+  }
+  // DOM 渲染单独保护 — 不影响数据持久化
   try {
-    var mistakes = DataStore.getProgress('mistakes', []);
-    var entry = {
-      word: w.word, phonetic: w.phonetic || '', pos: w.pos || '',
-      chinese: w.chinese || '', example: w.example || '',
-      source: source || 'unknown', date: getLocalDateStr(),
-      reviewed: false
-    };
-    var exists = false;
-    for (var i = 0; i < mistakes.length; i++) {
-      var m = mistakes[i];
-      if (m.word === entry.word && m.date === entry.date) {
-        exists = true;
-        // 当天再次答错：重置已复习标记，避免去重把"当天复发错题"吞掉
-        if (m.reviewed) {
-          m.reviewed = false;
-          m.source = entry.source;
-          DataStore.setProgress('mistakes', mistakes);
-          if (this.mistakesModule) this.mistakesModule.renderList();
-        }
-        break;
-      }
-    }
-    if (!exists) {
-      mistakes.push(entry);
-      DataStore.setProgress('mistakes', mistakes);
-      if (this.mistakesModule) this.mistakesModule.renderList();
-      // P0-04 事件通知：新增错题
-      if (window.EventBus && window.MS && window.MS.EVENTS) {
-        window.EventBus.emit(window.MS.EVENTS.MISTAKE_ADDED, { word: entry.word, source: entry.source });
-      }
-    }
-  } catch(e) {}
+    if (this.mistakesModule) this.mistakesModule.renderList();
+  } catch(e) { console.error('[addMistake] renderList failed:', e); }
+  if (!exists && window.EventBus && window.MS && window.MS.EVENTS) {
+    window.EventBus.emit(window.MS.EVENTS.MISTAKE_ADDED, { word: entry.word, source: entry.source });
+  }
 };
 App.prototype.markCheckin = function(count) {
   if (!count || count <= 0) return;
