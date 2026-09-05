@@ -64,8 +64,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// 局域网/公网访问令牌（F5）：服务暴露在非回环网络时默认拒绝，必须在请求头携带
-// X-Ms-Token: <token> 或 URL 携带 ?token=<token>（后者供手机浏览器直连）才放行。
+// 局域网/公网访问令牌（F5）：服务暴露在非回环网络时默认拒绝，必须提供令牌才放行。
+// 令牌来源三级：X-Ms-Token 请求头（API 客户端）、?token= query（入口引导）、
+// 会话 cookie ms_token（首次用 ?token= 打开页面后种下 HttpOnly cookie，
+// 随后的同源静态资源/API 请求由浏览器自动携带，SPA 才能正常加载）。
 // 回环来源（本机浏览器/桌面端）无需令牌；未设置 MS_TOKEN 时非回环来源一律拒绝，
 // 避免"先开 HOST=0.0.0.0 后忘设令牌"的裸奔（公开服务仍请配合反向代理/HTTPS/防火墙）。
 app.use((req, res, next) => {
@@ -79,8 +81,18 @@ app.use((req, res, next) => {
     }
   } catch (e) { /* socket 可能已断开，按非回环处理 */ }
   if (fromLoopback) return next();
-  const reqToken = req.headers['x-ms-token'] || (req.query && req.query.token);
-  if (token && reqToken === token) return next();
+  const cookieToken = (() => {
+    const m = /(?:^|;\s*)ms_token=([^;]+)/.exec(req.headers.cookie || '');
+    return m ? decodeURIComponent(m[1]) : '';
+  })();
+  const reqToken = req.headers['x-ms-token'] || (req.query && req.query.token) || cookieToken;
+  if (token && reqToken === token) {
+    // query token 匹配时种会话 cookie（HttpOnly 防 XSS 读取），此后同源请求自动放行
+    if (req.query && req.query.token && req.query.token === token && cookieToken !== token) {
+      res.setHeader('Set-Cookie', 'ms_token=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400');
+    }
+    return next();
+  }
   res.setHeader('Access-Control-Allow-Origin', '*');
   return res.status(403).json({ ok: false, message: 'Forbidden: 该服务暴露在局域网/公网，需访问令牌（设置 MS_TOKEN 并以 X-Ms-Token 请求头或 ?token= 提供）' });
 });

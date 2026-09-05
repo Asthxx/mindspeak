@@ -141,6 +141,23 @@ describe('F5 增强：未配置 MS_TOKEN 时局域网默认拒绝', () => {
     const r = await fetch('http://' + LAN_IP + ':' + PORT + '/api/health?token=' + TOKEN);
     expect(r.status).toBe(200);
   });
+
+  it.skipIf(!LAN_IP)('query token 放行时种下会话 cookie，此后同源静态/API 请求无需再带 token', async () => {
+    // 模拟手机浏览器打开 http://IP:3000/?token=xxx：首次请求种 cookie，
+    // 页面里的 script/style/API 请求靠同源 cookie 自动放行（否则 SPA 打不开）
+    const r1 = await fetch('http://' + LAN_IP + ':' + PORT + '/index.html?token=' + TOKEN);
+    expect(r1.status).toBe(200);
+    const setCookie = r1.headers.get('set-cookie');
+    expect(setCookie).toContain('ms_token=' + TOKEN);
+    expect(setCookie).toContain('HttpOnly');
+    const cookie = setCookie.split(';')[0];
+    const r2 = await fetch('http://' + LAN_IP + ':' + PORT + '/js/app.js', { headers: { Cookie: cookie } });
+    expect(r2.status).toBe(200);
+    const r3 = await fetch('http://' + LAN_IP + ':' + PORT + '/api/health', { headers: { Cookie: cookie } });
+    expect(r3.status).toBe(200);
+    const r4 = await fetch('http://' + LAN_IP + ':' + PORT + '/js/app.js');
+    expect(r4.status).toBe(403);
+  });
 });
 
 describe('限流覆盖 /api/edge-tts', () => {
