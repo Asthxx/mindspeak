@@ -55,7 +55,7 @@ app.use((req, res, next) => {
   if (!allowed) return res.status(403).json({ ok: false, message: '禁止跨源访问' });
   res.setHeader('Access-Control-Allow-Origin', origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Ms-Token');
   // Chromium 正在弃用 unload 事件，默认会打印
   // "Permissions policy violation: unload is not allowed in this document"。
   // 这里显式声明本文档允许 unload（含扩展注入脚本），消除该控制台噪音。
@@ -64,13 +64,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// 局域网/公网访问令牌（F5）：HOST=0.0.0.0 把未鉴权 API 暴露给整个网络。
-// 设 MS_TOKEN 后，非回环来源（局域网设备/公网）必须在请求头携带
-// X-Ms-Token: <token> 才放行；回环来源（本机浏览器/桌面端）无需令牌。
-// 公开服务仍请配合反向代理/HTTPS/防火墙。
+// 局域网/公网访问令牌（F5）：服务暴露在非回环网络时默认拒绝，必须在请求头携带
+// X-Ms-Token: <token> 或 URL 携带 ?token=<token>（后者供手机浏览器直连）才放行。
+// 回环来源（本机浏览器/桌面端）无需令牌；未设置 MS_TOKEN 时非回环来源一律拒绝，
+// 避免"先开 HOST=0.0.0.0 后忘设令牌"的裸奔（公开服务仍请配合反向代理/HTTPS/防火墙）。
 app.use((req, res, next) => {
   const token = process.env.MS_TOKEN;
-  if (!token) return next();
   let fromLoopback = false;
   try {
     const { address } = req.socket.address();
@@ -79,9 +78,11 @@ app.use((req, res, next) => {
       fromLoopback = a === '127.0.0.1' || a === '::1';
     }
   } catch (e) { /* socket 可能已断开，按非回环处理 */ }
-  if (fromLoopback || req.headers['x-ms-token'] === token) return next();
+  if (fromLoopback) return next();
+  const reqToken = req.headers['x-ms-token'] || (req.query && req.query.token);
+  if (token && reqToken === token) return next();
   res.setHeader('Access-Control-Allow-Origin', '*');
-  return res.status(403).json({ ok: false, message: 'Forbidden: 缺少访问令牌（X-Ms-Token）' });
+  return res.status(403).json({ ok: false, message: 'Forbidden: 该服务暴露在局域网/公网，需访问令牌（设置 MS_TOKEN 并以 X-Ms-Token 请求头或 ?token= 提供）' });
 });
 
 // ==================== 保底朗读：Windows SAPI 离线合成 ====================
@@ -150,6 +151,7 @@ const { createTtsLimiter } = require('./rate-limit');
 app.use('/api/tts', createTtsLimiter({ prefix: 'tts', limit: Number(process.env.TTS_LIMIT) || 60 }));
 app.use('/api/piper-tts', createTtsLimiter({ prefix: 'piper', limit: Number(process.env.TTS_LIMIT) || 60 }));
 app.use('/api/online-tts', createTtsLimiter({ prefix: 'online', limit: Number(process.env.TTS_LIMIT) || 60 }));
+app.use('/api/edge-tts', createTtsLimiter({ prefix: 'edge', limit: Number(process.env.TTS_LIMIT) || 60 }));
 app.get('/api/tts', (req, res) => {
   const text = String(req.query.text || '').trim();
   const lang = String(req.query.lang || 'en-US').slice(0, 64);

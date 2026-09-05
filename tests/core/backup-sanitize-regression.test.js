@@ -53,6 +53,14 @@ describe('F6 徽章对象被数组默认值覆盖', () => {
     const body = extractFn(read('js/app.js'), 'App.prototype._sanitizeBackup', 'App.prototype._applyBackup');
     expect(body).toContain('sanitized.badges = _badges;');
   });
+
+  it('badges 字符串日期值（真实存储形态，badges.js 写入 today()）必须原样保留，不得误删', () => {
+    const body = extractFn(read('js/app.js'), 'App.prototype._sanitizeBackup', 'App.prototype._applyBackup');
+    // 回归保护：曾只接纳"对象形"徽章，字符串日期（"2026-08-01"）被整体丢弃，
+    // 导致恢复备份后徽章清零并再次发奖（F6 想消除的重复加分以延迟形式回归）
+    expect(body).toContain("if (typeof _b === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(_b)) {");
+    expect(body).toContain('_badges[_bk] = _b;');
+  });
 });
 
 describe('F7 自定义背景图导出/导入丢失', () => {

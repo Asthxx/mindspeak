@@ -6490,12 +6490,16 @@ if (name) {
       }
       sanitized.items = _items;
     }
-    // badges：对象键=徽章 id，值只保留日期白名单 + 布尔标记（badges.js 直接改结构，F6 修复）
+    // badges：真实存储已升级为 "id -> 'YYYY-MM-DD'"（badges.js today() 直接写字符串），
+    // 对象形（{date,achieved,count}）属于旧/攻防变体。字符串日期走白名单原样保留，
+    // 若只收对象形会把合法徽章全部清空，恢复备份后再次发奖（F6 重复加分延迟回归）。
     if (sanitized.badges && typeof sanitized.badges === 'object' && !Array.isArray(sanitized.badges)) {
       var _badges = {}, _badgesN = 0;
       for (var _bk in sanitized.badges) {
         var _b = sanitized.badges[_bk];
-        if (_b && typeof _b === 'object') {
+        if (typeof _b === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(_b)) {
+          _badges[_bk] = _b;
+        } else if (_b && typeof _b === 'object') {
           var _bo = {};
           if (typeof _b.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(_b.date)) _bo.date = _b.date;
           if (_b.achieved === true) _bo.achieved = true;

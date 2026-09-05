@@ -9,8 +9,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PORT = 43100 + Math.floor(Math.random() * 500);
+const PORT_NO_TOKEN = PORT + 1;
 const TOKEN = 'test-secret-token';
 let child = null;
+let childNoToken = null;
 
 function lanIPv4() {
   const ifs = networkInterfaces();
@@ -38,14 +40,21 @@ async function waitReady(base, deadlineMs = 12000) {
 beforeAll(async () => {
   child = spawn(process.execPath, ['server/server.js'], {
     cwd: root,
-    env: { ...process.env, PORT: String(PORT), HOST: '0.0.0.0', MS_TOKEN: TOKEN },
+    env: { ...process.env, PORT: String(PORT), HOST: '0.0.0.0', MS_TOKEN: TOKEN, TTS_LIMIT: '1' },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  childNoToken = spawn(process.execPath, ['server/server.js'], {
+    cwd: root,
+    env: { ...process.env, PORT: String(PORT_NO_TOKEN), HOST: '0.0.0.0' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   await waitReady('http://127.0.0.1:' + PORT);
+  await waitReady('http://127.0.0.1:' + PORT_NO_TOKEN);
 }, 15000);
 
 afterAll(async () => {
   if (child) child.kill();
+  if (childNoToken) childNoToken.kill();
 });
 
 const BASE = 'http://127.0.0.1:' + PORT;
@@ -114,5 +123,31 @@ describe('F5 局域网/远程访问令牌（MS_TOKEN）', () => {
       headers: { 'X-Ms-Token': TOKEN }
     });
     expect(r.status).toBe(200);
+  });
+});
+
+describe('F5 增强：未配置 MS_TOKEN 时局域网默认拒绝', () => {
+  it.skipIf(!LAN_IP)('无 MS_TOKEN 时局域网来源被拒（默认拒绝语义，而非可选开启）', async () => {
+    const r = await fetch('http://' + LAN_IP + ':' + PORT_NO_TOKEN + '/api/health');
+    expect(r.status).toBe(403);
+  });
+
+  it.skipIf(!LAN_IP)('无 MS_TOKEN 时回环来源仍放行', async () => {
+    const r = await fetch('http://127.0.0.1:' + PORT_NO_TOKEN + '/api/health');
+    expect(r.status).toBe(200);
+  });
+
+  it.skipIf(!LAN_IP)('局域网来源携带 query token 放行（手机浏览器可 ?token= 直连）', async () => {
+    const r = await fetch('http://' + LAN_IP + ':' + PORT + '/api/health?token=' + TOKEN);
+    expect(r.status).toBe(200);
+  });
+});
+
+describe('限流覆盖 /api/edge-tts', () => {
+  it('TTS_LIMIT=1 时 edge-tts 第二次请求在限流层被 429（空 text 首个请求快速 400，不触网络）', async () => {
+    const r1 = await fetch(BASE + '/api/edge-tts?text=');
+    expect(r1.status).toBe(400);
+    const r2 = await fetch(BASE + '/api/edge-tts?text=');
+    expect(r2.status).toBe(429);
   });
 });

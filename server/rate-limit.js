@@ -10,6 +10,9 @@ function createTtsLimiter(options) {
   const buckets = new Map();
   return function ttsRateLimit(req, res, next) {
     const now = Date.now();
+    // 前端 SpeechUtil.prefetch 用 HEAD 预热缓存（只促缓存、不出声），不占合成配额。
+    // 只对触发合成的 GET 计数；HEAD/OPTIONS 直接放行。
+    if (req.method && req.method !== 'GET') return next();
     var key = (req.socket && req.socket.remoteAddress || 'unknown');
     if (options && options.prefix) key += '|' + options.prefix;
     let b = buckets.get(key);

@@ -56,6 +56,18 @@ describe('TTS 限流中间件', () => {
     expect(res2._json).toBe(null);
   });
 
+  it('HEAD（前端缓存预热）请求不计数：连续 HEAD 永不触发 429', () => {
+    const mw = createTtsLimiter({ limit: 2, windowMs: 60000 });
+    let nexted = 0;
+    const res = mkRes();
+    const headReq = () => ({ socket: { remoteAddress: '127.0.0.1' }, method: 'HEAD' });
+    mw(headReq(), res, () => nexted++);
+    mw(headReq(), res, () => nexted++);
+    mw(headReq(), res, () => nexted++);
+    expect(nexted).toBe(3);
+    expect(res.statusCode).toBe(200);
+  });
+
   it('bucket 数量超过阈值时清理过期条目（防内存增长）', () => {
     const mw = createTtsLimiter({ limit: 100, windowMs: 10 });
     let nexted = 0;
