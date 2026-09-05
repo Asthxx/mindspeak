@@ -6375,7 +6375,7 @@ if (name) {
     ['autoSaveInterval','auto_save_interval','',false], ['pomodoroSessions','pomodoro_sessions',0,false],
     ['pomodoroMinutes','pomodoro_minutes',0,false], ['activeRecall','active_recall','0',false],
     ['dailyReviewPlan','daily_review_plan',{},false], ['dailyChallenge','daily_challenge',null,false],
-    ['adaptiveReview','adaptive_review',true,false], ['badges','badges',[],false], ['badgeStats','badge_stats',{},false],
+    ['adaptiveReview','adaptive_review',true,false], ['badges','badges',{},false], ['badgeStats','badge_stats',{},false],
     ['items','items',{},false], ['itemBuffs','item_buffs',{},false],
     ['assessment','assessment',null,false], ['assessmentHistory','assessment_history',[],false],
     ['assessmentLast','assessment_last_keys',[],false],
@@ -6468,6 +6468,48 @@ if (name) {
       if (_a.weakDim != null) _a.weakDim = String(_a.weakDim).substring(0, 20);
       if (_a.recommendName != null) _a.recommendName = String(_a.recommendName).substring(0, 50);
       sanitized.assessment = _a;
+    }
+    // gamification：level/points 必须是有限数字（AI 概况渲染直接拼接，F3 修复）
+    if (sanitized.gamification && typeof sanitized.gamification === 'object' && !Array.isArray(sanitized.gamification)) {
+      var _g = sanitized.gamification;
+      var _lv = Number(_g.level);
+      _g.level = isFinite(_lv) && _lv >= 0 ? Math.floor(Math.min(_lv, 99)) : 1;
+      var _pt = Number(_g.points);
+      _g.points = isFinite(_pt) && _pt >= 0 ? Math.floor(Math.min(_pt, 999999)) : 0;
+      sanitized.gamification = _g;
+    }
+    // items：道具数量必须是有限数字（道具商店渲染直接拼接，F2 修复）
+    if (sanitized.items && typeof sanitized.items === 'object' && !Array.isArray(sanitized.items)) {
+      var _items = {}, _itemsN = 0;
+      for (var _ik in sanitized.items) {
+        var _iv = Number(sanitized.items[_ik]);
+        if (!isFinite(_iv) || _iv < 0) continue;
+        if (_iv > 999) _iv = 999;
+        _items[_ik] = _iv;
+        if (++_itemsN >= 200) break;
+      }
+      sanitized.items = _items;
+    }
+    // badges：对象键=徽章 id，值只保留日期白名单 + 布尔标记（badges.js 直接改结构，F6 修复）
+    if (sanitized.badges && typeof sanitized.badges === 'object' && !Array.isArray(sanitized.badges)) {
+      var _badges = {}, _badgesN = 0;
+      for (var _bk in sanitized.badges) {
+        var _b = sanitized.badges[_bk];
+        if (_b && typeof _b === 'object') {
+          var _bo = {};
+          if (typeof _b.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(_b.date)) _bo.date = _b.date;
+          if (_b.achieved === true) _bo.achieved = true;
+          if (typeof _b.count === 'number' && isFinite(_b.count)) _bo.count = _b.count;
+          _badges[_bk] = _bo;
+        }
+        if (++_badgesN >= 200) break;
+      }
+      sanitized.badges = _badges;
+    }
+    // customBg：自定义背景图 dataURL 很长，string 分支的 1000 截断会损坏图片；
+    // 仅在 data:image 前缀时完整保留（F7 修复），随备份导出/导入由 _applyBackup 写回 IDB。
+    if (data.customBg && typeof data.customBg === 'string' && data.customBg.indexOf('data:image/') === 0) {
+      sanitized.customBg = data.customBg;
     }
     return sanitized;
   };

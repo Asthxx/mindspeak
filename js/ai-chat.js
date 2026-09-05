@@ -259,7 +259,7 @@ var AiChatModule = (function() {
       + '· 连续打卡 <b>' + streak + '</b> 天，今日已学 <b>' + todayCount + '</b> 词<br>'
       + '· 已掌握 <b>' + mastered + '</b> 词，今日新学 <b>' + todayNew + '</b>，今日已复习 <b>' + todayDone + '</b><br>'
       + '· 待复习 <b>' + due + '</b> 词（建议优先安排）<br>'
-      + '· 当前等级 <b>Lv.' + level + '</b>，积分 <b>' + (gami.points || 0) + '</b><br><br>'
+      + '· 当前等级 <b>Lv.' + escapeHtml(String(level)) + '</b>，积分 <b>' + escapeHtml(String(+gami.points || 0)) + '</b><br><br>'
       + '<button type="button" class="ai-reply-btn" data-goto="home">看首页总览</button>'
       + '<button type="button" class="ai-reply-btn" data-goto="ai">刷新报告</button>';
   };

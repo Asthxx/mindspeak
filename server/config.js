@@ -22,5 +22,8 @@ module.exports = {
   port: Number(process.env.PORT) || 3000,
   // 额外允许跨源的域名白名单，逗号分隔。例：GitHub Pages 域名
   // ALLOWED_ORIGINS=https://user.github.io,https://mydomain.com
-  allowedOrigins: (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean),
+  // 默认拒绝 Origin:null（沙箱 iframe / 隐私模式），避免无凭据 CORS 滥用；
+  // 仅当需要通过 file:// 直连本地服务时可显式开启：ALLOW_NULL_ORIGIN=1
+  allowNullOrigin: process.env.ALLOW_NULL_ORIGIN === '1' || process.env.ALLOW_NULL_ORIGIN === 'true'
 };

@@ -37,7 +37,10 @@ app.use((err, req, res, next) => {
 
 // 跨域策略：放行"与请求同源"的浏览器 Origin（同源部署到任意 IP/域名都自动放行：
 // localhost、127.0.0.1、局域网 IP、公网 IP/域名全部可用），同时拒绝远程恶意站点
-// 跨源调用未鉴权接口（防远程恶意站点滥用）。file:// 是 null origin 也放行。
+// 跨源调用未鉴权接口（防远程恶意站点滥用）。
+// file://（Origin:null）默认拒绝：其既非同源也不携带可验证身份，任何引用了本地服务的
+// 网页都能读取日志/滥用 TTS；仍需要在浏览器内以 file:// 直连本服务时，显式设
+// ALLOW_NULL_ORIGIN=1。
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   // 同源判定：Origin 的 host:port 与请求 Host 一致，或本机回环来源
@@ -46,7 +49,7 @@ app.use((req, res, next) => {
     const u = new URL(origin);
     sameOrigin = (u.host === req.headers.host);
   } catch (e) {}
-  const allowed = !origin || origin === 'null' || sameOrigin
+  const allowed = !origin || (config.allowNullOrigin && origin === 'null') || sameOrigin
     || config.allowedOrigins.includes(origin)
     || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
   if (!allowed) return res.status(403).json({ ok: false, message: '禁止跨源访问' });
@@ -59,6 +62,26 @@ app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'unload=(self)');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
+});
+
+// 局域网/公网访问令牌（F5）：HOST=0.0.0.0 把未鉴权 API 暴露给整个网络。
+// 设 MS_TOKEN 后，非回环来源（局域网设备/公网）必须在请求头携带
+// X-Ms-Token: <token> 才放行；回环来源（本机浏览器/桌面端）无需令牌。
+// 公开服务仍请配合反向代理/HTTPS/防火墙。
+app.use((req, res, next) => {
+  const token = process.env.MS_TOKEN;
+  if (!token) return next();
+  let fromLoopback = false;
+  try {
+    const { address } = req.socket.address();
+    if (address) {
+      const a = address.replace(/^::ffff:/, '').toLowerCase();
+      fromLoopback = a === '127.0.0.1' || a === '::1';
+    }
+  } catch (e) { /* socket 可能已断开，按非回环处理 */ }
+  if (fromLoopback || req.headers['x-ms-token'] === token) return next();
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  return res.status(403).json({ ok: false, message: 'Forbidden: 缺少访问令牌（X-Ms-Token）' });
 });
 
 // ==================== 保底朗读：Windows SAPI 离线合成 ====================
@@ -561,15 +584,26 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 // 本地开发服务器：禁用浏览器缓存，避免用户长期加载到旧版 js/css 而"功能失效"
 // 白名单中间件：只放行前端资源，防止 server/ 目录（含 config.js 密钥、data/app.db
 // 用户库、node_modules）被 HTTP 直接下载。
-// 注意：必须先 decode+normalize 再匹配——否则 /js/../server/config.js 这类
-// 原始（未归一化）路径能绕过前缀检查直达 express.static 根目录（ROOT 含 server/）。
+// 注意（F1 修复）：express.static 在 Windows 上按原始路径把反斜杠视为目录分隔符，
+// 因此 /js/..%5cserver/config.js 这类 decode 后含 `\` 的 URL 会绕过前缀检查、直达
+// STATIC_ROOT 根目录（该根目录包含 server/）。这里把 raw path 与 POSIX 归一化结果
+// 双重校验，任一不通过即 404——防止注入的相对段（..\ 或 ../）逃出白名单前缀。
 const STATIC_PUBLIC = ['/index.html', '/js/', '/css/', '/data/', '/assets/', '/sw.js', '/pwa-manifest.json', '/manifest.webmanifest'];
 app.use((req, res, next) => {
-  let p = req.path;
-  try { p = decodeURIComponent(p); } catch (e) {}
-  // 统一按 POSIX 语义归一化（Windows 的 path.normalize 会把 / 变 \ 或产生 UNC // 前缀）
-  p = path.posix.normalize('/' + p);
-  if (p === '/' || p === '/index.html' || STATIC_PUBLIC.some((a) => p.startsWith(a))) return next();
+  const raw = req.path;
+  let decoded = raw;
+  try { decoded = decodeURIComponent(raw); } catch (e) {}
+  // F1：URL 中任何反斜杠一律拒绝——原样 `\`、编码 %5c/%5C 解码后都算。
+  // 正常前端资源 URL 从不含反斜杠，出现即视为路径穿越尝试。
+  if (raw.includes('%5c') || raw.includes('%5C') || decoded.includes('\\')) {
+    return res.status(404).json({ ok: false, message: 'Not Found' });
+  }
+  // 白名单前缀同时检查原始路径与 decode 后路径（POSIX 归一化，因为 Windows
+  // path.normalize 会把 / 变 \ 或产生 UNC 前缀）
+  const ok = (p) => p === '/' || p === '/index.html' || STATIC_PUBLIC.some((a) => p.startsWith(a));
+  const norm = path.posix.normalize('/' + decoded);
+  const normRaw = path.posix.normalize('/' + raw);
+  if (ok(normRaw) && ok(norm)) return next();
   return res.status(404).json({ ok: false, message: 'Not Found' });
 });
 app.use(express.static(STATIC_ROOT, {

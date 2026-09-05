@@ -242,7 +242,7 @@ var ItemSystem = (function() {
         + '<div class="item-icon"><svg class="icon"><use href="' + it.icon + '"/></svg></div>'
         + '<div class="item-name">' + it.name + '</div>'
         + '<div class="item-desc">' + it.desc + '</div>'
-        + '<div class="item-own">拥有 ×' + self.count(id) + '</div>'
+        + '<div class="item-own">拥有 ×' + escapeHtml(String(self.count(id))) + '</div>'
         + '<button class="btn btn-primary btn-sm" onclick="window.app.itemSystem.buy(\'' + id + '\')">' + it.price + ' 积分购买</button>'
         + '</div>';
     }).join('');
