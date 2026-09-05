@@ -224,7 +224,7 @@ var BadgeSystem = (function() {
         + '<div class="badge-icon"><svg class="icon"><use href="#' + b.icon + '"/></svg></div>'
         + '<div class="badge-name">' + escapeHtml(b.name) + '</div>'
         + '<div class="badge-desc">' + escapeHtml(b.desc) + '</div>'
-        + (isEarned ? '<div class="badge-date">✓ ' + self.earned[b.id] + '</div>' : prog + '<div class="badge-date">未获得</div>')
+        + (isEarned ? '<div class="badge-date">✓ ' + escapeHtml(String(self.earned[b.id] || '')) + '</div>' : prog + '<div class="badge-date">未获得</div>')
         + '</div>';
     }).join('');
   };

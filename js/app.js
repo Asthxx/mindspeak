@@ -6583,7 +6583,7 @@ App.prototype.exportData = function() {
     function showErr(msg) {
       modal.classList.remove('hidden');
       var body = document.getElementById('logs-body');
-      if (body) body.innerHTML = '<tr><td colspan="5" style="padding:48px;text-align:center;color:#c9405a">' + msg + '</td></tr>';
+      if (body) body.innerHTML = '<tr><td colspan="5" style="padding:48px;text-align:center;color:#c9405a">' + escapeHtml(msg) + '</td></tr>';
       var summary = document.getElementById('logs-summary');
       if (summary) summary.textContent = '读取失败';
     }

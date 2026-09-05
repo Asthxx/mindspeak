@@ -144,6 +144,12 @@ function streamWav(file, res) {
   rs.on('error', () => { try { res.status(500).end(); } catch(e) {} });
   rs.pipe(res);
 }
+// TTS 端点限流：每 IP 每端点窗口内上限（默认 60 次/60s，TTS_LIMIT 可调）。
+// 防局域网/沙箱 no-cors 图片把本机当 TTS 中继刷进程与磁盘（审计 F5 配套加固）。
+const { createTtsLimiter } = require('./rate-limit');
+app.use('/api/tts', createTtsLimiter({ prefix: 'tts', limit: Number(process.env.TTS_LIMIT) || 60 }));
+app.use('/api/piper-tts', createTtsLimiter({ prefix: 'piper', limit: Number(process.env.TTS_LIMIT) || 60 }));
+app.use('/api/online-tts', createTtsLimiter({ prefix: 'online', limit: Number(process.env.TTS_LIMIT) || 60 }));
 app.get('/api/tts', (req, res) => {
   const text = String(req.query.text || '').trim();
   const lang = String(req.query.lang || 'en-US').slice(0, 64);
@@ -334,6 +340,17 @@ async function ensurePiperBinary() {
     });
   }
   try { fs.unlinkSync(archivePath); } catch (e) {}
+  // 供应链加固：解压后的二进制必须通过冒烟自检（--help 输出含 piper 特征），
+  // 失败视为被替换/损坏，删除并返回不可用（下次请求重新下载再自检）。
+  if (fs.existsSync(PIPER_BIN)) {
+    const { checkPiperBinary } = require('./piper-check');
+    const ok = await checkPiperBinary(PIPER_BIN);
+    if (!ok) {
+      logger.warn('piper-tts', 'Piper 二进制未通过冒烟自检，已丢弃', { bin: PIPER_BIN });
+      try { fs.unlinkSync(PIPER_BIN); } catch (e) {}
+      return false;
+    }
+  }
   return fs.existsSync(PIPER_BIN);
 }
 
