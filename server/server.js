@@ -298,7 +298,9 @@ app.get('/api/edge-tts', (req, res) => {
 // ==================== Piper TTS：本地离线神经网络语音合成 ====================
 const PIPER_DIR = path.join(os.homedir(), '.local', 'share', 'mindspeak-piper');
 const PIPER_BIN = path.join(PIPER_DIR, 'piper' + (process.platform === 'win32' ? '.exe' : ''));
-const PIPER_VOICE_DIR = path.join(PIPER_DIR, 'voices');
+// 固定版本 pin：rhasspy/piper release 2023.11.14-2（2026-09 已核查该 release 的 6 个资产
+// 均无 .sha256/校验和附件，官方未提供可信基准 → 无法做摘要强校验，只能依赖 HTTPS +
+// 版本 pin + piper-check 冒烟自检。升级版本前请再次核查上游是否补发校验和。）
 const PIPER_BASE_URL = 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2';
 const PIPER_PLATFORMS = {
   'win32-x64': 'piper_windows_amd64.zip',

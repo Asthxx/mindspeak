@@ -105,6 +105,19 @@ async function main() {
     execSync('node build.js', { cwd: ROOT, stdio: 'inherit' });
   }
 
+  // CSP 对齐护栏：tauri.conf.json 的 csp 为 null（依赖页面自带 meta CSP 作为唯一进化源），
+  // 桌面包从此失去 CSP。若未来 dist/index.html 的 meta CSP 被删除/放宽，必须在此拦截，
+  // 否则桌面 WebView 会以无 CSP 状态运行。
+  const cspHtml = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
+  const cspMatch = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(cspHtml);
+  const csp = cspMatch ? cspMatch[1] : '';
+  if (!cspMatch || !/script-src[^;]*'unsafe-inline'/.test(csp)
+      || !/connect-src[^;]*http:\/\/127\.0\.0\.1:3000/.test(csp)
+      || !/object-src[^;]*'none'/.test(csp)) {
+    throw new Error('[desktop-pack] dist/index.html 缺少收紧的 meta CSP（需 script-src unsafe-inline、connect-src 127.0.0.1:3000、object-src none），拒绝打包');
+  }
+  console.log('[desktop-pack] meta CSP 校验通过');
+
   // 1) Node 运行时
   const nodeFile = await ensureNode();
 

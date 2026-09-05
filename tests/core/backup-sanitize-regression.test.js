@@ -40,6 +40,12 @@ describe('F3 AI 概况存储型 XSS', () => {
     const body = extractFn(read('js/app.js'), 'App.prototype._sanitizeBackup', 'App.prototype._applyBackup');
     expect(body).toContain('sanitized.gamification = _g;');
   });
+
+  it('DataStore 读取 gamification 必须封顶（M1：localStorage 直写天文数字也只见到 999999/99）', () => {
+    const store = read('js/core/store.js');
+    expect(store).toContain('Math.min(Math.floor(parsed.points), 999999)');
+    expect(store).toContain('Math.min(Math.floor(parsed.level), 99)');
+  });
 });
 
 describe('F6 徽章对象被数组默认值覆盖', () => {

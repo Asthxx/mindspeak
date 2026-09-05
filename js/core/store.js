@@ -64,7 +64,16 @@ window.UserState = (function() {
     try {
       var v = localStorage.getItem(key);
       if (v === null) return fallback;
-      return JSON.parse(v);
+      var parsed = JSON.parse(v);
+      // gamification 读取收敛（审计 M1）：localStorage 直写天文数字（不经过备份导入）时，
+      // 渲染层也只见封顶值；level 固定 1-99、points 上限 999999，与 _sanitizeBackup 同口径。
+      if (key === KEYS.gamification && parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (typeof parsed.points !== 'number' || !isFinite(parsed.points)) parsed.points = 0;
+        else parsed.points = Math.min(Math.floor(parsed.points), 999999);
+        if (typeof parsed.level !== 'number') parsed.level = Math.floor((parsed.points || 0) / 100) + 1;
+        else parsed.level = Math.max(1, Math.min(Math.floor(parsed.level), 99));
+      }
+      return parsed;
     } catch (e) {
       return fallback;
     }
