@@ -531,7 +531,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 // 隐私红线：服务端绝不向 LLM 追加任何学习明细；日志只记 ms/intent/status/model/text 摘要。
 
 const AI_SYSTEM_PROMPT = '你是英语学习应用的 AI 教学助手。用中文讲解，回答尽量简洁（不超过 200 字），面向初中到高中英语水平。只做英语教学相关的解答，用词简单易懂。';
-const AI_PROXY_TIMEOUT = 15000;
+const AI_PROXY_TIMEOUT = 25000;
 
 // 校验前端请求体：只放行 messages（数组 ≤6 条、每条 content 字符串 ≤500 字符、总 body ≤2kb）
 function validateAiChatBody(body) {
@@ -573,13 +573,29 @@ async function proxyAiChat(messages) {
       body: JSON.stringify(upstreamBody),
       signal: controller ? controller.signal : undefined
     });
-    if (!resp || !resp.ok) return { ok: false, error: 'upstream' };
+    if (!resp) return { ok: false, error: 'upstream' };
+    if (!resp.ok) {
+      // 额度/配额类错误（401 无效 key、402 余额不足、403 无权限、429 限流、
+      // 或响应体含 quota/billing/insufficient 字样）→ 标记"额度耗尽"，health 降级为离线。
+      var quota = false;
+      if (resp.status === 401 || resp.status === 402 || resp.status === 403 || resp.status === 429) {
+        quota = true;
+      } else {
+        try {
+          var eb = await resp.json();
+          if (eb && /quota|billing|insufficient|balance|credit|limit/i.test(JSON.stringify(eb))) quota = true;
+        } catch (e) {}
+      }
+      if (quota) { aiQuotaMeta.exhausted = true; aiQuotaMeta.at = Date.now(); }
+      return { ok: false, error: quota ? 'quota' : 'upstream' };
+    }
     let data;
     try { data = await resp.json(); } catch (e) { return { ok: false, error: 'upstream' }; }
     const text = data && data.choices && data.choices.length
       && data.choices[0].message && typeof data.choices[0].message.content === 'string'
       ? data.choices[0].message.content : '';
     if (!text) return { ok: false, error: 'upstream' };
+    aiQuotaMeta.exhausted = false; // 成功响应说明额度恢复
     return { ok: true, text: text.slice(0, 400), model: config.aiModel, ms: Date.now() - started };
   } catch (e) {
     const aborted = e && (e.name === 'AbortError' || e.name === 'TimeoutError');
@@ -590,13 +606,22 @@ async function proxyAiChat(messages) {
 }
 
 // AI 通道健康状态：只暴露是否启用与配额，绝不返回 key 本身。
+// enabled=false 的两类原因：no-key（未配置）或 quota（已配置但额度耗尽）。
 // 前端 NeuralEngine 启动时查询，决定显示"在线增强已启用 / 离线模式"。
+let aiQuotaMeta = { exhausted: false, at: 0 };
+const AI_QUOTA_TTL = 5 * 60 * 1000; // 额度耗尽标记的“冷却期”：超时自动恢复探测
+function aiQuotaExhaustedNow() {
+  return aiQuotaMeta.exhausted && (Date.now() - aiQuotaMeta.at) < AI_QUOTA_TTL;
+}
 function aiHealthStatus() {
+  var hasKey = Boolean(config.pollinationsApiKey);
+  var quota = hasKey && aiQuotaExhaustedNow();
   return {
     ok: true,
-    enabled: Boolean(config.pollinationsApiKey),
+    enabled: hasKey && !quota,
     model: config.aiModel,
-    capacity: Number(process.env.AI_LIMIT) || 20
+    capacity: Number(process.env.AI_LIMIT) || 20,
+    reason: !hasKey ? 'no-key' : (quota ? 'quota' : null)
   };
 }
 
@@ -756,4 +781,8 @@ if (require.main === module) {
   });
 }
 
-module.exports = { validateAiChatBody, proxyAiChat, aiHealthStatus };
+module.exports = { validateAiChatBody, proxyAiChat, aiHealthStatus,
+  // —— 仅测试用钩子（不影响运行逻辑）——
+  _quotaMeta: aiQuotaMeta,                            // 额度耗尽标记（测试可读写/重置）
+  _setTestApiKey: function (v) { config.pollinationsApiKey = v; } // 测试注入 key（.env 隔离时无法自然配置）
+};

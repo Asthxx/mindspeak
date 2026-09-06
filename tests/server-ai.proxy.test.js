@@ -7,13 +7,15 @@ process.env.POLLINATIONS_API_KEY = '';
 
 // 服务端 AI 代理测试：直接验证核心函数（不启动 HTTP），限流器另行单测。
 // require('../server/server.js') 由 require.main 保护，不会 listen。
-let validateAiChatBody, proxyAiChat, aiHealthStatus;
+let validateAiChatBody, proxyAiChat, aiHealthStatus, _quotaMeta, _setTestApiKey;
 
 beforeAll(async () => {
   const srv = await import('../server/server.js');
   validateAiChatBody = srv.validateAiChatBody;
   proxyAiChat = srv.proxyAiChat;
   aiHealthStatus = srv.aiHealthStatus;
+  _quotaMeta = srv._quotaMeta;
+  _setTestApiKey = srv._setTestApiKey;
   delete globalThis.fetch;
 });
 
@@ -172,5 +174,81 @@ describe('createTtsLimiter — POST 限流扩展', () => {
     let nexted = false;
     mw({ method: 'POST', socket: { remoteAddress: 'x' } }, res, () => { nexted = true; });
     expect(nexted).toBe(true); // POST 默认不计数，直接放行
+  });
+});
+
+describe('aiHealthStatus — 额度耗尽自动降级/恢复', () => {
+  beforeEach(() => {
+    _setTestApiKey('sk_test_quota');
+    _quotaMeta.exhausted = false;
+    _quotaMeta.at = 0;
+  });
+  afterEach(() => {
+    _setTestApiKey('');
+    _quotaMeta.exhausted = false;
+    _quotaMeta.at = 0;
+  });
+  function failUpstream(status, body) {
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, status, json: async () => body }));
+  }
+
+  it('should_report_enabled_when_key_present_without_quota', () => {
+    const s = aiHealthStatus();
+    expect(s.enabled).toBe(true);
+    expect(s.reason).toBeNull();
+  });
+
+  it('should_disable_and_flag_quota_after_402_upstream', async () => {
+    failUpstream(402, { error: { message: 'Insufficient quota' } });
+    const r = await proxyAiChat([{ role: 'user', content: 'hi' }]);
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('quota');
+    expect(_quotaMeta.exhausted).toBe(true);
+    const s = aiHealthStatus();
+    expect(s.enabled).toBe(false);
+    expect(s.reason).toBe('quota');
+  });
+
+  it('should_treat_401_invalid_key_as_quota_style_disable', async () => {
+    failUpstream(401, { error: 'invalid key' });
+    const r = await proxyAiChat([{ role: 'user', content: 'hi' }]);
+    expect(r.error).toBe('quota');
+    expect(aiHealthStatus().reason).toBe('quota');
+  });
+
+  it('should_recover_after_successful_request', async () => {
+    failUpstream(402, {});
+    await proxyAiChat([{ role: 'user', content: 'hi' }]);
+    expect(aiHealthStatus().enabled).toBe(false);
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) }));
+    const r = await proxyAiChat([{ role: 'user', content: 'hi' }]);
+    expect(r.ok).toBe(true);
+    expect(aiHealthStatus().enabled).toBe(true);
+    expect(aiHealthStatus().reason).toBeNull();
+  });
+
+  it('should_auto_recover_after_ttl_elapses_without_retry', async () => {
+    vi.useFakeTimers();
+    try {
+      failUpstream(402, {});
+      await proxyAiChat([{ role: 'user', content: 'hi' }]);
+      expect(aiHealthStatus().enabled).toBe(false);
+      vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1000); // 过 5 分钟冷却期
+      const s = aiHealthStatus();
+      expect(s.enabled).toBe(true);
+      expect(s.reason).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should_not_clear_quota_on_generic_upstream_failure', async () => {
+    failUpstream(402, {});
+    await proxyAiChat([{ role: 'user', content: 'hi' }]);
+    expect(_quotaMeta.exhausted).toBe(true);
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 500, json: async () => ({}) }));
+    const r = await proxyAiChat([{ role: 'user', content: 'hi' }]);
+    expect(r.error).toBe('upstream');
+    expect(_quotaMeta.exhausted).toBe(true); // 5xx 不清除额度标记，避免误判恢复
   });
 });

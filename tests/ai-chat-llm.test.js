@@ -447,3 +447,61 @@ describe('AiChatModule — UI/UX（维度4）', () => {
     expect(chipText).not.toContain('abandon');
   });
 });
+
+describe('NeuralEngine — 额度耗尽离线拦截与自动恢复', () => {
+  const flush = () => new Promise((res) => setTimeout(res, 0));
+
+  it('should_skip_llm_without_network_when_health_reports_disabled', async () => {
+    const N = getNeural();
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: false, reason: 'quota' }) }));
+    const h = await N.checkHealth();
+    expect(h.enabled).toBe(false);
+    globalThis.fetch.mockClear();
+    const r = await N.ask('chat', '你好呀');
+    expect(r).toBeNull();
+    expect(globalThis.fetch).not.toHaveBeenCalled(); // 不打上游，直接规则兜底
+  });
+
+  it('should_probe_again_after_probe_window_and_recover_to_llm', async () => {
+    const N = getNeural();
+    vi.useFakeTimers();
+    try {
+      let healthEnabled = false;
+      globalThis.fetch = vi.fn((url) => {
+        if (String(url).includes('/api/ai/health')) {
+          return Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: healthEnabled }) });
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ ok: true, text: 'recovered' }) });
+      });
+      await N.checkHealth(); // 服务端说离线 → 缓存 enabled:false
+      globalThis.fetch.mockClear();
+      let r = await N.ask('chat', 'hi');
+      expect(r).toBeNull();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      healthEnabled = true; // 模拟额度恢复
+      vi.setSystemTime(Date.now() + 60001); // 探测窗过期
+      r = await N.ask('chat', 'hi');
+      expect(r).toBe('recovered'); // 侦察请求成功 → 自动切回在线 LLM
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should_recheck_health_after_upstream_failure', async () => {
+    const N = getNeural();
+    let healthCalls = 0;
+    globalThis.fetch = vi.fn((url) => {
+      if (String(url).includes('/api/ai/health')) {
+        healthCalls++;
+        return Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: false, reason: 'quota' }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: false, error: 'upstream' }) });
+    });
+    const r = await N.ask('chat', 'hi'); // 上游失败 → refreshHealth 重探测
+    expect(r).toBeNull();
+    await flush();
+    expect(healthCalls).toBe(1); // 失败后补了一次 health 探测（bootstrap UI 不算，此处 ask 前未探测）
+    N.resetForTest();
+  });
+});

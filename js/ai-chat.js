@@ -10,8 +10,11 @@ var NeuralEngine = (function() {
   var LLM_INTENTS = { 'explain_word': 1, 'sentence': 1, 'translate': 1, 'compare': 1, 'chat': 1, 'tips': 1, 'encourage': 1, 'practice': 1, 'motivation': 1, 'story': 1 };
   var LIMIT = 10;          // max LLM calls per minute
   var WINDOW_MS = 60000;
-  var DEFAULT_TIMEOUT = 15000;
+  var DEFAULT_TIMEOUT = 25000;
   var _calls = [];
+  var _health = null;      // 最近一次 /api/ai/health 结果（null=未知，不拦截）
+  var _healthAt = 0;       // 最近一次探测时间戳
+  var HEALTH_PROBE_MS = 60000; // 离线确认后拦截上限；超时后放行一次“侦察”请求，额度恢复即自动切回
 
   function allow() {
     var now = Date.now();
@@ -21,7 +24,7 @@ var NeuralEngine = (function() {
     return true;
   }
 
-  function resetForTest() { _calls = []; }
+  function resetForTest() { _calls = []; _health = null; _healthAt = 0; }
 
   function isLLMIntent(intent) { return !!LLM_INTENTS[intent]; }
 
@@ -57,6 +60,9 @@ var NeuralEngine = (function() {
     return new Promise(function(resolve) {
       var content = String(text || '').trim();
       if (!isLLMIntent(intent) || !content || !allow()) return resolve(null);
+      // 离线拦截：server 明确无 key / 额度耗尽，且探测未过期 → 直接规则兜底，不再打上游；
+      // 过期（HEALTH_PROBE_MS）后放行一次侦察请求，额度恢复即自动切回在线。
+      if (_health && _health.enabled === false && (Date.now() - _healthAt) < HEALTH_PROBE_MS) return resolve(null);
       var ctx = getAgentContext();
       content += '（我的学习概况：' + JSON.stringify(ctx) + '）';
       var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
@@ -73,13 +79,28 @@ var NeuralEngine = (function() {
       }).then(function(d) {
         if (done) return;
         done = true; clearTimeout(timer);
-        resolve(d && d.ok && typeof d.text === 'string' ? d.text : null);
+        if (d && d.ok && typeof d.text === 'string') {
+          resolve(d.text);
+        } else {
+          refreshHealth(); // 上游失败（含额度耗尽）：重新探测并同步徽章
+          resolve(null);
+        }
       }).catch(function() {
         if (done) return;
         done = true; clearTimeout(timer);
+        refreshHealth();
         resolve(null);
       });
     });
+  }
+
+  // 重探测 health 并让 UI 徽章随最新状态刷新（失败时 _health 保持未知，不误判离线）
+  function refreshHealth() {
+    checkHealth();
+    try {
+      var m = window.app && window.app.aiChatModule;
+      if (m && typeof m._aiStatus === 'function') m._aiStatus();
+    } catch (e) {}
   }
 
   function checkHealth() {
@@ -88,14 +109,21 @@ var NeuralEngine = (function() {
       fetch(base + '/api/ai/health', { method: 'GET', headers: { 'Accept': 'application/json' } })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          resolve({
+          var s = {
             ok: !!(d && d.ok),
             enabled: !!(d && d.ok && d.enabled),
             model: d && typeof d.model === 'string' ? d.model : null,
-            capacity: d && typeof d.capacity === 'number' ? d.capacity : 0
-          });
+            capacity: d && typeof d.capacity === 'number' ? d.capacity : 0,
+            reason: d && (d.reason === 'quota' || d.reason === 'no-key') ? d.reason : null
+          };
+          _health = s;
+          _healthAt = Date.now();
+          resolve(s);
         })
-        .catch(function() { resolve({ ok: false, enabled: false, model: null, capacity: 0 }); });
+        .catch(function() {
+          _healthAt = Date.now(); // 探测失败视为未知：不覆盖已确认状态（瞬时网络问题不误判离线）
+          resolve({ ok: false, enabled: false, model: null, capacity: 0 });
+        });
     });
   }
 
@@ -171,10 +199,14 @@ var AiChatModule = (function() {
     this._chatToolbar();
   };
 
-  // 在线增强状态徽章：NeuralEngine 探测 /api/ai/health，key 已配置 → 在线增强，否则离线模式
+  // 在线增强状态徽章：NeuralEngine 探测 /api/ai/health。
+  // key 已配置且未耗尽 → 在线增强；无 key 或额度耗尽 → 离线模式（原因写入 title）。
+  // 幂等：重复调用会替换旧徽章（LLM 失败后的 refreshHealth 会触发重画）。
   AiChatModule.prototype._aiStatus = function() {
     var host = document.querySelector('.ai-chat-card .ai-card-title') || document.querySelector('.ai-chat-card h3');
     if (!host) return;
+    var old = host.querySelector('.ai-status-badge');
+    if (old) old.parentNode.removeChild(old);
     var badge = document.createElement('span');
     badge.className = 'ai-status-badge ai-status-off';
     badge.setAttribute('data-state', 'loading');
@@ -182,9 +214,11 @@ var AiChatModule = (function() {
     host.appendChild(badge);
     NeuralEngine.checkHealth().then(function(s) {
       var on = !!(s && s.ok && s.enabled);
+      var quota = !!(s && s.reason === 'quota');
       badge.className = 'ai-status-badge ' + (on ? 'ai-status-on' : 'ai-status-off');
       badge.setAttribute('data-state', on ? 'on' : 'off');
-      badge.title = on ? '在线增强已启用（LLM 教学通道）' : '离线规则模式（未配置 LLM key）';
+      badge.title = on ? '在线增强已启用（LLM 教学通道）'
+        : (quota ? 'LLM 额度不足，暂用规则回复；额度恢复后自动切回' : '离线规则模式（未配置 LLM key）');
       badge.textContent = on ? '在线增强' : '离线模式';
     });
   };
