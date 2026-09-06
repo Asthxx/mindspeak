@@ -1174,6 +1174,13 @@ _markOnlineBroken: function() {
       // 表现成"点击后完全没声音也没提示"。
       while (src < SRC_COUNT && self._srcHealth && (self._srcHealth[order[src].id] || 0) >= 2) src++;
       var first = order[src] || order[0];
+      // 用户显式选择了在线音色（voice_name = __online_*，firstId 非空）时：只播所选
+      // 音色源（失败才按 order 串行换下一个）。不得并行塞兜底源抢播——否则有道 CDN
+      // 几乎总是先 onplay 胜出并停掉其余源，用户切 Jenny/Guy/Sonia 等音色听到的
+      // 永远是同一种声音（有道美音）。系统默认（未显式选音色）仍走并行抢播保出声。
+      if (firstId) {
+        return first ? [first] : [];
+      }
       var ids = [first.id];
       if (_isAndroidSrc) {
         // 安卓并行候选：有道（不校验 Referer，实测稳定出声）+ Edge（server 端合成，不受 UA/Referer 影响）；
