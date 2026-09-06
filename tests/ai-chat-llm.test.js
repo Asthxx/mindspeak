@@ -382,6 +382,7 @@ describe('AiChatModule — 清空对话', () => {
     expect(before.length).toBeGreaterThan(0);
     document.querySelector('.ai-clear-chat').click();
     const after = historyFromStorage();
+    expect(Array.isArray(after)).toBe(true);
     expect(after.length).toBe(0);
     const html = document.getElementById('ai-chat-msgs').innerHTML;
     expect(html).toContain('你好');
