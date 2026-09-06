@@ -50,6 +50,7 @@ beforeEach(async () => {
     <button id="ai-chat-send"></button>
     <div id="ai-chat-chips"></div>
     <input id="search-input" />
+    <div class="ai-chat-card"><h3 class="ai-card-title"></h3></div>
   `;
 
   vi.resetModules();
@@ -237,39 +238,51 @@ describe('AiChatModule — 意图升级（维度1）', () => {
   });
 
   it('should_ask_llm_for_natural_sentences_when_requested', async () => {
-    const fetcher = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, text: '自然例句' }) }));
+    const fetcher = vi.fn((url) => {
+      if (String(url).includes('/api/ai/health')) return Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: false }) });
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, text: '自然例句' }) });
+    });
     installFetch(fetcher);
     const chat = makeChat();
     const r = chat.ask('给 happy 生成更地道的例句');
     expect(r).toContain('happy');
     await flush();
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(fetcher.mock.calls[0][1].body);
+    const chatCalls = fetcher.mock.calls.filter((c) => String(c[0]).includes('/api/ai/chat'));
+    expect(chatCalls).toHaveLength(1);
+    const body = JSON.parse(chatCalls[0][1].body);
     expect(body.intent).toBe('sentence');
   });
 
   it('should_compare_two_words_with_llm', async () => {
-    const fetcher = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, text: 'apple 是苹果，banana 是香蕉。' }) }));
+    const fetcher = vi.fn((url) => {
+      if (String(url).includes('/api/ai/health')) return Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: false }) });
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, text: 'apple 是苹果，banana 是香蕉。' }) });
+    });
     installFetch(fetcher);
     const chat = makeChat();
     const r = chat.ask('apple 和 banana 有什么区别');
     expect(r).toContain('apple');
     expect(r).toContain('banana');
     await flush();
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(fetcher.mock.calls[0][1].body);
+    const chatCalls = fetcher.mock.calls.filter((c) => String(c[0]).includes('/api/ai/chat'));
+    expect(chatCalls).toHaveLength(1);
+    const body = JSON.parse(chatCalls[0][1].body);
     expect(body.intent).toBe('compare');
   });
 
   it('should_translate_question_to_llm', async () => {
-    const fetcher = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, text: '苹果 in English is “apple”.' }) }));
+    const fetcher = vi.fn((url) => {
+      if (String(url).includes('/api/ai/health')) return Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: false }) });
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, text: '苹果 in English is “apple”.' }) });
+    });
     installFetch(fetcher);
     const chat = makeChat();
     const r = chat.ask('苹果用英语怎么说');
     expect(r).toContain('翻译');
     await flush();
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(fetcher.mock.calls[0][1].body);
+    const chatCalls = fetcher.mock.calls.filter((c) => String(c[0]).includes('/api/ai/chat'));
+    expect(chatCalls).toHaveLength(1);
+    const body = JSON.parse(chatCalls[0][1].body);
     expect(body.intent).toBe('translate');
   });
 
@@ -298,6 +311,81 @@ describe('AiChatModule — 意图升级（维度1）', () => {
     expect(typeof chat.ask('分析我的错题')).toBe('string');
     expect(typeof chat.ask('给我发音建议')).toBe('string');
     expect(typeof chat.ask('你好')).toBe('string');
+  });
+});
+
+describe('NeuralEngine — 健康检查', () => {
+  function mockFetch(impl) { globalThis.fetch = vi.fn(impl); }
+
+  it('should_report_enabled_when_server_has_key', async () => {
+    mockFetch(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: true, model: 'openai', capacity: 20 }) }));
+    const s = await getNeural().checkHealth();
+    expect(s.ok).toBe(true);
+    expect(s.enabled).toBe(true);
+    expect(s.model).toBe('openai');
+  });
+
+  it('should_report_disabled_when_no_key', async () => {
+    mockFetch(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: false, model: 'openai', capacity: 20 }) }));
+    const s = await getNeural().checkHealth();
+    expect(s.enabled).toBe(false);
+  });
+
+  it('should_report_offline_when_fetch_fails', async () => {
+    mockFetch(() => Promise.reject(new TypeError('Failed to fetch')));
+    const s = await getNeural().checkHealth();
+    expect(s.ok).toBe(false);
+    expect(s.enabled).toBe(false);
+  });
+});
+
+describe('AiChatModule — 在线状态徽章', () => {
+  const flush = () => new Promise((res) => setTimeout(res, 20));
+
+  it('should_show_online_badge_when_enabled', async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: true, model: 'openai', capacity: 20 }) }));
+    makeChat();
+    await flush();
+    const b = document.querySelector('.ai-status-badge');
+    expect(b).toBeTruthy();
+    expect(b.getAttribute('data-state')).toBe('on');
+    expect(b.textContent).toContain('在线');
+  });
+
+  it('should_show_offline_badge_when_disabled', async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true, enabled: false, model: 'openai', capacity: 20 }) }));
+    makeChat();
+    await flush();
+    const b = document.querySelector('.ai-status-badge');
+    expect(b.getAttribute('data-state')).toBe('off');
+    expect(b.textContent).toContain('离线');
+  });
+});
+
+describe('AiChatModule — 清空对话', () => {
+  function historyFromStorage() {
+    try { return JSON.parse(ls.getItem('ai_chat_history') || '[]'); } catch (e) { return []; }
+  }
+
+  it('should_show_clear_button_with_history_count', () => {
+    const chat = makeChat();
+    chat.ask('解释单词 apple');
+    const btn = document.querySelector('.ai-clear-chat');
+    expect(btn).toBeTruthy();
+    expect(btn.title).toContain('条');
+  });
+
+  it('should_clear_history_and_reset_to_welcome', () => {
+    const chat = makeChat();
+    chat.ask('解释单词 apple');
+    const before = historyFromStorage();
+    expect(before.length).toBeGreaterThan(0);
+    document.querySelector('.ai-clear-chat').click();
+    const after = historyFromStorage();
+    expect(after.length).toBe(0);
+    const html = document.getElementById('ai-chat-msgs').innerHTML;
+    expect(html).toContain('你好');
+    expect(html).not.toContain('apple');
   });
 });
 

@@ -102,7 +102,11 @@ var AiCoachModule = (function() {
     }
     var max = rows[0].count;
     var pattern = PATTERN_DESC[rows[0].key];
-    var trend = this._weekTrend();
+    var trend = this._mistakeTrend();
+    var trendText;
+    if (trend.state === 'down') trendText = '，较上周 <span class="ai-up">▼ 减少</span>';
+    else if (trend.state === 'up') trendText = '，较上周 <span class="ai-down">▲ 增加</span>';
+    else trendText = '，与上周持平';
     wrap.innerHTML = rows.map(function(r) {
       var pct = Math.max(8, Math.round(r.count / max * 100));
       return '<div class="ai-weak-row">'
@@ -111,8 +115,30 @@ var AiCoachModule = (function() {
         + '</div>';
     }).join('')
       + (pattern ? '<div class="ai-weak-pattern">主要模式：' + pattern + '</div>' : '')
-      + '<div class="ai-weak-trend">近 7 天学习 <b>' + trend.total + '</b> 词'
-      + (trend.up ? '，较上周 <span class="ai-up">▲ 上升</span>' : '，较上周 <span class="ai-down">▼ 下降</span>') + '</div>';
+      + '<div class="ai-weak-trend">近 7 天错题 <b>' + trend.total + '</b> 道' + trendText + '</div>';
+  };
+
+  // 本周 vs 上周错题数（mistakes[].date；旧数据无 date 视为本周）
+  AiCoachModule.prototype._mistakeTrend = function() {
+    var mistakes = DataStore.getProgress('mistakes', []) || [];
+    var now = new Date();
+    var todayKey = getLocalDateStr();
+    var week = 0, prev = 0;
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(now); d.setDate(d.getDate() - i);
+      var key = getLocalDateStr(d);
+      var p = new Date(now); p.setDate(p.getDate() - 7 - i);
+      var pkey = getLocalDateStr(p);
+      mistakes.forEach(function(m) {
+        if (!m) return;
+        // 旧数据无日期 → 视为今天（更贴近"最近"的错题）
+        var md = (m.date && String(m.date).slice(0, 10)) || todayKey;
+        if (md === key) week++;
+        else if (md === pkey) prev++;
+      });
+    }
+    var state = week < prev ? 'down' : (week > prev ? 'up' : 'flat');
+    return { total: week, prev: prev, state: state };
   };
 
   // 本周 vs 上周学习词数（checkins）

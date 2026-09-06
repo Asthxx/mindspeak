@@ -91,6 +91,37 @@ describe('AiCoachModule — 弱点模式与趋势（维度2）', () => {
     const html = document.getElementById('ai-weakness').innerHTML;
     expect(html).toContain('近 7 天');
   });
+
+  it('should_show_mistake_trend_improved_when_week_less_than_prev', () => {
+    globalThis.DataStore.getProgress.mockImplementation((key, fb) => {
+      if (key === 'word_progress') return {};
+      if (key === 'checkins') return {};
+      if (key === 'mistakes') return [
+        { source: 'grammar', word: 'goed', date: '2026-01-14' },
+        { source: 'spelling', word: 'peice', date: '2026-01-06' },
+        { source: 'spelling', word: 'freind', date: '2026-01-04' },
+        { source: 'spelling', word: 'abandon2', date: '2026-01-05' }
+      ];
+      return fb;
+    });
+    makeCoach();
+    const html = document.getElementById('ai-weakness').innerHTML;
+    expect(html).toContain('近 7 天错题 <b>1</b>'); // 本周仅 1 道
+    expect(html).toContain('减少');
+    expect(html).toContain('ai-up');
+  });
+
+  it('should_treat_dataless_mistakes_as_this_week', () => {
+    globalThis.DataStore.getProgress.mockImplementation((key, fb) => {
+      if (key === 'word_progress') return {};
+      if (key === 'checkins') return {};
+      if (key === 'mistakes') return [{ source: 'spelling', word: 'peice' }];
+      return fb;
+    });
+    makeCoach();
+    const html = document.getElementById('ai-weakness').innerHTML;
+    expect(html).toContain('近 7 天错题 <b>1</b>');
+  });
 });
 
 describe('AiCoachModule — 三级建议（维度2）', () => {

@@ -82,6 +82,23 @@ var NeuralEngine = (function() {
     });
   }
 
+  function checkHealth() {
+    return new Promise(function(resolve) {
+      var base = (typeof window.API_BASE === 'string' ? window.API_BASE : '').replace(/\/$/, '');
+      fetch(base + '/api/ai/health', { method: 'GET', headers: { 'Accept': 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          resolve({
+            ok: !!(d && d.ok),
+            enabled: !!(d && d.ok && d.enabled),
+            model: d && typeof d.model === 'string' ? d.model : null,
+            capacity: d && typeof d.capacity === 'number' ? d.capacity : 0
+          });
+        })
+        .catch(function() { resolve({ ok: false, enabled: false, model: null, capacity: 0 }); });
+    });
+  }
+
   function toHtml(text) {
     var safe = typeof window.escapeHtml === 'function' ? window.escapeHtml(text) : String(text || '');
     return safe.replace(/\[跳转:([a-z-]+)\]/g, function(m, tab) {
@@ -89,7 +106,7 @@ var NeuralEngine = (function() {
     });
   }
 
-  return { allow: allow, resetForTest: resetForTest, isLLMIntent: isLLMIntent, getAgentContext: getAgentContext, ask: ask, toHtml: toHtml };
+  return { allow: allow, resetForTest: resetForTest, isLLMIntent: isLLMIntent, getAgentContext: getAgentContext, ask: ask, checkHealth: checkHealth, toHtml: toHtml };
 })();
 window.NeuralEngine = NeuralEngine;
 
@@ -150,6 +167,26 @@ var AiChatModule = (function() {
       }
     });
     this._welcome();
+    this._aiStatus();
+    this._chatToolbar();
+  };
+
+  // 在线增强状态徽章：NeuralEngine 探测 /api/ai/health，key 已配置 → 在线增强，否则离线模式
+  AiChatModule.prototype._aiStatus = function() {
+    var host = document.querySelector('.ai-chat-card .ai-card-title') || document.querySelector('.ai-chat-card h3');
+    if (!host) return;
+    var badge = document.createElement('span');
+    badge.className = 'ai-status-badge ai-status-off';
+    badge.setAttribute('data-state', 'loading');
+    badge.textContent = '…';
+    host.appendChild(badge);
+    NeuralEngine.checkHealth().then(function(s) {
+      var on = !!(s && s.ok && s.enabled);
+      badge.className = 'ai-status-badge ' + (on ? 'ai-status-on' : 'ai-status-off');
+      badge.setAttribute('data-state', on ? 'on' : 'off');
+      badge.title = on ? '在线增强已启用（LLM 教学通道）' : '离线规则模式（未配置 LLM key）';
+      badge.textContent = on ? '在线增强' : '离线模式';
+    });
   };
 
   AiChatModule.prototype._refreshChips = function() {
@@ -196,15 +233,15 @@ var AiChatModule = (function() {
       sep.textContent = '—— 以上是上次的对话 ——';
       box.appendChild(sep);
     }
-    this._append('ai', '你好，我是你的 AI 英语教练。我可以：<br>· 查看学习概况（如「我学得怎么样」）<br>· 制定学习计划（如「帮我制定学习计划」）<br>· 分析错题原因（如「分析我的错题」）<br>· 解释单词（如「解释单词 abandon」）<br>· 生成例句（如「给 happy 生成例句」）<br>· 发音建议（如「给我发音建议」）<br>· 生词/翻译/对比/口语陪练（在线时由 AI 增强）<br>直接输入你的问题，或点击下面的快捷提问。');
+    this._append('ai', '你好，我是你的 AI 英语教练。我可以：<br>· 查看学习概况（如「我学得怎么样」）<br>· 制定学习计划（如「帮我制定学习计划」）<br>· 分析错题原因（如「分析我的错题」）<br>· 解释单词（如「解释单词 abandon」）<br>· 生成例句（如「给 happy 生成例句」）<br>· 发音建议（如「给我发音建议」）<br>· 生词/翻译/对比/口语陪练（在线时由 AI 增强）<br>直接输入你的问题，或点击下面的快捷提问。', true);
   };
 
   AiChatModule.prototype._msgBox = function() {
     return document.getElementById('ai-chat-msgs');
   };
 
-  // 追加一条气泡：who = 'user' | 'ai'，并写入会话历史
-  AiChatModule.prototype._append = function(who, html) {
+  // 追加一条气泡：who = 'user' | 'ai'，并写入会话历史（noStore=true 时仅渲染，如欢迎语）
+  AiChatModule.prototype._append = function(who, html, noStore) {
     var box = this._msgBox();
     if (!box) return;
     var icon = who === 'user' ? 'i-user' : 'i-robot';
@@ -214,8 +251,38 @@ var AiChatModule = (function() {
       + '<div class="ai-msg-bubble">' + html + '</div>';
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
-    this._storeHistory(who, html);
+    if (!noStore) this._storeHistory(who, html);
     return div;
+  };
+
+  // 清空对话按钮：挂在对话卡片标题右侧，title 显示当前保留条数
+  AiChatModule.prototype._chatToolbar = function() {
+    var host = document.querySelector('.ai-chat-card .ai-card-title') || document.querySelector('.ai-chat-card h3');
+    if (!host || host.querySelector('.ai-clear-chat')) return;
+    var self = this;
+    var count = 0;
+    try { var h = DataStore.getProgress('ai_chat_history', []) || []; count = Array.isArray(h) ? h.length : 0; } catch (e) {}
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ai-clear-chat';
+    btn.title = '已保留 ' + count + ' 条对话记录，点击清空';
+    btn.textContent = '清空对话';
+    btn.addEventListener('click', function() {
+      self.clearHistory();
+    });
+    host.appendChild(btn);
+  };
+
+  AiChatModule.prototype.clearHistory = function() {
+    try { DataStore.setProgress('ai_chat_history', []); } catch (e) {}
+    var box = this._msgBox();
+    if (box) {
+      box.innerHTML = '';
+      this._welcome();
+    }
+    var btn = document.querySelector('.ai-clear-chat');
+    if (btn) btn.title = '对话记录已清空';
+    if (typeof Toast === 'object' && Toast.success) Toast.success('对话已清空');
   };
 
   // 会话历史：localStorage ai_ 前缀，最多 50 条（含按钮的安全 HTML，全部插值均已转义）

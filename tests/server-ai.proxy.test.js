@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 
 // 服务端 AI 代理测试：直接验证核心函数（不启动 HTTP），限流器另行单测。
 // require('../server/server.js') 由 require.main 保护，不会 listen。
-let validateAiChatBody, proxyAiChat;
+let validateAiChatBody, proxyAiChat, aiHealthStatus;
 
 beforeAll(async () => {
   const srv = await import('../server/server.js');
   validateAiChatBody = srv.validateAiChatBody;
   proxyAiChat = srv.proxyAiChat;
+  aiHealthStatus = srv.aiHealthStatus;
   delete globalThis.fetch;
 });
 
@@ -113,6 +114,17 @@ describe('proxyAiChat — LLM 转发与降级', () => {
     expect(callBody).not.toHaveProperty('temperature');
     expect(callBody).not.toHaveProperty('max_tokens');
     expect(callBody.messages[0].role).toBe('system');
+  });
+});
+
+describe('aiHealthStatus — AI 通道健康状态', () => {
+  it('should_report_disabled_when_no_api_key', () => {
+    const s = aiHealthStatus();
+    expect(s.ok).toBe(true);
+    expect(typeof s.enabled).toBe('boolean');
+    expect(s.enabled).toBe(false);
+    expect(typeof s.model).toBe('string');
+    expect(typeof s.capacity).toBe('number');
   });
 });
 

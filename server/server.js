@@ -589,6 +589,17 @@ async function proxyAiChat(messages) {
   }
 }
 
+// AI 通道健康状态：只暴露是否启用与配额，绝不返回 key 本身。
+// 前端 NeuralEngine 启动时查询，决定显示"在线增强已启用 / 离线模式"。
+function aiHealthStatus() {
+  return {
+    ok: true,
+    enabled: Boolean(config.pollinationsApiKey),
+    model: config.aiModel,
+    capacity: Number(process.env.AI_LIMIT) || 20
+  };
+}
+
 app.use('/api/ai/chat', createTtsLimiter({ prefix: 'ai', limit: Number(process.env.AI_LIMIT) || 20, methods: ['POST'], errorBody: { ok: false, error: 'rate-limit', message: 'AI 请求过于频繁，请稍后再试' } }));
 app.post('/api/ai/chat', async (req, res) => {
   const v = validateAiChatBody(req.body);
@@ -605,6 +616,9 @@ app.post('/api/ai/chat', async (req, res) => {
   logger.info('ai', 'AI 代理成功', { status: 'ok', intent: intent, ms: r.ms, model: r.model, text: r.text.slice(0, 60) });
   res.json({ ok: true, text: r.text, model: r.model, ms: r.ms });
 });
+
+// AI 健康检查（GET /api/ai/health）：前端启动时探测在线增强是否可用
+app.get('/api/ai/health', (req, res) => res.json(aiHealthStatus()));
 
 // ==================== 前端错误日志上报（AI 可读）====================
 // 浏览器端 logger.js 捕获的 error/warn 通过 POST /api/logs 批量上报，
@@ -742,4 +756,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { validateAiChatBody, proxyAiChat };
+module.exports = { validateAiChatBody, proxyAiChat, aiHealthStatus };

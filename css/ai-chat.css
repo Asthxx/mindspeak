@@ -269,3 +269,37 @@
   .ai-msg { animation: none; }
   .ai-typing i { animation: none; opacity: 0.5; }
 }
+
+/* 在线增强状态徽章 */
+.ai-status-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  cursor: default;
+}
+.ai-status-on { background: var(--sage-light); color: var(--sage-deep); }
+.ai-status-off { background: var(--surface-hover); color: var(--text-secondary); }
+
+/* 清空对话按钮 */
+.ai-clear-chat {
+  margin-left: 8px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all var(--duration-normal) var(--ease);
+}
+.ai-clear-chat:hover {
+  background: var(--surface-hover);
+  color: var(--coral);
+  border-color: var(--coral);
+}
