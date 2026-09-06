@@ -42,3 +42,10 @@ src-tauri/node-runtime/
 *.jks
 *.keystore
 !android-template/
+
+# 开发辅助产物（技能/浏览器调试截图与临时备份）
+.superpowers/
+browser-shots/
+test-screenshots/
+*.bak
+*draft-backup.js
