@@ -17,7 +17,7 @@
 
 <div align="center">
 
-[![下载 APK](https://img.shields.io/badge/GitHub_Release-下载最新版_APK_v1.1.0-brightgreen?style=for-the-badge&logo=github&logoColor=white)](https://github.com/你的用户名/你的仓库名/releases/latest)
+[![下载 APK](https://img.shields.io/badge/GitHub_Release-下载最新版_APK_v1.1.0-brightgreen?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Asthxx/mindspeak/releases/latest)
 
 </div>
 
@@ -25,7 +25,7 @@
 2. 打开文件安装（首次需在手机设置中允许「安装未知来源应用」）；
 3. 安装完成，打开「闻道 MindSpeak」即可开始背词学习。
 
-> 教程中「你的用户名 / 你的仓库名」请替换为你的 GitHub 账号与仓库名。APK 通过 GitHub Release 附件分发（不入库），发布步骤见「方式二 / 方式三」。
+> APK 通过 GitHub Release 附件分发（不入库），发布步骤见「方式二 / 方式三」。
 
 ### 💻 Windows / macOS（桌面）→ 下载桌面安装包
 
@@ -45,7 +45,7 @@
 
 **iOS 添加到主屏幕步骤**：
 
-1. 用 **Safari** 打开部署后的在线地址（如 `https://<你的用户名>.github.io/<你的仓库名>/`，见「方式二」）
+1. 用 **Safari** 打开部署后的在线地址（如 `https://Asthxx.github.io/mindspeak/`，见「方式二」）
 2. 点击底部 **分享** 按钮（方框+箭头图标）；
 3. 选择 **「添加到主屏幕」**；
 4. 桌面出现「闻道 MindSpeak」图标，点击即可全屏使用。
@@ -108,7 +108,7 @@
 
 1. 把代码推送到 GitHub 仓库（详见文末「GitHub 操作清单」）；
 2. 打开仓库 **Settings → Pages**，在 **Build and deployment / Source** 下拉选择 **GitHub Actions**；
-3. 之后每次推送代码到 `main`，自动重新构建并发布；在线地址为 `https://<你的用户名>.github.io/<你的仓库名>/`。
+3. 之后每次推送代码到 `main`，自动重新构建并发布；在线地址为 `https://Asthxx.github.io/mindspeak/`。
 
 也可以跳过 Actions，本地 `node build.js` 生成 `dist/` 后手动发布：
 
@@ -193,12 +193,12 @@ node server.js
 1. **创建仓库**：登录 GitHub → New repository → 填写仓库名（如 `mindspeak`）→ Create repository。
 2. **推送代码**（本机项目目录下）：
    ```bash
-   git remote add origin https://github.com/<你的用户名>/<你的仓库名>.git
+   git remote add origin https://github.com/Asthxx/mindspeak.git
    git push -u origin main
    ```
    > 若提示 `remote origin already exists`，先执行 `git remote remove origin` 再添加。
 3. **开启 Pages 自动发布**：仓库 **Settings → Pages** → Build and deployment → **Source 选 `GitHub Actions`**（保存后首次 Action 会自动运行，几分钟内发布完成）。
-4. **访问地址**：`https://<你的用户名>.github.io/<你的仓库名>/`（PWA 可添加到主屏幕）。
+4. **访问地址**：`https://Asthxx.github.io/mindspeak/`（PWA 可添加到主屏幕）。
 5. **发布 APK**：本地按「方式三」打包出 `MindSpeak-Android-v1.1.0.apk`，到仓库 **Releases → Create a new release**，`Tag` 填 `v1.1.0`，把 APK 拖入附件上传（APK 不入库，通过 Release 分发），发布后手机上直接用上方的 Release 下载链接。后续每次升版本改个好记的 Tag（如 `v1.2.0`）即可。
 
 ---
