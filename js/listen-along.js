@@ -279,3 +279,5 @@ var ListenAlongModule = (function() {
 
   return ListenAlongModule;
 })();
+
+if (typeof window !== 'undefined') window.ListenAlongModule = ListenAlongModule;

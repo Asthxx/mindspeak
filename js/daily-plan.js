@@ -66,3 +66,5 @@ var DailyPlanModule = (function() {
 
   return DailyPlanModule;
 })();
+
+if (typeof window !== 'undefined') window.DailyPlanModule = DailyPlanModule;

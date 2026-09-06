@@ -165,3 +165,5 @@ var DashboardModule = (function() {
 
   return DashboardModule;
 })();
+
+if (typeof window !== 'undefined') window.DashboardModule = DashboardModule;

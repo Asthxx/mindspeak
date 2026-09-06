@@ -1775,6 +1775,7 @@ if (typeof window !== 'undefined') {
   window.escapeHtml = escapeHtml;
   window.getLocalDateStr = getLocalDateStr;
   window.calculateStreak = calculateStreak;
+  window.safeBind = safeBind;
   window.Storage = Storage;
   window.DataStore = DataStore;
   window.SpeechUtil = SpeechUtil;
