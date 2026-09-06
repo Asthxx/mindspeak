@@ -7,12 +7,17 @@
 function createTtsLimiter(options) {
   const limit = (options && options.limit) || 60;
   const windowMs = (options && options.windowMs) || 60000;
+  // 默认只对 GET 计数（TTS 端点全部 GET）；AI 代理端点传 methods:['POST'] 扩展。
+  // 后端一个端点上同时存在 GET+POST 时（如 /api/ai/chat 的 OPTIONS 预检），
+  // 传 methods:['POST','GET'] 即按端点合并计数。
+  const methods = (options && options.methods) || ['GET'];
+  // 超限响应体可定制（AI 端点返回结构化 {ok:false,error:'rate-limit'} 供前端降级）
+  const errorBody = (options && options.errorBody) || { ok: false, message: '请求过于频繁，请稍后再试' };
   const buckets = new Map();
   return function ttsRateLimit(req, res, next) {
     const now = Date.now();
-    // 前端 SpeechUtil.prefetch 用 HEAD 预热缓存（只促缓存、不出声），不占合成配额。
-    // 只对触发合成的 GET 计数；HEAD/OPTIONS 直接放行。
-    if (req.method && req.method !== 'GET') return next();
+    // 未匹配的目标方法直接放行不计数（如 TTS 的 HEAD 预热、其他端点的预检）
+    if (req.method && methods.indexOf(req.method) === -1) return next();
     var key = (req.socket && req.socket.remoteAddress || 'unknown');
     if (options && options.prefix) key += '|' + options.prefix;
     let b = buckets.get(key);
@@ -22,7 +27,7 @@ function createTtsLimiter(options) {
       buckets.set(key, b);
     }
     b.count++;
-    if (b.count > limit) return res.status(429).json({ ok: false, message: 'TTS 请求过于频繁，请稍后再试' });
+    if (b.count > limit) return res.status(429).json(errorBody);
     if (buckets.size > 1000) {
       for (const [k, v] of buckets) {
         if (now - v.start >= windowMs) buckets.delete(k);

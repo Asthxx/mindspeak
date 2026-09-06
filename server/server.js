@@ -30,7 +30,8 @@ app.use(express.json({ limit: '2mb' }));
 // 泄露堆栈，也不让前端 logger 把失败当网络错误无限缓冲重传
 app.use((err, req, res, next) => {
   if (err && (err.type === 'entity.too.large' || err.type === 'entity.parse.failed')) {
-    return res.status(err.type === 'entity.too.large' ? 413 : 400).json({ ok: false, message: '请求体过大或格式错误' });
+    // 附带 error:'invalid' 供 AI 代理等新端点按语义降级；既有字段 message 保留，不影响旧前端
+    return res.status(err.type === 'entity.too.large' ? 413 : 400).json({ ok: false, error: 'invalid', message: '请求体过大或格式错误' });
   }
   next(err);
 });
@@ -524,6 +525,87 @@ app.get('/api/online-tts', (req, res) => {
 // API 路由
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// ==================== AI 大模型代理（POST /api/ai/chat） ====================
+// 前端 AI 助手（NeuralEngine 双通道）经此端点访问真实 LLM（Pollinations，免密钥）。
+// 服务端只做四件事：校验 / 注入 system prompt / 转发 / 响应处理；智能全在前端。
+// 隐私红线：服务端绝不向 LLM 追加任何学习明细；日志只记 ms/intent/status/model/text 摘要。
+
+const AI_SYSTEM_PROMPT = '你是英语学习应用的 AI 教学助手。用中文讲解，回答尽量简洁（不超过 200 字），面向初中到高中英语水平。只做英语教学相关的解答，用词简单易懂。';
+const AI_PROXY_TIMEOUT = 15000;
+
+// 校验前端请求体：只放行 messages（数组 ≤6 条、每条 content 字符串 ≤500 字符、总 body ≤2kb）
+function validateAiChatBody(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false };
+  const messages = body.messages;
+  if (!Array.isArray(messages) || !messages.length || messages.length > 6) return { ok: false };
+  for (const m of messages) {
+    if (!m || typeof m !== 'object'
+      || (m.role !== 'user' && m.role !== 'assistant')
+      || typeof m.content !== 'string' || !m.content.trim() || m.content.length > 500) {
+      return { ok: false };
+    }
+  }
+  // 总 body ≤2kb 逻辑约束（express.json 的 2mb 是传输层硬上限，这里是业务约束）
+  if (JSON.stringify(body).length > 2048) return { ok: false };
+  return { ok: true, messages };
+}
+
+// 转发到上游 LLM：成功 {ok:true,text,model,ms}；失败 {ok:false,error:'timeout'|'upstream'}
+async function proxyAiChat(messages) {
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = setTimeout(() => { if (controller) controller.abort(); }, AI_PROXY_TIMEOUT);
+  const started = Date.now();
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (config.pollinationsApiKey) headers['Authorization'] = 'Bearer ' + config.pollinationsApiKey;
+    const upMsg = [{ role: 'system', content: AI_SYSTEM_PROMPT }].concat(messages);
+    // 上游匿名配额实测：带 temperature/max_tokens 的请求返回 401（UNAUTHORIZED，
+    // "A valid API key is required"），精简 body（model + messages）才放行。
+    // 因此仅当配了 POLLINATIONS_API_KEY（付费通道）时附带这两个采样参数。
+    const upstreamBody = { model: config.aiModel, messages: upMsg };
+    if (config.pollinationsApiKey) {
+      upstreamBody.temperature = 0.7;
+      upstreamBody.max_tokens = 200;
+    }
+    const resp = await fetch(config.aiBaseUrl + '/chat/completions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(upstreamBody),
+      signal: controller ? controller.signal : undefined
+    });
+    if (!resp || !resp.ok) return { ok: false, error: 'upstream' };
+    let data;
+    try { data = await resp.json(); } catch (e) { return { ok: false, error: 'upstream' }; }
+    const text = data && data.choices && data.choices.length
+      && data.choices[0].message && typeof data.choices[0].message.content === 'string'
+      ? data.choices[0].message.content : '';
+    if (!text) return { ok: false, error: 'upstream' };
+    return { ok: true, text: text.slice(0, 400), model: config.aiModel, ms: Date.now() - started };
+  } catch (e) {
+    const aborted = e && (e.name === 'AbortError' || e.name === 'TimeoutError');
+    return { ok: false, error: aborted ? 'timeout' : 'upstream' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+app.use('/api/ai/chat', createTtsLimiter({ prefix: 'ai', limit: Number(process.env.AI_LIMIT) || 20, methods: ['POST'], errorBody: { ok: false, error: 'rate-limit', message: 'AI 请求过于频繁，请稍后再试' } }));
+app.post('/api/ai/chat', async (req, res) => {
+  const v = validateAiChatBody(req.body);
+  if (!v.ok) return res.status(400).json({ ok: false, error: 'invalid' });
+  const intent = (req.body && typeof req.body.intent === 'string') ? req.body.intent.slice(0, 40) : '';
+  const started = Date.now();
+  const r = await proxyAiChat(v.messages);
+  const ms = Date.now() - started;
+  if (!r.ok) {
+    logger.warn('ai', 'AI 代理失败，前端应降级规则引擎', { status: r.error, intent: intent, ms: ms });
+    return res.status(r.error === 'timeout' ? 504 : 500).json({ ok: false, error: r.error });
+  }
+  // 隐私：日志只记摘要（前 60 字符），不记录用户完整提问
+  logger.info('ai', 'AI 代理成功', { status: 'ok', intent: intent, ms: r.ms, model: r.model, text: r.text.slice(0, 60) });
+  res.json({ ok: true, text: r.text, model: r.model, ms: r.ms });
+});
+
 // ==================== 前端错误日志上报（AI 可读）====================
 // 浏览器端 logger.js 捕获的 error/warn 通过 POST /api/logs 批量上报，
 // 最终与 server 端日志合并写入 server/logs/app.log（JSON Lines）。
@@ -653,6 +735,11 @@ app.use((req, res) => res.status(404).json({ ok: false, message: 'Not Found' }))
 
 // 监听地址与端口：默认 127.0.0.1 仅本机；server/.env 或环境变量 HOST=0.0.0.0
 // 可让局域网设备（安卓/苹果手机）访问，公网部署时配合防火墙/反代使用。
-app.listen(config.port, config.host, () => {
-  console.log('🌐 闻道 MindSpeak 服务已启动:  http://' + (config.host === '0.0.0.0' ? '局域网IP' : 'localhost') + ':' + config.port);
-});
+// require.main 保护：被测试 require 时不启动监听（listen 只发生在直接运行 node server.js 时）。
+if (require.main === module) {
+  app.listen(config.port, config.host, () => {
+    console.log('🌐 闻道 MindSpeak 服务已启动:  http://' + (config.host === '0.0.0.0' ? '局域网IP' : 'localhost') + ':' + config.port);
+  });
+}
+
+module.exports = { validateAiChatBody, proxyAiChat };
