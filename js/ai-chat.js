@@ -3,6 +3,96 @@
 // 能力：学习概况 / 制定学习计划 / 解释单词 / 生成例句 / 错题错误分析 / 发音建议 / 复习建议 / 帮助。
 // 依赖 app.js 提供的 DataStore / calculateStreak / getLocalDateStr /
 // escapeHtml / Toast / SpeechUtil，以及 window.app.showTab。
+// ---- NeuralEngine: unified AI entry (LLM first + rules fallback) ----
+// LLM via server-side /api/ai/chat proxy (keyless). Offline/rate-limit/fail -> rule fallback.
+// Privacy: only question text + aggregated stats are sent; never per-word details.
+var NeuralEngine = (function() {
+  var LLM_INTENTS = { 'explain_word': 1, 'sentence': 1, 'translate': 1, 'compare': 1, 'chat': 1, 'tips': 1, 'encourage': 1, 'practice': 1, 'motivation': 1, 'story': 1 };
+  var LIMIT = 10;          // max LLM calls per minute
+  var WINDOW_MS = 60000;
+  var DEFAULT_TIMEOUT = 3000;
+  var _calls = [];
+
+  function allow() {
+    var now = Date.now();
+    while (_calls.length && (now - _calls[0]) > WINDOW_MS) _calls.shift();
+    if (_calls.length >= LIMIT) return false;
+    _calls.push(now);
+    return true;
+  }
+
+  function resetForTest() { _calls = []; }
+
+  function isLLMIntent(intent) { return !!LLM_INTENTS[intent]; }
+
+  function getAgentContext() {
+    var result = { mastered: 0, due: 0, streak: 0, level: 1, points: 0, weak: [] };
+    try {
+      var ds = window.DataStore || {};
+      var wp = (ds.getProgress && ds.getProgress('word_progress', {})) || {};
+      var today = typeof window.getLocalDateStr === 'function' ? window.getLocalDateStr() : '';
+      Object.keys(wp).forEach(function(id) {
+        var p = wp[id] || {};
+        if (p.status === 'mastered') result.mastered++;
+        else if (p.status && p.nextReview && today && String(p.nextReview) <= today) result.due++;
+      });
+      var g = (ds.getProgress && ds.getProgress('gamification', {})) || {};
+      if (typeof g.points === 'number') result.points = g.points;
+      if (typeof g.level === 'number') result.level = g.level;
+      if (typeof window.calculateStreak === 'function') {
+        var c = (ds.getProgress && ds.getProgress('checkins', {})) || {};
+        result.streak = window.calculateStreak(c) || 0;
+      }
+      var m = (ds.getProgress && ds.getProgress('mistakes', [])) || [];
+      var cnt = {};
+      if (Array.isArray(m)) m.forEach(function(x) { var s = (x && x.source) || 'other'; cnt[s] = (cnt[s] || 0) + 1; });
+      result.weak = Object.keys(cnt).sort(function(a, b) { return cnt[b] - cnt[a]; }).slice(0, 3);
+    } catch (e) {}
+    return result;
+  }
+
+  function ask(intent, text, opts) {
+    opts = opts || {};
+    var timeoutMs = opts.timeoutMs || DEFAULT_TIMEOUT;
+    return new Promise(function(resolve) {
+      var content = String(text || '').trim();
+      if (!isLLMIntent(intent) || !content || !allow()) return resolve(null);
+      var ctx = getAgentContext();
+      content += '（我的学习概况：' + JSON.stringify(ctx) + '）';
+      var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+      var done = false;
+      var timer = setTimeout(function() { if (!done) { done = true; if (ctrl) ctrl.abort(); resolve(null); } }, timeoutMs);
+      var base = (typeof window.API_BASE === 'string' ? window.API_BASE : '').replace(/\/$/, '');
+      fetch(base + '/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intent: intent, messages: [{ role: 'user', content: content }] }),
+        signal: ctrl ? ctrl.signal : undefined
+      }).then(function(r) {
+        return r.json();
+      }).then(function(d) {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        resolve(d && d.ok && typeof d.text === 'string' ? d.text : null);
+      }).catch(function() {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        resolve(null);
+      });
+    });
+  }
+
+  function toHtml(text) {
+    var safe = typeof window.escapeHtml === 'function' ? window.escapeHtml(text) : String(text || '');
+    return safe.replace(/\[跳转:([a-z-]+)\]/g, function(m, tab) {
+      return ' <button class="ai-goto" data-goto="' + (window.escapeHtml ? window.escapeHtml(tab) : tab) + '">前往</button>';
+    });
+  }
+
+  return { allow: allow, resetForTest: resetForTest, isLLMIntent: isLLMIntent, getAgentContext: getAgentContext, ask: ask, toHtml: toHtml };
+})();
+window.NeuralEngine = NeuralEngine;
+
 var AiChatModule = (function() {
   var EXAMPLE_TEMPLATES = {
     'n.': ['I bought a {w} yesterday.', 'The {w} is on the desk.', 'She showed me a {w} just now.'],
@@ -21,11 +111,16 @@ var AiChatModule = (function() {
   var INTENT_PLAN = ['计划', '规划', '安排', 'plan'];
   var INTENT_MISTAKE = ['错题', '错误', '薄弱', '弱点', '原因', '分析'];
   var INTENT_REVIEW = ['复习', '回顾', 'review', '艾宾浩斯'];
-  var INTENT_PRON = ['发音', '读音', '口语', '跟读', 'pronoun', 'pronounce'];
+  var INTENT_PRON = ['发音', '读音', '跟读', 'pronoun', 'pronounce'];
   var INTENT_HELP = ['帮助', 'help', '怎么办', '能做什么'];
+  var INTENT_TRANSLATE = ['翻译', '用英语怎么说', '英文怎么说', '怎么说', 'translate', 'how to say', 'how do you say'];
+  var INTENT_ENCOURAGE = ['鼓励', '夸夸', '夸我', '太棒', '真棒', '厉害', '坚持', '加油', '疲惫', '放弃', '坚持不下去', '好累'];
+  var INTENT_TIPS = ['怎么背', '背单词', '记单词', '记忆技巧', '提高英语', '语感', '遗忘', '忘得快', '背了就忘', '技巧', '效率', '学习方法', '方法'];
+  var INTENT_PRACTICE = ['口语', '陪练', '练对话', '对话练习', '跟我聊', 'practice', '跟我练习'];
 
   function AiChatModule() {
     this._wordIndex = null;
+    this._ctx = { lastWord: null, lastIntent: null };
     this.initUI();
   }
 
@@ -39,26 +134,8 @@ var AiChatModule = (function() {
         if (e.key === 'Enter') { e.preventDefault(); self.sendFromInput(); }
       });
     }
-    // 快捷提问 chips
-    var chipsBox = document.getElementById('ai-chat-chips');
-    if (chipsBox) {
-      var chips = [
-        '我学得怎么样',
-        '帮我制定学习计划',
-        '分析我的错题',
-        '解释单词 abandon',
-        '给 happy 生成例句',
-        '给我发音建议'
-      ];
-      chipsBox.innerHTML = chips.map(function(c) {
-        return '<button type="button" class="ai-chip" data-q="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>';
-      }).join('');
-      chipsBox.querySelectorAll('.ai-chip').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          self.ask(btn.dataset.q);
-        });
-      });
-    }
+    // 快捷提问 chips（随多轮上下文动态变化）
+    this._refreshChips();
     // 文档级委托：对话里 data-speak 朗读 / data-prefill 预填查单词输入框
     // （data-goto 跳转已由 dashboard.js 全局委托处理）
     document.addEventListener('click', function(ev) {
@@ -75,18 +152,58 @@ var AiChatModule = (function() {
     this._welcome();
   };
 
+  AiChatModule.prototype._refreshChips = function() {
+    var chipsBox = document.getElementById('ai-chat-chips');
+    if (!chipsBox) return;
+    var self = this;
+    var list;
+    var ctx = this._ctx || {};
+    if (ctx.lastWord && (ctx.lastIntent === 'explain_word' || ctx.lastIntent === 'sentence')) {
+      list = ['那 ' + ctx.lastWord + ' 呢', '给 ' + ctx.lastWord + ' 生成例句', '对比 ' + ctx.lastWord + ' 和 apple', '我学得怎么样'];
+    } else {
+      list = ['我学得怎么样', '帮我制定学习计划', '分析我的错题', '解释单词 abandon', '给 happy 生成例句', '给我发音建议'];
+    }
+    chipsBox.innerHTML = list.map(function(c) {
+      return '<button type="button" class="ai-chip" data-q="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>';
+    }).join('');
+    chipsBox.querySelectorAll('.ai-chip').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        self.ask(btn.dataset.q);
+      });
+    });
+  };
+
   AiChatModule.prototype._welcome = function() {
     var box = document.getElementById('ai-chat-msgs');
     if (!box) return;
     box.innerHTML = '';
-    this._append('ai', '你好，我是你的 AI 英语教练。我可以：<br>· 查看学习概况（如「我学得怎么样」）<br>· 制定学习计划（如「帮我制定学习计划」）<br>· 分析错题原因（如「分析我的错题」）<br>· 解释单词（如「解释单词 abandon」）<br>· 生成例句（如「给 happy 生成例句」）<br>· 发音建议（如「给我发音建议」）<br>直接输入你的问题，或点击下面的快捷提问。');
+    // 恢复上次对话最近两条
+    var history;
+    try { history = DataStore.getProgress('ai_chat_history', []) || []; } catch (e) { history = []; }
+    if (Array.isArray(history) && history.length) {
+      var recent = history.slice(-2);
+      recent.forEach(function(m) {
+        if (!m || !m.html) return;
+        var who = m.role === 'user' ? 'user' : 'ai';
+        var div = document.createElement('div');
+        div.className = 'ai-msg ai-msg-' + who;
+        div.innerHTML = '<div class="ai-msg-avatar"><svg class="icon"><use href="#' + (who === 'user' ? 'i-user' : 'i-robot') + '"/></svg></div>'
+          + '<div class="ai-msg-bubble">' + m.html + '</div>';
+        box.appendChild(div);
+      });
+      var sep = document.createElement('div');
+      sep.className = 'ai-hist-sep';
+      sep.textContent = '—— 以上是上次的对话 ——';
+      box.appendChild(sep);
+    }
+    this._append('ai', '你好，我是你的 AI 英语教练。我可以：<br>· 查看学习概况（如「我学得怎么样」）<br>· 制定学习计划（如「帮我制定学习计划」）<br>· 分析错题原因（如「分析我的错题」）<br>· 解释单词（如「解释单词 abandon」）<br>· 生成例句（如「给 happy 生成例句」）<br>· 发音建议（如「给我发音建议」）<br>· 生词/翻译/对比/口语陪练（在线时由 AI 增强）<br>直接输入你的问题，或点击下面的快捷提问。');
   };
 
   AiChatModule.prototype._msgBox = function() {
     return document.getElementById('ai-chat-msgs');
   };
 
-  // 追加一条气泡：who = 'user' | 'ai'
+  // 追加一条气泡：who = 'user' | 'ai'，并写入会话历史
   AiChatModule.prototype._append = function(who, html) {
     var box = this._msgBox();
     if (!box) return;
@@ -95,6 +212,32 @@ var AiChatModule = (function() {
     div.className = 'ai-msg ai-msg-' + who;
     div.innerHTML = '<div class="ai-msg-avatar"><svg class="icon"><use href="#' + icon + '"/></svg></div>'
       + '<div class="ai-msg-bubble">' + html + '</div>';
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+    this._storeHistory(who, html);
+    return div;
+  };
+
+  // 会话历史：localStorage ai_ 前缀，最多 50 条（含按钮的安全 HTML，全部插值均已转义）
+  AiChatModule.prototype._storeHistory = function(who, html) {
+    try {
+      var key = 'ai_chat_history';
+      var list = DataStore.getProgress(key, []) || [];
+      if (!Array.isArray(list)) list = [];
+      list.push({ role: who, html: html, ts: Date.now() });
+      if (list.length > 50) list = list.slice(list.length - 50);
+      DataStore.setProgress(key, list);
+    } catch (e) {}
+  };
+
+  // 打字中气泡（不写入历史，完成时整体移除）
+  AiChatModule.prototype._aiThinking = function() {
+    var box = this._msgBox();
+    if (!box) return null;
+    var div = document.createElement('div');
+    div.className = 'ai-msg ai-msg-ai';
+    div.innerHTML = '<div class="ai-msg-avatar"><svg class="icon"><use href="#i-robot"/></svg></div>'
+      + '<div class="ai-msg-bubble"><span class="ai-typing"><i></i><i></i><i></i></span></div>';
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
     return div;
@@ -117,36 +260,157 @@ var AiChatModule = (function() {
     var lower = text.toLowerCase();
     var reply = this._handle(lower, text);
     this._append('ai', reply);
+    this._refreshChips();
     return reply;
   };
 
   AiChatModule.prototype._handle = function(lower, original) {
+    // 0. 多轮上下文：上轮在解释/例句，本轮只报新词（如「那 happy 呢」）
+    var fu = this._tryFollowUp(lower, original);
+    if (fu) return fu;
+
+    var mistakeHit = this._has(lower, INTENT_MISTAKE);
+    var planHit = this._has(lower, INTENT_PLAN);
+    // 1. 复合意图：错题分析 + 制定计划 一次回复
+    if (mistakeHit && planHit && this._has(lower, ['并', '和', '然后', '同时', '还有'])) {
+      this._setCtx(null, 'compound');
+      return this._analyzeMistakes() + '<br>—— 结合错题，给你建议 ——<br>' + this._makePlan();
+    }
     var word = this._extractWord(lower, original);
-    // 1. 解释单词 / 是什么意思 / 怎么读（含英文词）
+    // 2. 单词对比：两个词 + 区别词
+    if (this._has(lower, ['区别', '差别', '不同', 'difference', 'different']) && /[a-z]{2,}/i.test(lower)) {
+      var pair = this._extractPair(lower);
+      if (pair) {
+        this._setCtx(pair[0], 'compare');
+        return this._compare(pair[0], pair[1]);
+      }
+    }
+    // 3. 解释单词 / 什么意思 / 怎么读（含英文词，排除纯错题请求）
     if (word && this._has(lower, ['解释', '什么意思', 'meaning', 'explain', '这个单词', '单词']) && !this._has(lower, ['分析我的', '我的错题'])) {
+      this._setCtx(word, 'explain_word');
       return this._explainWord(word, false);
     }
-    // 2. 生成例句
+    // 4. 生成例句（要求更地道/更多时同步秒回模板并异步请求 LLM 增强）
     if (word && this._has(lower, ['例句', '造句', 'example', 'sentence', '生成'])) {
-      return this._explainWord(word, true);
+      this._setCtx(word, 'sentence');
+      var wantMore = this._has(lower, ['更', '地道', '自然', '高级', '复杂', '几个', '多条', '三', '3']);
+      return this._explainWord(word, true, wantMore);
     }
-    // 3. 错题分析
-    if (this._has(lower, INTENT_MISTAKE)) return this._analyzeMistakes();
-    // 4. 制定计划
-    if (this._has(lower, INTENT_PLAN)) return this._makePlan();
-    // 5. 复习建议
-    if (this._has(lower, INTENT_REVIEW)) return this._reviewAdvice();
-    // 6. 发音建议
-    if (this._has(lower, INTENT_PRON)) return this._pronAdvice();
-    // 7. 学习概况
-    if (this._has(lower, INTENT_OVERVIEW)) return this._overview();
-    // 8. 打招呼
-    if (this._has(lower, INTENT_GREET)) return this._greeting();
-    // 9. 帮助
-    if (this._has(lower, INTENT_HELP)) return this._help();
-    // 10. 兜底：提取到的单词默认解释，否则提醒
-    if (word) return this._explainWord(word, false);
+    // 5. 错题分析
+    if (mistakeHit) { this._setCtx(null, 'mistakes'); return this._analyzeMistakes(); }
+    // 6. 制定计划
+    if (planHit) { this._setCtx(null, 'plan'); return this._makePlan(); }
+    // 7. 复习建议
+    if (this._has(lower, INTENT_REVIEW)) { this._setCtx(null, 'review'); return this._reviewAdvice(); }
+    // 8. 发音建议
+    if (this._has(lower, INTENT_PRON)) { this._setCtx(null, 'pron'); return this._pronAdvice(); }
+    // 9. 学习概况
+    if (this._has(lower, INTENT_OVERVIEW)) { this._setCtx(null, 'overview'); return this._overview(); }
+    // 10. 翻译
+    if (this._has(lower, INTENT_TRANSLATE)) { this._setCtx(word, 'translate'); return this._translate(word, original); }
+    // 11. 鼓励 / 表扬 / 情绪支持
+    if (this._has(lower, INTENT_ENCOURAGE)) { this._setCtx(null, 'encourage'); return this._encourage(); }
+    // 12. 学习技巧咨询
+    if (this._has(lower, INTENT_TIPS)) { this._setCtx(null, 'tips'); return this._tips(); }
+    // 13. 口语陪练开场
+    if (this._has(lower, INTENT_PRACTICE)) { this._setCtx(null, 'practice'); return this._practice(); }
+    // 14. 打招呼
+    if (this._has(lower, INTENT_GREET)) { this._setCtx(null, 'greet'); return this._greeting(); }
+    // 15. 帮助
+    if (this._has(lower, INTENT_HELP)) { this._setCtx(null, 'help'); return this._help(); }
+    // 16. 兜底：提取到的单词默认解释，否则提醒
+    if (word) { this._setCtx(word, 'explain_word'); return this._explainWord(word, false); }
     return this._fallback();
+  };
+
+  AiChatModule.prototype._setCtx = function(word, intent) {
+    this._ctx = this._ctx || {};
+    this._ctx.lastWord = word || null;
+    this._ctx.lastIntent = intent || null;
+    return '';
+  };
+
+  // 多轮省略追问：上轮是解释/例句，本轮只提一个新词
+  AiChatModule.prototype._tryFollowUp = function(lower, original) {
+    var ctx = this._ctx;
+    if (!ctx || (ctx.lastIntent !== 'explain_word' && ctx.lastIntent !== 'sentence')) return null;
+    var m = /^(那|那么|还有|然后|顺便|再|也|刚才)?([a-z][a-z'\-]{1,39})\s*呢[?？.!]*$/.exec(lower);
+    if (!m) return null;
+    var w = m[2].toLowerCase();
+    if (['i', 'my', 'me', 'you', 'the', 'a', 'an', 'for', 'to', 'of', 'and', 'what', 'how'].indexOf(w) !== -1) return null;
+    var wantExample = ctx.lastIntent === 'sentence';
+    this._setCtx(w, ctx.lastIntent);
+    return this._explainWord(w, wantExample);
+  };
+
+  // 提取对比的两个英文词
+  AiChatModule.prototype._extractPair = function(text) {
+    var m = /([a-z][a-z'\-]{1,39})\s*(?:和|与|跟|及|vs\.?|or|to|against)\s*([a-z][a-z'\-]{1,39})/i.exec(text);
+    if (!m) return null;
+    var a = m[1].toLowerCase(), b = m[2].toLowerCase();
+    var skip = ['i', 'my', 'me', 'you', 'the', 'a', 'an', 'for', 'to', 'of', 'and', 'what', 'how', 'please'];
+    if (skip.indexOf(a) !== -1 || skip.indexOf(b) !== -1 || a === b) return null;
+    return [a, b];
+  };
+
+  AiChatModule.prototype._compare = function(a, b) {
+    var index = this._ensureIndex();
+    function line(w) {
+      var e = index[w];
+      if (!e) return '<b>' + escapeHtml(w) + '</b>：词库暂未收录';
+      return '<b>' + escapeHtml(e.word) + '</b> <span class="ai-em">' + escapeHtml(e.phonetic || '') + '</span> <span class="ai-em">' + escapeHtml(e.pos || '') + '</span>：' + escapeHtml(e.chinese || '');
+    }
+    this._llmAppend('compare', '对比英语单词 ' + a + ' 和 ' + b + ' 的用法区别，用中文回答，简洁');
+    return '对比「' + escapeHtml(a) + '」与「' + escapeHtml(b) + '」：<br>' + line(a) + '<br>' + line(b)
+      + '<br><span style="color:var(--text-secondary);font-size:var(--text-xs)">AI 正在补充具体区别…</span>';
+  };
+
+  // 异步 LLM 增强：打字中占位 → 成功后替换为 AI 气泡（含朗读按钮），失败静默（离线兜底已就位）
+  AiChatModule.prototype._llmAppend = function(intent, prompt) {
+    var self = this;
+    var typing = self._aiThinking();
+    NeuralEngine.ask(intent, prompt).then(function(text) {
+      if (typing && typing.parentNode) typing.parentNode.removeChild(typing);
+      if (!text || !self._msgBox()) return;
+      var plain = String(text).replace(/<[^>]*>/g, ' ').replace(/\[跳转:[a-z-]+\]/g, '').replace(/\s+/g, ' ').trim();
+      self._append('ai', NeuralEngine.toHtml(text)
+        + (plain ? '<br><button type="button" class="ai-reply-btn" data-speak="' + escapeHtml(plain) + '">朗读</button>' : ''));
+    });
+  };
+
+  AiChatModule.prototype._translate = function(word, original) {
+    var q = String(original || '').trim() || word || '';
+    this._llmAppend('translate', '请把"' + q + '"翻译成英语，并给出中文释义，简洁');
+    return '正在为你翻译「' + escapeHtml(q) + '」…<br>'
+      + '<span style="color:var(--text-secondary);font-size:var(--text-xs)">如未收到回复，可在查单词页直接搜索。</span>';
+  };
+
+  AiChatModule.prototype._encourage = function() {
+    var streak = 0;
+    try { streak = calculateStreak(DataStore.getProgress('checkins', {})) || 0; } catch (e) {}
+    return '能坚持到这里已经很了不起！' + (streak > 0 ? '你已连续打卡 <b>' + streak + '</b> 天，习惯正在形成。' : '')
+      + '英语学习是积累的过程，今天的每一次复习都会让明天的你更轻松。<br>'
+      + '· 允许偶尔慢一点，但别停下来<br>'
+      + '· 把目标拆小：今天先完成 <b>10 个词</b> 就够了<br><br>'
+      + '<button type="button" class="ai-reply-btn" data-goto="word">现在背 10 个词</button>';
+  };
+
+  AiChatModule.prototype._tips = function() {
+    return '提升记忆效果的实用技巧：<br>'
+      + '· 1. 用句子记单词：别单背词义，放进例句里（对我说「给 happy 生成例句」）<br>'
+      + '· 2. 间隔复习：按艾宾浩斯曲线复习，胜过一次猛背<br>'
+      + '· 3. 音形对应：拼写错多就练「错词强化」，注意元音/辅音对应<br>'
+      + '· 4. 少量多次：每天 10 个新词 + 复习旧词，优于一次 50 个<br><br>'
+      + '<button type="button" class="ai-reply-btn" data-goto="word">开始今天的学习</button>';
+  };
+
+  AiChatModule.prototype._practice = function() {
+    return '口语陪练开始！先从简单的自我介绍开始：<br>'
+      + '我对你说一句英语，你用英语回答我：<br>'
+      + '<i>"Hi! I\'m your AI coach. What is your favorite book?"</i><br>'
+      + '你可以回：My favorite book is ...。<br>'
+      + '想练特定话题就告诉我，比如「聊吃的」「练自我介绍」。<br><br>'
+      + '<button type="button" class="ai-reply-btn" data-speak="Hi! I am your AI coach. What is your favorite book?">播放开场</button>';
   };
 
   AiChatModule.prototype._has = function(lower, keys) {
@@ -181,11 +445,11 @@ var AiChatModule = (function() {
   };
 
   // 解释单词 or 生成例句
-  AiChatModule.prototype._explainWord = function(word, wantExample) {
+  AiChatModule.prototype._explainWord = function(word, wantExample, wantMore) {
     var index = this._ensureIndex();
     var entry = index[word];
     if (entry) {
-      if (wantExample) return this._sentence(word, entry);
+      if (wantExample) return this._sentence(word, entry, !!wantMore);
       if (window.app && window.app.searchModule) {
         // 顺便反馈给查单词页（仅定位，不改输入），可选优化
       }
@@ -203,12 +467,14 @@ var AiChatModule = (function() {
         + '<br><span style="color:var(--text-secondary);font-size:var(--text-xs)">' + statusText + '</span>';
       return html;
     }
+    // 未收录生词：先给离线兜底，同时尝试 LLM 解释（异步追加气泡，失败则静默）
+    this._llmAppend(wantExample ? 'sentence' : 'explain_word', (wantExample ? '为单词 ' : '解释单词 ') + word);
     return '抱歉，词库中没找到 <b>' + escapeHtml(word) + '</b>。可能是生词或未收录。<br>'
       + '<button type="button" class="ai-reply-btn" data-goto="search" data-prefill="' + escapeHtml(word) + '">在查单词页搜索</button>';
   };
 
-  // 生成例句：优先用词库例句，否则按词性模板生成
-  AiChatModule.prototype._sentence = function(word, entry) {
+  // 生成例句：优先词库例句，否则按词性模板；wantMore 时异步请求 LLM 生成更地道的例句
+  AiChatModule.prototype._sentence = function(word, entry, wantMore) {
     var lines = [];
     if (entry.example) lines.push(entry.example);
     var pos = entry.pos || '';
@@ -218,6 +484,8 @@ var AiChatModule = (function() {
     }
     // 整段一次性朗读：全部例句连成一段（句号连接），一个按钮读完
     var joined = lines.map(function(l) { return l.replace(/[.!?…]+$/, ''); }).join('. ') + '.';
+    // 用户要求更地道的例句：模板先秒回，异步请求 LLM 补充
+    if (wantMore) this._llmAppend('sentence', '为单词 ' + word + ' 生成 3 个更加地道自然的英语例句，每个附中文翻译，简洁');
     var html = '为 <b>' + escapeHtml(word) + '</b> 生成例句：<br>'
       + lines.map(function(l, i) {
           return (i + 1) + '. <i>' + escapeHtml(l) + '</i>';

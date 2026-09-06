@@ -222,3 +222,50 @@
 @media (max-width: 480px) {
   .ai-msg { max-width: 96%; }
 }
+
+/* ==================== AI 交互增强（四维升级新增） ==================== */
+/* 消息入场 */
+.ai-msg {
+  animation: aiPop 0.25s ease;
+}
+@keyframes aiPop {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 历史分隔条（刷新后显示"上次对话"） */
+.ai-hist-sep {
+  margin: 2px 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
+/* 打字中指示 */
+.ai-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+.ai-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  opacity: 0.25;
+  animation: aiBlink 1s infinite;
+}
+.ai-typing i:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes aiBlink {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+/* 尊重减少动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .ai-msg { animation: none; }
+  .ai-typing i { animation: none; opacity: 0.5; }
+}

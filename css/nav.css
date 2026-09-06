@@ -241,3 +241,108 @@
 @media (max-width: 480px) {
   .ai-actions { grid-template-columns: 1fr; }
 }
+
+/* ==================== AI 升级新增（四维升级） ==================== */
+
+/* 弱点模式与趋势 */
+.ai-weak-pattern {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--coral);
+  background: var(--surface-hover);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.ai-weak-trend {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.ai-up { color: var(--success); font-weight: var(--weight-semibold); }
+.ai-down { color: var(--coral); font-weight: var(--weight-semibold); }
+
+/* 三级建议徽章 */
+.ai-tips li.ai-tip::before { content: none; }
+.ai-tip-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+}
+.ai-tip-urgent .ai-tip-badge { background: var(--coral); color: #fff; }
+.ai-tip-prevent .ai-tip-badge { background: var(--amber); color: #fff; }
+.ai-tip-encourage .ai-tip-badge { background: var(--sage); color: #fff; }
+.ai-tip-normal .ai-tip-badge { background: var(--border); color: var(--text-secondary); }
+
+/* 每周学习报告 */
+.ai-card-dynamic { }
+.ai-report-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.ai-report-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  text-align: center;
+}
+.ai-report-item b {
+  font-size: 1.15rem;
+  color: var(--sage-deep);
+  font-weight: var(--weight-bold);
+}
+.ai-report-item span {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.ai-report-up b { color: var(--success); }
+.ai-report-down b { color: var(--coral); }
+.ai-report-summary {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--sage-light);
+  color: var(--sage-deep);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+/* 能力雷达 */
+.ai-radar-svg {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+.ai-radar-ring {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.ai-radar-data {
+  fill: rgba(132, 169, 140, 0.28);
+  stroke: var(--sage-deep);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.ai-radar-label {
+  fill: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font);
+}
+
+@media (max-width: 480px) {
+  .ai-report-grid { grid-template-columns: repeat(2, 1fr); }
+}
