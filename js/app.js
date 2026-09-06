@@ -2783,6 +2783,8 @@ WordModule.prototype.renderStats = function() {
     e.preventDefault();
     var word = document.getElementById('new-word').value.trim().toLowerCase();
     if (!word) return;
+    if (!/^[a-z][a-z' -]*$/.test(word)) { Toast.warning('单词仅支持英文字母（可含空格、连字符、撇号）'); return; }
+    if (word.length > 40) { Toast.warning('单词过长（最多 40 个字符）'); return; }
     var existingWords = this.categories[this.currentCategoryIndex].words.map(function(w) { return w.word.toLowerCase(); });
     if (existingWords.indexOf(word) !== -1) { Toast.warning('该单词已存在'); return; }
     var newW = {

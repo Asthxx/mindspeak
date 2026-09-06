@@ -129,4 +129,29 @@ describe('WordModule 行为', () => {
     document.getElementById('form-add-word').dispatchEvent(new Event('submit', { cancelable: true }));
     expect(wm.categories[0].words.length).toBe(before + 1);
   });
+
+  it('should_reject_words_with_illegal_characters_or_excessive_length', () => {
+    const wm = showWordTab();
+    const before = wm.categories[0].words.length;
+    // XSS 脚本
+    document.getElementById('new-word').value = '<script>alert(1)</script>';
+    document.getElementById('form-add-word').dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(wm.categories[0].words.length).toBe(before);
+    // 中文
+    document.getElementById('new-word').value = '苹果';
+    document.getElementById('form-add-word').dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(wm.categories[0].words.length).toBe(before);
+    // 非法符号
+    document.getElementById('new-word').value = 'hello@world#!';
+    document.getElementById('form-add-word').dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(wm.categories[0].words.length).toBe(before);
+    // 超长（超过 40 字符）
+    document.getElementById('new-word').value = 'a'.repeat(41);
+    document.getElementById('form-add-word').dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(wm.categories[0].words.length).toBe(before);
+    // 合法：连字符与撇号可接受
+    document.getElementById('new-word').value = "rock-'n-roll";
+    document.getElementById('form-add-word').dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(wm.categories[0].words.length).toBe(before + 1);
+  });
 });
