@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 
+// 测试隔离：本地 server/.env 可能已配置 POLLINATIONS_API_KEY（运行配置），
+// config.js 会在 import 时读入 process.env，导致"无 key"行为无法验证。
+// 预置空串让 config.js 跳过 .env（in 判断成立），仅影响本测试进程。
+process.env.POLLINATIONS_API_KEY = '';
+
 // 服务端 AI 代理测试：直接验证核心函数（不启动 HTTP），限流器另行单测。
 // require('../server/server.js') 由 require.main 保护，不会 listen。
 let validateAiChatBody, proxyAiChat, aiHealthStatus;

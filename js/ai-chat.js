@@ -10,7 +10,7 @@ var NeuralEngine = (function() {
   var LLM_INTENTS = { 'explain_word': 1, 'sentence': 1, 'translate': 1, 'compare': 1, 'chat': 1, 'tips': 1, 'encourage': 1, 'practice': 1, 'motivation': 1, 'story': 1 };
   var LIMIT = 10;          // max LLM calls per minute
   var WINDOW_MS = 60000;
-  var DEFAULT_TIMEOUT = 3000;
+  var DEFAULT_TIMEOUT = 15000;
   var _calls = [];
 
   function allow() {
