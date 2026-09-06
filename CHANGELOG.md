@@ -24,6 +24,7 @@
   5. **徽章默认值数组 bug（F6）**：`badges` 默认值由 `[]` 改 `{}`，导入时字符串日期徽章原样保留，恢复备份不再清零/重复发奖。
   6. **自定义背景图丢失（F7）**：`customBg` 的 `data:image` dataURL 跨备份完整保留。
 - **加固**：TTS 四端点限流（默认 60 次/60s，HEAD 预热不计数）；Piper 二进制下载后冒烟自检（上游 release 无 SHA256 附件，已核查并记录）；桌面打包时校验 meta CSP 防漂移；`gamification` 读取路径统一封顶（level ≤ 99 / points ≤ 999999）。
+- **CSP 彻底收紧**：index.html 全部 5 处内联脚本提取为 `js/head-boot.js`（首帧前同步引导：视口兜底/主题防闪烁/平台检测/语音预热/SW 注册），CSP 的 `script-src` 移除 `unsafe-inline` 收紧为 `'self'`——任何内联脚本注入（含 XSS 载荷）一律不执行，与既有转义/消毒构成纵深防御；打包脚本强制校验 dist 不得回退到宽松 CSP（测试 `tests/core/no-inline-script.test.js`、`csp-guard.test.js`）。
 
 ### 数据
 
