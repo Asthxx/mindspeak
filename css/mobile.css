@@ -57,7 +57,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .logo .text{display:none}
   .logo .icon{width:24px;height:24px}
   .header-right{gap:2px;flex-shrink:0}
-  .theme-toggle{width:40px;height:40px}
+  .theme-toggle{width:44px;height:44px}
   .stats-bar{gap:4px}
   .stats-bar span{flex-shrink:0;padding:6px 9px;font-size:0.7rem}
   /* 超窄屏只保留"积分"与"道具"两项，避免挤压图标区 */
@@ -366,7 +366,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
     min-height:44px;
   }
   .content .btn-sm{padding:12px 16px}
-  .content .btn-icon{width:44px;height:44px}
+  .btn-icon{width:44px;height:44px}
   /* 主 CTA（开始学习等）加大 */
   .content .btn-primary{padding:14px 24px}
   .content .btn-lg{padding:14px 28px}
