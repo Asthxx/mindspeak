@@ -17,6 +17,7 @@ const APP_SHELL = [
   'css/mobile.css',
   'js/bundle.js',
   'js/api-config.js',
+  'js/head-boot.js',
   'assets/favicon.svg',
   'pwa-manifest.json'
 ];

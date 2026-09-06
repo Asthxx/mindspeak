@@ -111,10 +111,11 @@ async function main() {
   const cspHtml = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
   const cspMatch = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(cspHtml);
   const csp = cspMatch ? cspMatch[1] : '';
-  if (!cspMatch || !/script-src[^;]*'unsafe-inline'/.test(csp)
+  if (!cspMatch || !/script-src[^;]*'self'/.test(csp)
+      || /script-src[^;]*'unsafe-inline'/.test(csp)
       || !/connect-src[^;]*http:\/\/127\.0\.0\.1:3000/.test(csp)
       || !/object-src[^;]*'none'/.test(csp)) {
-    throw new Error('[desktop-pack] dist/index.html 缺少收紧的 meta CSP（需 script-src unsafe-inline、connect-src 127.0.0.1:3000、object-src none），拒绝打包');
+    throw new Error('[desktop-pack] dist/index.html 缺少收紧的 meta CSP（需 script-src \'self\' 且无 unsafe-inline、connect-src 127.0.0.1:3000、object-src none），拒绝打包');
   }
   console.log('[desktop-pack] meta CSP 校验通过');
 

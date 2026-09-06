@@ -1,6 +1,6 @@
 // MindSpeak Service Worker — App 壳预缓存 + 网络优先/离线回退
 // 版本号在构建时注入（见 build.js），每次发布强制刷新缓存
-const CACHE = 'mindspeak-v20260905052653';
+const CACHE = 'mindspeak-v20260905082342';
 const APP_SHELL = [
   './',
   'index.html',
@@ -17,6 +17,7 @@ const APP_SHELL = [
   'css/mobile.css',
   'js/bundle.js',
   'js/api-config.js',
+  'js/head-boot.js',
   'assets/favicon.svg',
   'pwa-manifest.json'
 ];

@@ -127,8 +127,9 @@ async function build() {
   // ---- 1. index.html 复制并更新路径 ----
   let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
   // 移除 body 末尾所有业务 script 标签、收敛为 bundle.js；但保留 head 中独立加载的
-  // js/api-config.js（API 配置必须在任何逻辑执行前就位，且不参与混淆）。
-  html = html.replace(/<script src="js\/(?!api-config\.js)[^"]+\.js(?:\?[^"']*)?"><\/script>\s*/gi, '');
+  // js/api-config.js（API 配置必须在任何逻辑执行前就位，且不参与混淆）与
+  // js/head-boot.js（首帧前引导：视口/主题/平台，CSP 收紧后不得内联，且不参与混淆）。
+  html = html.replace(/<script src="js\/(?!api-config\.js|head-boot\.js)[^"]+\.js(?:\?[^"']*)?"><\/script>\s*/gi, '');
   // 全量源码 version 注入（版本分离）：dist/index.html 始终带当前 VERSION
   html = html.replace(/(<meta name="app-version" content=")[^"]*(")/i, '$1' + VER_TAG + '$2');
   const bStamp = buildStamp(BUILD_TIME);
@@ -140,6 +141,10 @@ async function build() {
   // ---- 1.5 api-config（独立加载不进 bundle）：head 已引用，保持真实路径即可被 SW/PWA 缓存 ----
   copyFile(path.join(SRC, 'js', 'api-config.js'), path.join(DIST, 'js', 'api-config.js'));
   console.log('[ok] js/api-config.js -> dist/js/（独立加载，不进 bundle）');
+
+  // ---- 1.6 head-boot（首帧前引导，独立加载不进 bundle）----
+  copyFile(path.join(SRC, 'js', 'head-boot.js'), path.join(DIST, 'js', 'head-boot.js'));
+  console.log('[ok] js/head-boot.js -> dist/js/（首帧引导，独立加载，不进 bundle）');
 
   // ---- 2. 复制 CSS ----
   const cssSrc = path.join(SRC, 'css');
