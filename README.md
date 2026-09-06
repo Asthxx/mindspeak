@@ -1,6 +1,6 @@
 # 闻道 MindSpeak · 英语学习助手
 
-一套开箱即用的**本地英语学习桌面应用**（也可一键部署到 GitHub Pages / Vercel / Cloudflare Pages 在线使用）。无需注册账号、无需联网（离线模式）即可背单词、练听力、做拼写、刷语法，配合 Windows 本地服务还能离线朗读和信息加密。
+一套开箱即用的**本地英语学习桌面应用**（也可部署到**阿里云**等任意静态托管 / 服务器在线使用）。无需注册账号、无需联网（离线模式）即可背单词、练听力、做拼写、刷语法，配合 Windows 本地服务还能离线朗读和信息加密。
 
 > 当前版本：见 [VERSION](VERSION)（构建时自动注入 `dist/version.txt`）
 > 迭代记录：见 [CHANGELOG.md](CHANGELOG.md)
@@ -17,21 +17,19 @@
 
 <div align="center">
 
-[![下载 APK](https://img.shields.io/badge/⬇️_下载最新版_APK_v1.1.0-brightgreen?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Asthxx/mindspeak/releases/download/v1.1.0/MindSpeak-Android-v1.1.0.apk)
-
-[![查看全部版本](https://img.shields.io/badge/查看全部版本-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Asthxx/mindspeak/releases)
+[![下载 APK](https://img.shields.io/badge/本地文件-下载最新版_APK_v1.1.0-brightgreen?style=for-the-badge&logo=android&logoColor=white)](MindSpeak-Android-v1.1.0.apk)
 
 </div>
 
-1. 点击上方绿色按钮下载 `MindSpeak-Android-v1.1.0.apk` 到手机；
+1. 下载 `MindSpeak-Android-v1.1.0.apk`（项目根目录）到手机；
 2. 打开文件安装（首次需在手机设置中允许「安装未知来源应用」）；
 3. 安装完成，打开「闻道 MindSpeak」即可开始背词学习。
 
-> 每次发布版本时在 GitHub 创建 `v1.x.x` 标签，Actions 会自动把 APK 挂到 Releases 页面。也可以到仓库 **Actions → 打包安卓安装包 APK → Run workflow** 手动触发打包，完成后在 **Artifacts** 下载。
+> 部署到阿里云后，可把该 APK 上传到 OSS / 服务器下载区，再把上方下载链接替换为你的在线地址（或分享给手机直接下载）。
 
 ### 💻 Windows / macOS（桌面）→ 下载桌面安装包
 
-桌面安装包在 **[Releases 页面](https://github.com/Asthxx/mindspeak/releases)**，文件名为 `MindSpeak-Windows-*.exe`（Windows）或 `MindSpeak-macOS-*.dmg`（macOS），请按文件名认准平台下载。
+桌面安装包按「方式三」本地构建（Capacitor / Tauri），产物命名 `MindSpeak-Windows-*.exe`（Windows）或 `MindSpeak-macOS-*.dmg`（macOS），请按文件名认准平台下载。已部署到阿里云时，安装包放在下载区一并提供。
 
 | 文件名前缀 | 平台 | 说明 |
 |---|---|---|
@@ -39,7 +37,7 @@
 | `MindSpeak-Windows-*.exe` | 🖥️ Windows | 桌面安装包（NSIS 安装向导） |
 | `MindSpeak-macOS-*.dmg` | 🍏 macOS | 桌面安装包（Apple Silicon） |
 
-> 若在 Releases 页面看到 `MindSpeak_1.x.x_*` 旧命名文件，请忽略，以下载 `MindSpeak-平台-版本` 命名的新文件为准。
+> 若下载区看到 `MindSpeak_1.x.x_*` 旧命名文件，请忽略，以下载 `MindSpeak-平台-版本` 命名的新文件为准。
 
 ### 🍎 iOS（苹果）→ 无安装包，请用 PWA 在线版
 
@@ -47,7 +45,7 @@
 
 **iOS 添加到主屏幕步骤**：
 
-1. 用 **Safari** 打开 [https://asthxx.github.io/mindspeak/](https://asthxx.github.io/mindspeak/)
+1. 用 **Safari** 打开部署后的在线地址（如 `https://<你的域名>/`，见「方式二」）
 2. 点击底部 **分享** 按钮（方框+箭头图标）；
 3. 选择 **「添加到主屏幕」**；
 4. 桌面出现「闻道 MindSpeak」图标，点击即可全屏使用。
@@ -58,7 +56,7 @@
 
 | 渠道 | 说明 |
 |---|---|
-| **在线版（无需安装）** | [打开 GitHub Pages 在线版](https://asthxx.github.io/mindspeak/)（PWA，覆盖全部功能） |
+| **在线版（无需安装）** | 打开部署后的在线地址（PWA，覆盖全部功能），阿里云部署见「方式二」 |
 | 桌面版（Windows / macOS） | 见下方「快速开始」章节，支持本地服务完整发音 |
 
 ---
@@ -104,14 +102,21 @@
 2. **双击 `英语学习.bat`** 即可启动本地服务，浏览器自动打开 `http://localhost:3000`；
 3. 或直接双击 `index.html` → 自动切换在线 `http://localhost:3000`（本地服务未运行则保持离线模式）。
 
-### 方式二：部署在线版（手机也能用）
+### 方式二：部署在线版（手机也能用，如阿里云）
 
-把 **`dist/` 目录**内容上传到 GitHub Pages / Vercel / Cloudflare Pages（只公开装这一个目录），或用 `node build.js` 重新构建：
+把 **`dist/` 目录**内容上传即可（只公开装这一个目录），或用 `node build.js` 重新构建：
 
 ```bash
 npm install         # 安装 terser
 node build.js       # 生成 dist/
 ```
+
+**阿里云两种常见介质**（任选其一，HTTPS 均建议配好以便 PWA 生效）：
+
+1. **OSS 静态网站托管**（纯静态，部署最简单）：在阿里云 OSS 控制台创建 Bucket → 开启「静态网站托管」→ 把 `dist/` 上传到 Bucket → 绑定你的域名（需 ICP 备案）并开启 HTTPS。
+2. **轻量应用服务器 / ECS + Nginx**（功能最全，可同时跑后端服务）：把 `dist/` 放到 Nginx 站点根目录，另按「方式四」跑 `server/server.js` 服务（提供 TTS / 日志 / 令牌鉴权），Nginx 反代 `/api` 与 `/logs` 到 `127.0.0.1:3000`；或直接把 `dist/` 交给 `server/server.js` 托管（同源部署，无需反代）。
+
+> 在线版已按 `connect-src` 放行配置：页面在 HTTPS 下可连接 `http://127.0.0.1:3000` / `http://localhost:3000`（本地后端调试）与任意 HTTPS 接口（在线发音 / AI）。后端如需安全接入，按「方式四」设置 `MS_TOKEN` 环境变量。
 
 在线版已内置 **PWA（渐进式 Web 应用）**：App 图标、离线缓存、全屏沉浸、刘海屏安全区，**可添加到主屏幕当 App 用**：
 
@@ -120,14 +125,19 @@ node build.js       # 生成 dist/
 
 ### 方式三：打包成安卓安装包（APK）
 
-本仓库已配置 **GitHub Actions 云端自动打包**（无需本地 SDK）：
+本地打包（无需云端），产物为项目根目录下方按钮指向的 `MindSpeak-Android-v1.1.0.apk`：
 
-1. 打开仓库 **Actions** 页 → 选中 **「打包安卓安装包 APK」**；
-2. 点 **Run workflow**（或在仓库创建 `v1.x.x` 标签自动触发）；
-3. 构建完成后：打标签的版本会出现在 **Releases** 下载页；手动触发的在 **Artifacts** 里下载；
-4. 把 APK 传入手机直接安装（需允许安装未知来源应用）。
+```bash
+node build.js                 # 先构建 dist/（web 资源）
+npx cap sync android          # 把 dist 同步进 android/app/src/main/assets/public
+# 需要 JDK 21（本机默认 Java 17 会报"无效的源发行版：21"），在 android/ 下执行：
+..\fix-java.bat gradlew.bat assembleDebug
+# 产物：android\app\build\outputs\apk\debug\app-debug.apk
+```
 
-APK 由 Capacitor 打包，内置全部词库与离线缓存，**断网也能背单词**。也可以在线用 PWA：`https://asthxx.github.io/mindspeak/` 添加到主屏幕。
+把 APK 传入手机直接安装（需允许安装未知来源应用），或上传阿里云后分享下载链接。
+
+> APK 由 Capacitor 打包，内置全部词库与离线缓存，**断网也能背单词**。在线 PWA 版（部署后地址）也可添加到主屏幕。
 
 ### 方式四：自建本地服务（完整发音 + 日志）
 
@@ -169,7 +179,7 @@ node server.js
 - Node.js（可选，仅供本地发音服务与会话日志）
 - Terser（构建混淆）
 - **PWA**：manifest + Service Worker 离线缓存，可安装到主屏幕 / 打包 APK
-- 部署：GitHub Pages / Vercel / Cloudflare Pages 均可
+- 部署：任意静态托管 / 服务器均可（如阿里云 OSS 静态托管、轻量应用服务器 / ECS + Nginx）；HTTPS 建议启用（PWA 与安全特性需要）
 
 ---
 
