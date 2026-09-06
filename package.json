@@ -23,6 +23,7 @@
     "@capgo/capacitor-navigation-bar": "^8.2.6",
     "@sentiolabs/opencode-frontend-design": "^0.3.0",
     "@tauri-apps/cli": "^2.4.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "jsdom": "^30.0.1",
     "terser": "^5.49.2",
     "typescript": "^7.0.2",

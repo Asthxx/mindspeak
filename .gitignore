@@ -4,6 +4,7 @@ server/.env
 # 依赖与构建产物
 node_modules/
 dist/
+coverage/
 
 # 运行时数据库（含用户数据，启动时自动重建）
 server/data/
