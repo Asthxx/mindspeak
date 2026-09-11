@@ -37,7 +37,13 @@ var NeuralEngine = (function() {
       Object.keys(wp).forEach(function(id) {
         var p = wp[id] || {};
         if (p.status === 'mastered') result.mastered++;
-        else if (p.status && p.nextReview && today && String(p.nextReview) <= today) result.due++;
+        else if (p.status) {
+          // nextReview 防御：兼容旧导入数据的时间戳数字 → 转为日期字符串再比较
+          var nr = p.nextReview;
+          if (typeof nr === 'number') nr = (typeof getLocalDateStr === 'function') ? getLocalDateStr(new Date(nr)) : '';
+          else nr = String(nr || '').slice(0, 10);
+          if (nr && today && nr <= today) result.due++;
+        }
       });
       var g = (ds.getProgress && ds.getProgress('gamification', {})) || {};
       if (typeof g.points === 'number') result.points = g.points;
@@ -59,10 +65,13 @@ var NeuralEngine = (function() {
     var timeoutMs = opts.timeoutMs || DEFAULT_TIMEOUT;
     return new Promise(function(resolve) {
       var content = String(text || '').trim();
-      if (!isLLMIntent(intent) || !content || !allow()) return resolve(null);
-      // 离线拦截：server 明确无 key / 额度耗尽，且探测未过期 → 直接规则兜底，不再打上游；
-      // 过期（HEALTH_PROBE_MS）后放行一次侦察请求，额度恢复即自动切回在线。
+      if (!isLLMIntent(intent) || !content) return resolve(null);
+      // 离线拦截（先于 allow()，离线不消耗限流额度）：server 明确无 key / 额度耗尽，
+      // 且探测未过期 → 直接规则兜底；过期（HEALTH_PROBE_MS）后放行一次侦察请求，额度恢复自动切回。
       if (_health && _health.enabled === false && (Date.now() - _healthAt) < HEALTH_PROBE_MS) return resolve(null);
+      if (!allow()) return resolve(null);
+      // 服务端严格限制单条 content ≤500（含概况拼接）；超长截断避免整条被拒导致 LLM 丢池
+      if (content.length > 400) content = content.slice(0, 400);
       var ctx = getAgentContext();
       content += '（我的学习概况：' + JSON.stringify(ctx) + '）';
       var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
@@ -95,12 +104,14 @@ var NeuralEngine = (function() {
   }
 
   // 重探测 health 并让 UI 徽章随最新状态刷新（失败时 _health 保持未知，不误判离线）
+  // 复用单次 checkHealth 结果更新 badge，避免与 _aiStatus 重复发请求
   function refreshHealth() {
-    checkHealth();
-    try {
-      var m = window.app && window.app.aiChatModule;
-      if (m && typeof m._aiStatus === 'function') m._aiStatus();
-    } catch (e) {}
+    checkHealth().then(function(s) {
+      try {
+        var m = window.app && window.app.aiChatModule;
+        if (m && typeof m._aiStatus === 'function') m._aiStatus(s);
+      } catch (e) {}
+    });
   }
 
   function checkHealth() {
@@ -202,7 +213,8 @@ var AiChatModule = (function() {
   // 在线增强状态徽章：NeuralEngine 探测 /api/ai/health。
   // key 已配置且未耗尽 → 在线增强；无 key 或额度耗尽 → 离线模式（原因写入 title）。
   // 幂等：重复调用会替换旧徽章（LLM 失败后的 refreshHealth 会触发重画）。
-  AiChatModule.prototype._aiStatus = function() {
+  // 接受可选 prefetched（refreshHealth 已探测好的结果），避免重复发 health 请求。
+  AiChatModule.prototype._aiStatus = function(prefetched) {
     var host = document.querySelector('.ai-chat-card .ai-card-title') || document.querySelector('.ai-chat-card h3');
     if (!host) return;
     var old = host.querySelector('.ai-status-badge');
@@ -212,7 +224,7 @@ var AiChatModule = (function() {
     badge.setAttribute('data-state', 'loading');
     badge.textContent = '…';
     host.appendChild(badge);
-    NeuralEngine.checkHealth().then(function(s) {
+    function apply(s) {
       var on = !!(s && s.ok && s.enabled);
       var quota = !!(s && s.reason === 'quota');
       badge.className = 'ai-status-badge ' + (on ? 'ai-status-on' : 'ai-status-off');
@@ -220,7 +232,9 @@ var AiChatModule = (function() {
       badge.title = on ? '在线增强已启用（LLM 教学通道）'
         : (quota ? 'LLM 额度不足，暂用规则回复；额度恢复后自动切回' : '离线规则模式（未配置 LLM key）');
       badge.textContent = on ? '在线增强' : '离线模式';
-    });
+    }
+    if (prefetched) { apply(prefetched); }
+    else { NeuralEngine.checkHealth().then(apply); }
   };
 
   AiChatModule.prototype._refreshChips = function() {
@@ -643,12 +657,17 @@ var AiChatModule = (function() {
       var p = progress[k];
       if (!p) return;
       if (p.status === 'mastered') mastered++;
-      if (p.status !== 'mastered' && p.nextReview && p.nextReview <= t) due++;
+      if (p.status !== 'mastered') {
+        var nr = p.nextReview;
+        if (typeof nr === 'number') nr = (typeof getLocalDateStr === 'function') ? getLocalDateStr(new Date(nr)) : '';
+        else nr = String(nr || '').slice(0, 10);
+        if (nr && t && nr <= t) due++;
+      }
       if (p.firstSeen === t) todayNew++;
       if (p.lastReviewed === t) todayDone++;
     });
-    var goal = DataStore.getProgress('daily_goal', 10) || 10;
-    if (goal < 1) goal = 10;
+    var goal = Number(DataStore.getProgress('daily_goal', 10));
+    if (!isFinite(goal) || goal < 1) goal = 10;
     var newLeft = Math.max(0, goal - todayNew);
     var mistakes = DataStore.getProgress('mistakes', []);
     var weak = this._roots(mistakes, 1)[0];

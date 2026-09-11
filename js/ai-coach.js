@@ -174,7 +174,12 @@ var AiCoachModule = (function() {
       var p = progress[k];
       if (!p) return;
       if (p.status === 'mastered') mastered++;
-      if (p.status !== 'mastered' && p.nextReview && p.nextReview <= t) due++;
+      if (p.status !== 'mastered') {
+        var nr = p.nextReview;
+        if (typeof nr === 'number') nr = (typeof getLocalDateStr === 'function') ? getLocalDateStr(new Date(nr)) : '';
+        else nr = String(nr || '').slice(0, 10);
+        if (nr && nr <= t) due++;
+      }
       if (p.firstSeen === t) todayNew++;
       if (p.lastReviewed === t) todayDone++;
     });

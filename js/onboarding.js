@@ -166,7 +166,8 @@ var OnboardingModule = (function() {
     var box = document.getElementById('ob-plan-box');
     if (!box) return;
     var res = this._assessmentRes || DataStore.getProgress('assessment', null);
-    var goal = DataStore.getProgress('daily_goal', 10) || 10;
+    var goal = Number(DataStore.getProgress('daily_goal', 10));
+    if (!isFinite(goal) || goal < 1) goal = 10;
     var lv = res ? { newcomer: '零基础', beginner: '入门', basic: '基础', intermediate: '进阶', advanced: '挑战' }[res.level] || res.level : '入门';
     if (res) {
       var plan = AssessmentEngine.buildPlan(res, goal);

@@ -97,12 +97,17 @@ var DashboardModule = (function() {
       var p = progress[k];
       if (!p) return;
       if (p.firstSeen === t) newCount++;
-      if (p.status !== 'mastered' && p.nextReview && p.nextReview <= t) dueCount++;
+      if (p.status !== 'mastered') {
+        var nr = p.nextReview;
+        if (typeof nr === 'number') nr = (typeof getLocalDateStr === 'function') ? getLocalDateStr(new Date(nr)) : '';
+        else nr = String(nr || '').slice(0, 10);
+        if (nr && nr <= t) dueCount++;
+      }
       if (p.lastReviewed === t) doneCount++;
       if (p.status === 'mastered') mastered++;
     });
-    var goal = DataStore.getProgress('daily_goal', 10) || 10;
-    if (goal < 1) goal = 10;
+    var goal = Number(DataStore.getProgress('daily_goal', 10));
+    if (!isFinite(goal) || goal < 1) goal = 10;
     var cats = DataStore.getDefaultWords().categories || [];
     var total = 0;
     cats.forEach(function(cat) { if (cat && cat.words) total += cat.words.length; });
@@ -151,7 +156,12 @@ var DashboardModule = (function() {
     var t = getLocalDateStr();
     Object.keys(progress).forEach(function(k) {
       var p = progress[k];
-      if (p && p.status !== 'mastered' && p.nextReview && p.nextReview <= t) due++;
+      if (p && p.status !== 'mastered') {
+        var nr = p.nextReview;
+        if (typeof nr === 'number') nr = (typeof getLocalDateStr === 'function') ? getLocalDateStr(new Date(nr)) : '';
+        else nr = String(nr || '').slice(0, 10);
+        if (nr && nr <= t) due++;
+      }
     });
     if (due > 0) tips.push('有 ' + due + ' 个单词待复习，先复习再学新词效率更高');
     if (tips.length === 0) tips.push('学习状态良好，继续保持！');

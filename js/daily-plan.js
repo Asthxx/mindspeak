@@ -34,11 +34,16 @@ var DailyPlanModule = (function() {
     Object.keys(progress).forEach(function(k) {
       var p = progress[k];
       if (p.firstSeen === t) newCount++;
-      if (p.status !== 'mastered' && p.nextReview && p.nextReview <= t) dueCount++;
+      if (p.status !== 'mastered') {
+        var nr = p.nextReview;
+        if (typeof nr === 'number') nr = (typeof getLocalDateStr === 'function') ? getLocalDateStr(new Date(nr)) : '';
+        else nr = String(nr || '').slice(0, 10);
+        if (nr && nr <= t) dueCount++;
+      }
       if (p.lastReviewed === t) doneCount++;
     });
-    var goal = DataStore.getProgress('daily_goal', 10) || 10;
-    if (goal < 1) goal = 10;
+    var goal = Number(DataStore.getProgress('daily_goal', 10));
+    if (!isFinite(goal) || goal < 1) goal = 10;
 
     var el = document.getElementById('dp-goal-num');
     if (el) el.textContent = goal;
