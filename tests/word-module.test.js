@@ -76,7 +76,10 @@ describe('WordModule 行为', () => {
     const favs = window.DataStore.getProgress('favorites', []);
     expect(favs.length).toBe(1);
     expect(favs[0].word).toBe('apple');
-    // 重复收藏不新增
+    // toggle: 重复收藏 = 取消收藏
+    document.getElementById('btn-fav-word').click();
+    expect(window.DataStore.getProgress('favorites', []).length).toBe(0);
+    // 再次收藏
     document.getElementById('btn-fav-word').click();
     expect(window.DataStore.getProgress('favorites', []).length).toBe(1);
   });

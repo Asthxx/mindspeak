@@ -2478,6 +2478,8 @@ cat.words = merged;
     document.getElementById('word-back').classList.add('hidden');
     // 新词展示：主动回忆的"已答对放行"状态复位，下一次翻牌重新考
     this._recallPassed = false;
+    // 收藏按钮状态同步：当前词是否已收藏 → 实心书签+填色 / 描边书签+描边
+    this._syncFavBtn();
     // 本地即时语音：后台预合成当前词 + 接下来几个词，点击即出声
     if (window.SpeechUtil) {
       var pf = [];
@@ -2508,19 +2510,42 @@ WordModule.prototype.speakCurrent = function() {
     } catch(e) {
     }
   };
+  // 收藏按钮状态同步：已收藏 → 实心书签+填色；未收藏 → 描边书签+
+  WordModule.prototype._syncFavBtn = function() {
+    var words = this.getCurrentWords();
+    if (!words.length) return;
+    var w = words[this.currentIndex];
+    var favs = DataStore.getProgress('favorites', []);
+    var isFav = favs.some(function(f) { return f.word === w.word; });
+    var btn = document.getElementById('btn-fav-word');
+    if (!btn) return;
+    var use = btn.querySelector('use');
+    if (use) {
+      var href = isFav ? '#i-bookmark' : '#i-bookmark-add';
+      use.setAttribute('href', href);
+      use.setAttribute('xlink:href', href);
+    }
+    btn.title = isFav ? '取消收藏' : '收藏';
+    if (isFav) btn.classList.add('active');
+    else btn.classList.remove('active');
+  };
   WordModule.prototype.favoriteCurrent = function() {
     var words = this.getCurrentWords();
     if (!words.length) return;
     var w = words[this.currentIndex];
     var favs = DataStore.getProgress('favorites', []);
-    var exists = favs.some(function(f) { return f.word === w.word; });
-    if (!exists) {
+    var idx = -1;
+    favs.forEach(function(f, i) { if (f.word === w.word) idx = i; });
+    if (idx >= 0) {
+      favs.splice(idx, 1);
+      DataStore.setProgress('favorites', favs);
+      Toast.info('已取消收藏');
+    } else {
       favs.push({ word: w.word, phonetic: w.phonetic, pos: w.pos, chinese: w.chinese, example: w.example, example_cn: w.example_cn, category: this.currentCategoryIndex, source: 'manual' });
       DataStore.setProgress('favorites', favs);
       Toast.success('已收藏');
-    } else {
-      Toast.info('已在收藏夹中');
     }
+    this._syncFavBtn();
   };
   WordModule.prototype.prevWord = function() { if (this.currentIndex > 0) { this.currentIndex--; this.showCurrentWord(); this.saveCardPos(); } };
   WordModule.prototype.nextWord = function() { var words = this.getCurrentWords(); if (this.currentIndex < words.length - 1) { this.currentIndex++; this.showCurrentWord(); this.saveCardPos(); } };

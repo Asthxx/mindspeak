@@ -123,6 +123,13 @@
   transform:scale(1.1);
   box-shadow:var(--shadow-coral);
 }
+.btn-fav.active{
+  background:var(--coral);border-color:var(--coral);
+  color:#fff;box-shadow:var(--shadow-coral);
+}
+.btn-fav.active:hover{
+  background:var(--coral-deep);border-color:var(--coral-deep);
+}
 
 @media (max-width:768px){
   .listening-card{padding:var(--sp-7) var(--sp-5);border-radius:var(--radius-lg)}
