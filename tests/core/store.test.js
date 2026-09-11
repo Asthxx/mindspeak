@@ -76,18 +76,30 @@ describe('UserState — migrate() 幂等性', () => {
     ls.setItem('mindspeak.schemaVersion', '0');
     ls.setItem('gamification', JSON.stringify({ points: 'bad' }));
     const ver = US().migrate();
-    expect(ver).toBe(1);
+    expect(ver).toBe(2);
     const gami = JSON.parse(localStorage.getItem('gamification'));
     expect(gami.points).toBe(0);
   });
 
-  it('should_not_rerun_migration_when_already_at_current_version', () => {
+  it('should_run_v2_when_at_version_1', () => {
+    // 模拟存量数据：schemaVersion 1 + word_progress 含数字时间戳 nextReview
     ls.setItem('mindspeak.schemaVersion', '1');
-    ls.setItem('gamification', JSON.stringify({ points: 50, level: 1, streak: 0, totalWords: 0, totalExercises: 0 }));
+    ls.setItem('word_progress', JSON.stringify({ 'apple-0': { nextReview: 1757600000000, status: 'learning' } }));
     const ver = US().migrate();
-    expect(ver).toBe(1);
-    const gami = JSON.parse(localStorage.getItem('gamification'));
-    expect(gami.points).toBe(50);
+    expect(ver).toBe(2);
+    const wp = JSON.parse(localStorage.getItem('word_progress'));
+    // 数字时间戳 1757600000000 → 2025-09-11（东八区）
+    expect(wp['apple-0'].nextReview).toBe('2025-09-11');
+  });
+
+  it('should_not_rerun_when_already_at_current_version', () => {
+    ls.setItem('mindspeak.schemaVersion', '2');
+    ls.setItem('word_progress', JSON.stringify({ 'test-0': { nextReview: '2026-10-01', status: 'learning' } }));
+    const ver = US().migrate();
+    expect(ver).toBe(2);
+    const wp = JSON.parse(localStorage.getItem('word_progress'));
+    // 不应被二次处理（已是字符串）
+    expect(wp['test-0'].nextReview).toBe('2026-10-01');
   });
 
   // BUG 测试：schemaVersion 写入失败后 migrate 重复执行
@@ -129,5 +141,32 @@ describe('UserState — reset() 全量清除', () => {
     US().reset(['word_progress']);
     expect(US().get('word_progress', null)).toBeNull();
     expect(US().get('mistakes')).toEqual([]);
+  });
+});
+
+describe('UserState — isDue()', () => {
+  it('should_return_true_when_string_nextReview_is_due', () => {
+    expect(US().isDue({ status: 'learning', nextReview: '2026-09-10' }, '2026-09-11')).toBe(true);
+  });
+
+  it('should_return_false_when_string_nextReview_is_future', () => {
+    expect(US().isDue({ status: 'learning', nextReview: '2026-09-12' }, '2026-09-11')).toBe(false);
+  });
+
+  it('should_return_false_for_mastered_even_if_nextReview_is_past', () => {
+    expect(US().isDue({ status: 'mastered', nextReview: '2025-01-01' }, '2026-09-11')).toBe(false);
+  });
+
+  it('should_handle_numeric_timestamp_nextReview', () => {
+    // 1757500800000 = 2025-09-11T00:00:00Z
+    expect(US().isDue({ status: 'learning', nextReview: 1757500800000 }, '2025-09-11')).toBe(true);
+  });
+
+  it('should_return_false_when_nextReview_is_null', () => {
+    expect(US().isDue({ status: 'learning', nextReview: null }, '2026-09-11')).toBe(false);
+  });
+
+  it('should_return_false_when_today_is_empty', () => {
+    expect(US().isDue({ status: 'learning', nextReview: '2026-09-10' }, '')).toBe(false);
   });
 });

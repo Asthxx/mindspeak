@@ -9,7 +9,7 @@ window.UserState = (function() {
   'use strict';
 
   var SCHEMA_KEY = 'mindspeak.schemaVersion';
-  var CURRENT_SCHEMA = 1;
+  var CURRENT_SCHEMA = 2;
 
   // 统一 key 常量（新代码从这里取，禁止散落字符串）
   var KEYS = {
@@ -158,12 +158,52 @@ window.UserState = (function() {
       nextVer = 1;
     }
 
-    // ---- 未来版本在此追加：if (ver < 2) { ...; nextVer = 2; } ----
+    // ---- 第 2 版：word_progress 数字时间戳 nextReview 归一为日期字符串 ----
+    // 旧/导入数据可能把 nextReview 存成毫秒时间戳，与"YYYY-MM-DD"字典序比较会误判
+    // due（全部判 due 或全部判非 due）。这里一次性转成日期字符串，运行期统计/复习列表
+    // 与备份导入以外的路径都不用再担心脏数据口径。正常写入的日期字符串不受影响。
+    if (ver < 2) {
+      var wp = get(KEYS.wordProgress, null);
+      if (wp && typeof wp === 'object' && !Array.isArray(wp)) {
+        var wpChanged = false;
+        for (var wk in wp) {
+          var rec = wp[wk];
+          if (rec && typeof rec === 'object' && typeof rec.nextReview === 'number') {
+            rec.nextReview = fmtDate(new Date(rec.nextReview));
+            wpChanged = true;
+          }
+        }
+        if (wpChanged) set(KEYS.wordProgress, wp);
+      }
+      nextVer = 2;
+    }
 
     if (nextVer > ver) setRaw(SCHEMA_KEY, String(nextVer));
     return nextVer;
   }
 
+  // 本地日期字符串（YYYY-MM-DD）；与 app.js getLocalDateStr 同语义，供本层独立使用
+  function fmtDate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  // 统一"是否待复习"判断：兼容旧/导入数据的数字时间戳 nextReview → 转日期字符串再字典序比较。
+  // 统计口径与复习列表/复习建议共用同一套防御，避免数字时间戳被字典序误判为全部 due 或全部非 due。
+  function isDue(prog, todayStr) {
+    if (!prog || !prog.nextReview || !todayStr || prog.status === 'mastered') return false;
+    var nr = prog.nextReview;
+    if (typeof nr === 'number') {
+      var d = new Date(nr);
+      if (isNaN(d.getTime())) return false;
+      nr = fmtDate(d);
+    } else {
+      nr = String(nr).slice(0, 10);
+    }
+    return !!nr && nr <= todayStr;
+  }
   // 词库进度内存优先读取：页面运行中 wordModule 内存态是最新的（写入有 300ms 节流），
   // 事件驱动的即时刷新用它可避免读到过期存储；无内存态时回落到 localStorage。
   function getWordProgress() {
@@ -186,6 +226,7 @@ window.UserState = (function() {
     reset: reset,
     migrate: migrate,
     getWordProgress: getWordProgress,
+    isDue: isDue,
     SCHEMA_KEY: SCHEMA_KEY,
     CURRENT_SCHEMA: CURRENT_SCHEMA,
     schemaVersion: schemaVersion

@@ -2250,7 +2250,7 @@ function WordModule() {
           status = 'mastered';
         } else if (p.status === 'failed') {
           status = 'failed';
-        } else if (p.nextReview && p.nextReview <= today) {
+        } else if (window.UserState && window.UserState.isDue ? window.UserState.isDue(p, today) : (p.nextReview && p.nextReview <= today)) {
           status = 'due';
         } else {
           status = 'learning';
@@ -2286,7 +2286,7 @@ function WordModule() {
       if (p) {
         if (p.status === 'mastered') { status = '已掌握'; statusCls = 'status-mastered'; }
         else if (p.status === 'failed') { status = '不认识'; statusCls = 'status-failed'; }
-        else if (p.nextReview && p.nextReview <= today) { status = '待复习'; statusCls = 'status-due'; }
+        else if (window.UserState && window.UserState.isDue ? window.UserState.isDue(p, today) : (p.nextReview && p.nextReview <= today)) { status = '待复习'; statusCls = 'status-due'; }
         else { status = '学习中'; statusCls = 'status-learning'; }
       }
       return '<div class="wl-row">' +
@@ -2612,7 +2612,7 @@ WordModule.prototype.saveCardPos = function() {
     // 记录旧状态用于统计缓存增量维护（避免翻牌热路径每次全量遍历当前分类）
     var oldProg = this.wordProgress[key];
     var oldMastered = !!(oldProg && oldProg.status === 'mastered');
-    var oldDue = !!(oldProg && oldProg.status !== 'mastered' && oldProg.nextReview && oldProg.nextReview <= today);
+    var oldDue = !!(oldProg && (window.UserState && window.UserState.isDue ? window.UserState.isDue(oldProg, today) : (oldProg.status !== 'mastered' && oldProg.nextReview && oldProg.nextReview <= today)));
     // 首次建档：记录 firstSeen（供词文串学识别"今日新学"）
     if (!oldProg) this.wordProgress[key] = { reviewCount: 0, status: 'learning', nextReview: this.getToday(), firstSeen: this.getToday() };
     var prog = this.wordProgress[key];
@@ -2671,7 +2671,7 @@ prog.lastReviewed = today; // 供每日学习计划统计"今日已复习"
     var cb = this._statsCache;
     if (cb && cb.catIdx === this.currentCategoryIndex && cb.valid) {
       var newMastered = prog.status === 'mastered';
-      var newDue = !(prog.status === 'mastered') && prog.nextReview && prog.nextReview <= today;
+      var newDue = !(prog.status === 'mastered') && (window.UserState && window.UserState.isDue ? window.UserState.isDue(prog, today) : (prog.nextReview && prog.nextReview <= today));
       if (oldMastered !== newMastered) cb.mastered += newMastered ? 1 : -1;
       if (oldDue !== newDue) cb.due += newDue ? 1 : -1;
     } else if (cb && cb.catIdx === this.currentCategoryIndex) {
@@ -2729,7 +2729,7 @@ WordModule.prototype.renderStats = function() {
         var key = words[i].word + '-' + ci;
         var p = self.wordProgress[key];
         if (p && p.status === 'mastered') m++;
-        else if (p && p.status !== 'mastered' && p.nextReview && p.nextReview <= today) d++;
+        else if (p && p.status !== 'mastered' && (window.UserState && window.UserState.isDue ? window.UserState.isDue(p, today) : (p.nextReview && p.nextReview <= today))) d++;
       }
       mastered = m; due = d; total = words.length;
       this._statsCache = { catIdx: ci, mastered: m, due: d, total: words.length, today: today };
@@ -5395,7 +5395,7 @@ var SmartReview = (function() {
       var p = progress[key];
       if (p && p.status !== 'mastered') {
         total++;
-        if (p.nextReview && p.nextReview <= today) due++;
+        if (window.UserState && window.UserState.isDue ? window.UserState.isDue(p, today) : (p.nextReview && p.nextReview <= today)) due++;
       }
     });
     var done = total - due;
@@ -5721,7 +5721,7 @@ App.prototype.triggerRecall = function(currentWord) {
   var self = this;
   Object.keys(progress).forEach(function(k) {
     var p = progress[k];
-    if (!p || p.status === 'mastered' || !p.nextReview || p.nextReview > today) return;
+    if (!p || p.status === 'mastered' || !p.nextReview || (window.UserState && window.UserState.isDue ? !window.UserState.isDue(p, today) : p.nextReview > today)) return;
     var sp = split(k);
     if (!sp) return;
     var w = self._recallIndex[sp.ci + '\u0001' + String(sp.word).toLowerCase()];
@@ -6403,6 +6403,20 @@ if (name) {
     });
     if (Array.isArray(data.wordProgress) || (data.wordProgress && typeof data.wordProgress === 'object')) {
       sanitized.wordProgress = data.wordProgress;
+      // 导入脏数据防御：nextReview 若为数字时间戳则转日期字符串，防止统计/复习列表字典序误判
+      if (sanitized.wordProgress && typeof sanitized.wordProgress === 'object' && !Array.isArray(sanitized.wordProgress)) {
+        var wpSanitized = sanitized.wordProgress;
+        var wpKeys = Object.keys(wpSanitized);
+        for (var i = 0; i < wpKeys.length; i++) {
+          var rec = wpSanitized[wpKeys[i]];
+          if (rec && typeof rec === 'object' && typeof rec.nextReview === 'number') {
+            var dNr = new Date(rec.nextReview);
+            if (!isNaN(dNr.getTime())) {
+              rec.nextReview = dNr.getFullYear() + '-' + String(dNr.getMonth()+1).padStart(2,'0') + '-' + String(dNr.getDate()).padStart(2,'0');
+            }
+          }
+        }
+      }
     }
     if (data.customVoice && typeof data.customVoice === 'object') {
       sanitized.customVoice = data.customVoice;

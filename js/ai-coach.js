@@ -270,6 +270,7 @@ var AiCoachModule = (function() {
       var p = progress[k];
       if (!p) return;
       if (p.status === 'mastered') mastered++;
+      else if (window.UserState && window.UserState.isDue) { if (window.UserState.isDue(p, t)) due++; }
       else if (p.nextReview && p.nextReview <= t) due++;
     });
     var mistakes = DataStore.getProgress('mistakes', []);
@@ -309,6 +310,7 @@ var AiCoachModule = (function() {
       var p = progress[k];
       if (!p) return;
       if (p.status === 'mastered') mastered++;
+      else if (window.UserState && window.UserState.isDue) { if (window.UserState.isDue(p, t)) due++; }
       else if (p.nextReview && p.nextReview <= t) due++;
     });
     var mistakes = DataStore.getProgress('mistakes', []);

@@ -630,7 +630,8 @@ var AiChatModule = (function() {
       var p = progress[k];
       if (!p) return;
       if (p.status === 'mastered') mastered++;
-      if (p.status !== 'mastered' && p.nextReview && p.nextReview <= t) due++;
+      if (window.UserState && window.UserState.isDue) { if (window.UserState.isDue(p, t)) due++; }
+      else if (p.status !== 'mastered' && p.nextReview && p.nextReview <= t) due++;
       if (p.firstSeen === t) todayNew++;
       if (p.lastReviewed === t) todayDone++;
     });
@@ -714,7 +715,10 @@ var AiChatModule = (function() {
     var due = [];
     Object.keys(progress).forEach(function(k) {
       var p = progress[k];
-      if (p && p.status !== 'mastered' && p.nextReview && p.nextReview <= t) due.push(p);
+      if (p && p.status !== 'mastered' && p.nextReview) {
+        if (window.UserState && window.UserState.isDue) { if (window.UserState.isDue(p, t)) due.push(p); }
+        else if (p.nextReview <= t) due.push(p);
+      }
     });
     if (!due.length) {
       return '目前没有待复习的单词，记忆曲线状态很好！<br><button type="button" class="ai-reply-btn" data-goto="word">学几个新词</button>';
