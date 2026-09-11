@@ -423,30 +423,6 @@ h2{
   /* inline-block：inline 会忽略垂直 margin（下方间距失效），且不影响与右侧播放按钮同行 */
   display:inline-block;
 }
-.phoneme-play-all{
-  display:inline-block;cursor:pointer;
-  font-size:.7rem;color:var(--primary,#5B82A6);
-  background:rgba(91,130,166,.08);
-  border-radius:var(--r-full);padding:2px 8px;
-  margin-left:6px;vertical-align:middle;
-  transition:background .15s;
-}
-.phoneme-play-all:hover{background:rgba(91,130,166,.18);}
-.clickable-phoneme{
-  cursor:pointer;text-decoration:underline;
-  text-decoration-color:var(--primary,#5B82A6);
-  text-underline-offset:3px;
-  transition:color .15s,background .15s;
-  border-radius:3px;padding:1px 2px;
-}
-.clickable-phoneme:hover{
-  color:var(--primary,#5B82A6);
-  background:rgba(91,130,166,.08);
-}
-.phoneme-active{
-  color:#fff!important;
-  background:var(--primary,#5B82A6)!important;
-}
 .word-pos{
   display:inline-block;
   background:linear-gradient(135deg,var(--sage-surface),#E0E7FF);

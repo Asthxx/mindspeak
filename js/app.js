@@ -2184,15 +2184,6 @@ function WordModule() {
     safeBind('btn-hesitate', 'click', function() { self.markWord('hesitate'); });
     safeBind('btn-known', 'click', function() { self.markWord('known'); });
     safeBind('btn-fav-word', 'click', function() { self.favoriteCurrent(); });
-    safeBind('phoneme-play-all', 'click', function() {
-      var el = document.getElementById('current-phonetic');
-      if (!el) return;
-      var spans = el.querySelectorAll('.clickable-phoneme');
-      if (!spans.length) return;
-      var segs = [];
-      for (var i = 0; i < spans.length; i++) segs.push(spans[i].textContent);
-      self._playPhonemeQueue(segs);
-    });
     safeBind('word-category', 'change', function(e) { self.selectCategory(e.target.value); });
     safeBind('btn-add-word', 'click', function() { self.showAddModal(); });
     safeBind('btn-reset-card-pos', 'click', function() { self.resetCardPos(); });
@@ -2421,7 +2412,7 @@ cat.words = merged;
     if (this.currentCategoryIndex >= this.categories.length) return [];
     return this.categories[this.currentCategoryIndex].words;
   };
-  // 音标解析：将 "/həˈloʊ/" 拆成 ["h","ə","ˈl","oʊ"] 等音素段
+  // 音标解析：将 "/həˈloʊ/" 拆成 ["h","ə","ˈl","oʊ"] 等音素段（保留分段排版，仅展示不可点击）
   WordModule.parsePhonetic = function(str) {
     if (!str) return [];
     var inner = str.replace(/^\/|\/$/g, '');
@@ -2433,64 +2424,21 @@ cat.words = merged;
     return parts.filter(function(s) { return s.length > 0; });
   };
 
-  WordModule._phonemeQueue = [];
-  WordModule._phonemeQueueTimer = null;
-
+  // 展示音标：按音素分段（无点读交互），仅渲染文本
   WordModule.prototype._renderPhonetic = function(phonetic) {
-    WordModule._phonemeQueue = [];
-    if (WordModule._phonemeQueueTimer) { clearTimeout(WordModule._phonemeQueueTimer); WordModule._phonemeQueueTimer = null; }
     var el = document.getElementById('current-phonetic');
-    // 无音标/无法分音素时隐藏"连续播放"按钮，避免出现点了没反应的死按钮
-    var playAllBtn = document.getElementById('phoneme-play-all');
-    var setPlayAllVisible = function(on) { if (playAllBtn) playAllBtn.style.display = on ? '' : 'none'; };
     if (!el) return;
-    if (!phonetic) { el.textContent = ''; setPlayAllVisible(false); return; }
+    if (!phonetic) { el.textContent = ''; return; }
     var segments = WordModule.parsePhonetic(phonetic);
-    if (!segments.length) { el.textContent = phonetic; setPlayAllVisible(false); return; }
+    if (!segments.length) { el.textContent = phonetic; return; }
     el.innerHTML = '';
     el.style.fontStyle = 'normal';
-    setPlayAllVisible(true);
-    var self = this;
-    segments.forEach(function(seg, idx) {
+    segments.forEach(function(seg) {
       var span = document.createElement('span');
-      span.className = 'clickable-phoneme';
+      span.className = 'phoneme';
       span.textContent = seg;
-      span.setAttribute('data-idx', idx);
-      span.addEventListener('click', function() { self._onPhonemeClick(idx, seg, segments); });
       el.appendChild(span);
     });
-  };
-
-  WordModule.prototype._onPhonemeClick = function(idx, seg, segments) {
-    var self = this;
-    var el = document.getElementById('current-phonetic');
-    if (el) {
-      var spans = el.querySelectorAll('.clickable-phoneme');
-      if (spans[idx]) {
-        var span = spans[idx];
-        span.classList.add('phoneme-active');
-        setTimeout(function() { span.classList.remove('phoneme-active'); }, 200);
-      }
-    }
-    WordModule._phonemeQueue.push(seg);
-    if (WordModule._phonemeQueueTimer) clearTimeout(WordModule._phonemeQueueTimer);
-    WordModule._phonemeQueueTimer = setTimeout(function() {
-      var queue = WordModule._phonemeQueue.slice();
-      WordModule._phonemeQueue = [];
-      WordModule._phonemeQueueTimer = null;
-      self._playPhonemeQueue(queue);
-    }, 800);
-  };
-
-  WordModule.prototype._playPhonemeQueue = function(queue) {
-    if (!queue.length) return;
-    var i = 0;
-    function next() {
-      if (i >= queue.length) return;
-      var seg = queue[i++];
-      SpeechUtil.speak(seg, 'en-US', { rate: 0.7, onend: next, onerror: next });
-    }
-    next();
   };
 
   WordModule.prototype.showCurrentWord = function() {
