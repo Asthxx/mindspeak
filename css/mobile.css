@@ -4,7 +4,7 @@
    用于强制走手机布局，即使 WebView 没正确触发媒体查询。 */
 .bottom-nav{display:none}
 html.forced-mobile .bottom-nav{display:flex}
-html.forced-mobile .sidebar{position:fixed;top:var(--header);left:0;width:280px;max-width:80vw;height:calc(100dvh - var(--header));transform:translateX(-110%);transition:transform var(--duration-slower) var(--ease-out);z-index:100;overflow-y:auto}
+html.forced-mobile .sidebar{position:fixed;top:var(--header);left:0;width:260px;max-width:80vw;height:calc(100dvh - var(--header));transform:translateX(-110%);transition:transform var(--duration-slower) var(--ease-out);z-index:100;overflow-y:auto}
 html.forced-mobile .sidebar.open{transform:translateX(0)}
 html.forced-mobile .content{margin-left:0;margin-top:var(--header);padding-bottom:calc(var(--sp-6) + 76px + env(safe-area-inset-bottom,0px));overflow-x:hidden}
 html.forced-mobile .app-header{height:var(--header);padding-top:env(safe-area-inset-top,0px)}
@@ -26,7 +26,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   :root{
     --header:calc(48px + env(safe-area-inset-top,0px));
     --header-h:var(--header);
-    --sidebar:280px;
+    --sidebar:260px;
   }
   html{
     -webkit-text-size-adjust:100%;
@@ -110,7 +110,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   /* ---- 内容区全宽：留出底部手势条安全区 ---- */
   .content{
     margin-left:0;margin-top:var(--header);
-    padding:var(--sp-4) var(--sp-4);
+    padding:var(--sp-3) var(--sp-3);
     padding-bottom:calc(var(--sp-6) + 76px + env(safe-area-inset-bottom,0px));
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
@@ -143,32 +143,33 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .bottom-nav-btn.active{
     color:var(--sage-deep);
     background:var(--sage-surface);
+    border-radius:16px 16px 0 0;
   }
   .bottom-nav-btn.active .icon{color:var(--sage-deep)}
   .bottom-nav-btn:active{opacity:0.7}
-  h2{font-size:1.15rem;margin-bottom:var(--sp-4)}
-  h3{font-size:1rem}
+  h2{font-size:1.1rem;margin-bottom:var(--sp-3)}
+  h3{font-size:0.95rem}
 
   /* ================= 首页 控制面板 ================= */
   .dash-greeting{flex-direction:column;align-items:stretch;gap:var(--sp-3)}
   .dash-greeting .btn{width:100%;min-height:48px}
-  .dash-stat-card{padding:14px 14px;gap:10px;border-radius:var(--radius-lg)}
-  .dash-stat-icon{width:40px;height:40px;border-radius:12px}
-  .dash-stat-num{font-size:1.35rem}
-  .dash-stat-label{font-size:0.7rem;line-height:1.4}
-  .dash-card{padding:16px 16px;border-radius:var(--radius-xl)}
+  .dash-stat-card{padding:12px 12px;gap:8px;border-radius:var(--radius-lg)}
+  .dash-stat-icon{width:38px;height:38px;border-radius:12px}
+  .dash-stat-num{font-size:1.25rem}
+  .dash-stat-label{font-size:0.68rem;line-height:1.4}
+  .dash-card{padding:14px 14px;border-radius:var(--radius-lg)}
 
   /* ================= 学习卡片 ================= */
   .card-area{max-width:100%;padding:0 var(--sp-1)}
   .word-card{
-    min-height:min(46vh,360px);
-    padding:var(--sp-8) var(--sp-4);
+    min-height:min(44vh,340px);
+    padding:var(--sp-6) var(--sp-3);
     border-radius:var(--radius-lg);
   }
-  .word-card::before,.word-card::after{width:28px;height:28px}
-  .word-main{font-size:2.6rem;word-break:break-word}
-  .chinese-meaning{font-size:1.3rem}
-  .word-phonetic{font-size:0.95rem}
+  .word-card::before,.word-card::after{width:26px;height:26px}
+  .word-main{font-size:2.3rem;word-break:break-word}
+  .chinese-meaning{font-size:1.15rem}
+  .word-phonetic{font-size:0.9rem}
   .word-actions{gap:var(--sp-2)}
   .word-actions .btn{flex:1;min-width:0;font-size:0.8rem;padding:12px 6px;white-space:nowrap}
   .word-nav{gap:var(--sp-3);margin-bottom:var(--sp-4)}
@@ -177,9 +178,9 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 
   /* ================= 统计/报告网格 ================= */
   .word-stats,.phonetic-stats,.mistake-stats,.report-grid,.mt-stats{grid-template-columns:repeat(2,1fr);gap:var(--sp-3)}
-  .stat-card{padding:var(--sp-4) var(--sp-3)}
-  .stat-num{font-size:1.6rem}
-  .stat-label{font-size:0.68rem}
+  .stat-card{padding:var(--sp-3) var(--sp-3)}
+  .stat-num{font-size:1.45rem}
+  .stat-label{font-size:0.66rem}
 
   /* ================= 工具条 / 筛选 ================= */
   .section-header{flex-direction:column;gap:var(--sp-3);padding:var(--sp-4);align-items:stretch}
@@ -277,8 +278,8 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
     width:100%;max-width:100%;max-height:88vh;max-height:88dvh; /* 双声明：旧 WebView 不识别 dvh 时回退 vh */
     overflow-y:auto;-webkit-overflow-scrolling:touch;
     border-radius:var(--radius-lg) var(--radius-lg) 0 0;
-    padding:var(--sp-5);
-    padding-bottom:calc(var(--sp-5) + env(safe-area-inset-bottom,0px));
+    padding:var(--sp-4);
+    padding-bottom:calc(var(--sp-4) + env(safe-area-inset-bottom,0px));
     animation:modalSheetIn 0.28s var(--ease-out);
   }
   @keyframes modalSheetIn{
@@ -287,6 +288,15 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   }
   .modal-actions{flex-direction:column-reverse}
   .modal-actions .btn{width:100%;padding:12px;min-height:48px}
+  .modal-content{position:relative}
+  /* 拖拽把手（sticky 在滚动容器顶） */
+  .modal-content::before{
+    content:'';display:block;position:sticky;top:8px;z-index:1;
+    width:36px;height:4px;border-radius:2px;background:var(--border);
+    margin:0 auto var(--sp-3);
+  }
+  .bottom-nav-btn.active{font-weight:600}
+  .bottom-nav-btn:active .icon{transform:scale(0.92);transition:transform 0.08s}
   .modal-content.assess-modal-content{width:100%;max-width:100%;max-height:92vh;max-height:92dvh}
   .assess-modal-content,.ob-modal-content, .modal-content[style*="width:860px"],
   .modal-content[style*="width:550px"], .modal-content[style*="width:500px"]{
