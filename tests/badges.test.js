@@ -73,6 +73,22 @@ describe('BadgeSystem — checkAll() 幂等性', () => {
 });
 
 describe('BadgeSystem — 徽章条件边界', () => {
+  it('should_read_word_progress_from_memory_first_when_flushing_is_throttled', () => {
+    // 语义同 #1/#5/#9：wordModule.wordProgress 在 300ms 节流窗口内更新、尚未落盘到 localStorage。
+    // 徽章 getProgress 若直读 localStorage 会拿到节流前旧表 → first「累计学过 1 词」徽章滞后解锁。
+    // 必须读内存态（徽章奖品 30 积分，滞后=白丢一次发奖时机）。
+    globalThis.app = { wordModule: { wordProgress: { 'apple-0': { status: 'mastered' } } }, updateGlobalStats: vi.fn() };
+    // localStorage 仍是空表（节流窗口未过，无 word_progress 写）
+    globalThis.DataStore.getProgress.mockImplementation((key, fallback) => {
+      if (key === 'word_progress') return {};
+      if (key === 'badges') return {};
+      return fallback;
+    });
+    const bs = new BadgeSystem();
+    bs.checkAll();
+    expect(bs.earned['first']).toBeTruthy();
+  });
+
   it('should_not_award_mistakes_badge_when_no_mistakes', () => {
     // 空错题本不应触发 "错题清零" 徽章
     globalThis.DataStore.getProgress = vi.fn((key, fallback) => {

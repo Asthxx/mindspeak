@@ -76,6 +76,13 @@ window.UserState = (function() {
         else parsed.points = Math.min(Math.floor(parsed.points), 999999);
         if (typeof parsed.level !== 'number') parsed.level = Math.floor((parsed.points || 0) / 100) + 1;
         else parsed.level = Math.max(1, Math.min(Math.floor(parsed.level), 99));
+        // 与 _sanitizeBackup 同口径（审计 M2）：streak/totalWords/totalExercises 也封顶，防 AI 概况/统计拼接大数字
+        ['streak', 'totalWords', 'totalExercises'].forEach(function(k2) {
+          var v2 = parsed[k2];
+          if (v2 === undefined || v2 === null) return;
+          if (typeof v2 !== 'number' || !isFinite(v2)) parsed[k2] = 0;
+          else parsed[k2] = Math.min(Math.floor(v2), 999999);
+        });
       }
       return parsed;
     } catch (e) {
@@ -173,7 +180,11 @@ window.UserState = (function() {
         for (var wk in wp) {
           var rec = wp[wk];
           if (rec && typeof rec === 'object' && typeof rec.nextReview === 'number') {
-            rec.nextReview = fmtDate(new Date(rec.nextReview));
+            // 非法时间戳（如 1e300 产生 Invalid Date）不得转成 "NaN-NaN-NaN"：
+            // 否则 isDue 字典序比较永久判非 due，词从复习队列消失。同导入路径守卫（app.js）。
+            var dNr = new Date(rec.nextReview);
+            if (isNaN(dNr.getTime())) continue;
+            rec.nextReview = fmtDate(dNr);
             wpChanged = true;
           }
         }

@@ -5,7 +5,16 @@ var BadgeSystem = (function() {
   var REWARD = 30;
 
   function today() { return getLocalDateStr(); }
-  function getProgress() { return DataStore.getProgress('word_progress', {}); }
+  // 徽章条件统计词表必须读内存态（wordModule.wordProgress）优先，再回退 localStorage ——
+  // 与 app.js sampleLearnedWords/_collectBackup/undoLastKnown 同一口径（审查 #16/#5/#9）：
+  // word_progress 有 300ms 节流，节流窗口内直读 localStorage 会拿到旧表 → "累计学过 1 词" 等
+  // 徽章滞后解锁（白丢一次发奖时机）。内存态是 300ms 内最新真实数据。
+  function getProgress() {
+    var wm = (window.app && window.app.wordModule && window.app.wordModule.wordProgress)
+      ? window.app.wordModule.wordProgress
+      : (globalThis.app && globalThis.app.wordModule && globalThis.app.wordModule.wordProgress);
+    return wm || DataStore.getProgress('word_progress', {});
+  }
   function getCheckins() { return DataStore.getProgress('checkins', {}); }
 
   // 徽章配置：id / name / icon / desc / reward / check / progress

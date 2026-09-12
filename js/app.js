@@ -31,19 +31,52 @@ function shuffleSample(arr, n) {
 // 练习取样（单词PK/听力/语境/跟读共用）：只从「已学过」的词里抽，杜绝出未学词必错的题。
 // word_progress 有 status 记录 = 学过（mastered/learning/new 任一状态都算）。
 // 已学不足 n 时返回全部已学词（不掺未学词补齐）；返回空数组表示没有任何已学词，调用方提示并中止开局。
-function sampleLearnedWords(wordList, n) {
-  var wp = {};
+function sampleLearnedWords(wordList, n, windowDays) {
+  // 词->{status,lastReviewed} 索引：进度表 key 可能是纯词（旧口径）或 "word-分类序号"（markWord 生产口径）。
+  // 用与 app.js 其他解析点（错题同步/统计）一致的贪婪正则 ^(.+)-(\d+)$ 还原纯词，
+  // 兼容单词本身带连字符/数字（'x-ray-2' -> word:'x-ray', ci:2）。只构建一次，避免 N×M 扫描。
+  var idx = {};
   try {
-    wp = (window.app && window.app.wordModule && window.app.wordModule.wordProgress)
+    var wp = (window.app && window.app.wordModule && window.app.wordModule.wordProgress)
       ? window.app.wordModule.wordProgress
       : DataStore.getProgress('word_progress', {});
+    if (wp && typeof wp === 'object') {
+      var re = /^(.+)-(\d+)$/;
+      var keys = Object.keys(wp);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var rec = wp[k];
+        if (!rec || typeof rec !== 'object') continue;
+        var base = k;
+        var m = re.exec(k);
+        if (m) base = m[1];
+        if (!idx[base]) idx[base] = { status: null, lastReviewed: '' };
+        if (rec.status && (!idx[base].status || rec.lastReviewed > idx[base].lastReviewed)) {
+          idx[base].status = rec.status;
+          if (rec.lastReviewed) idx[base].lastReviewed = rec.lastReviewed;
+        }
+      }
+    }
   } catch (e) {}
-  var learned = [];
+  var cutoffStr = '';
+  if (windowDays !== 0) {
+    var cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - (windowDays || 7) + 1); // 最近 N 天（默认 7，含今天）
+    cutoffStr = getLocalDateStr(cutoff);
+  }
+  var recent = [], older = [];
   for (var i = 0; i < wordList.length; i++) {
     var w = wordList[i];
-    if (w && w.word && wp[w.word] && wp[w.word].status) learned.push(w);
+    if (!w || !w.word || !idx[w.word] || !idx[w.word].status) continue;
+    var last = idx[w.word].lastReviewed;
+    if (last && cutoffStr && last >= cutoffStr) recent.push(w);
+    else older.push(w);
   }
-  return shuffleSample(learned, Math.min(n, learned.length));
+  // 优先最近窗口；窗口不足则用更早已学词兜底补足（仍不掺未学词，杜绝必错题）。
+  // 完全没有已学词 → 返回空，由调用方提示先背单词。
+  if (recent.length >= n) return shuffleSample(recent, n);
+  if (recent.length || older.length) return shuffleSample([].concat(recent, older), n);
+  return [];
 }
 // 本地日期字符串（YYYY-MM-DD）。全局统一用这个取"今天/某天"，
 // 避免 toISOString 按 UTC 转日期导致东八区凌晨 0-8 点记到昨天。
@@ -4759,7 +4792,12 @@ MistakeModule.prototype.markKnown = function() {
       DataStore.setProgress('mistakes', mistakes);
     } catch(e) {}
     try {
-      var wp = DataStore.getProgress('word_progress', {});
+      // 以内存态为基础（不是 localStorage 旧全表）：saveProgress 有 300ms 节流，
+      // 直读 localStorage 会①漏还原节流窗口内尚未落盘的 key ②把旧表整体盖掉内存态里
+      // 其它未落盘的新进度（审查 P2 #9）。只还原本次真正动过的 key，不动其它记录。
+      var wp = (window.app && window.app.wordModule && window.app.wordModule.wordProgress)
+        ? window.app.wordModule.wordProgress
+        : DataStore.getProgress('word_progress', {});
       var changed = false;
       for (var j = 0; j < last.wpSnapshots.length; j++) {
         var s = last.wpSnapshots[j];
@@ -6604,7 +6642,17 @@ if (name) {
 // includeBig=false 用于本地自动/手动保存 english_app_backup（只存小字段，避免双份超配额）
   App.prototype._collectBackup = function(includeBig) {
     var data = {};
-    this._backupFields.forEach(function(f) { if (!includeBig && f[3]) return; data[f[0]] = DataStore.getProgress(f[1], f[2]); });
+    // word_progress 优先读 wordModule 内存态：saveProgress 有 300ms 节流，
+    // 若直读 localStorage 会丢节流窗口内已标记但未落盘的最新进度（审查 P2 #5）
+    var wm0 = (window.app && window.app.wordModule) ? window.app.wordModule : null;
+    this._backupFields.forEach(function(f) {
+      if (!includeBig && f[3]) return;
+      if (f[1] === 'word_progress' && wm0 && wm0.wordProgress && typeof wm0.wordProgress === 'object') {
+        data[f[0]] = wm0.wordProgress;
+        return;
+      }
+      data[f[0]] = DataStore.getProgress(f[1], f[2]);
+    });
     var customWords = [];
     var cats = DataStore.getDefaultWords().categories || [];
     if (includeBig) {
@@ -6717,13 +6765,17 @@ if (name) {
       if (_a.recommendName != null) _a.recommendName = String(_a.recommendName).substring(0, 50);
       sanitized.assessment = _a;
     }
-    // gamification：level/points 必须是有限数字（AI 概况渲染直接拼接，F3 修复）
+    // gamification：level/points/streak/totals 必须是有限数字（AI 概况渲染直接拼接，F3 修复；审计 M2 扩到 streak/totals）
     if (sanitized.gamification && typeof sanitized.gamification === 'object' && !Array.isArray(sanitized.gamification)) {
       var _g = sanitized.gamification;
       var _lv = Number(_g.level);
       _g.level = isFinite(_lv) && _lv >= 0 ? Math.floor(Math.min(_lv, 99)) : 1;
       var _pt = Number(_g.points);
       _g.points = isFinite(_pt) && _pt >= 0 ? Math.floor(Math.min(_pt, 999999)) : 0;
+      ['streak', 'totalWords', 'totalExercises'].forEach(function(_gk) {
+        var _gv = Number(_g[_gk]);
+        _g[_gk] = isFinite(_gv) && _gv >= 0 ? Math.floor(Math.min(_gv, 999999)) : 0;
+      });
       sanitized.gamification = _g;
     }
     // items：道具数量必须是有限数字（道具商店渲染直接拼接，F2 修复）
@@ -7232,10 +7284,13 @@ App.prototype.resetData = function() {
       if (window.app.wordModule.wordProgress) window.app.wordModule.wordProgress = {};
     }
     window.__resettingData = true;
-    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','custom_voice','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice'];
+    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','custom_voice','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
     appKeys.forEach(function(k) { Storage.remove(k); });
     var _cats = DataStore.getDefaultWords().categories || [];
-    for (var i = 0; i < _cats.length; i++) Storage.remove('custom_words_' + i);
+    for (var i = 0; i < _cats.length; i++) {
+      Storage.remove('custom_words_' + i);
+      Storage.remove('selected_words_' + i); // 精选勾选按分类动态键，重置须一并清（审查 P3 #15）
+    }
     // 自定义背景图在 IndexedDB，一并清掉
     try { IDBStore.clear().catch(function() {}); } catch(e) {}
     location.reload();

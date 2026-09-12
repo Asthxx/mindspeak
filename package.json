@@ -7,6 +7,7 @@
     "build": "node build.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke": "node scripts/browser-smoke.mjs",
     "desktop:pack": "node scripts/desktop-pack.js",
     "desktop:build": "npm run build && npm run desktop:pack && tauri build",
     "desktop:dev": "node server/server.js & tauri dev",

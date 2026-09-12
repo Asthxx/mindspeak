@@ -92,6 +92,17 @@ describe('UserState — migrate() 幂等性', () => {
     expect(wp['apple-0'].nextReview).toBe('2025-09-11');
   });
 
+  // BUG 测试（审查 P2 #4）：数字 nextReview 非法（如 1e300）时 migrate 不得写入 "NaN-NaN-NaN"
+  it('should_skip_invalid_numeric_nextReview_during_v2_migration', () => {
+    ls.setItem('mindspeak.schemaVersion', '1');
+    ls.setItem('word_progress', JSON.stringify({ 'bad-0': { nextReview: 1e300, status: 'learning' } }));
+    const ver = US().migrate();
+    expect(ver).toBe(2);
+    const wp = JSON.parse(localStorage.getItem('word_progress'));
+    // 非法时间戳应原样保留，而不是被转成 "NaN-NaN-NaN"（否则 isDue 永久判非 due，词从复习队列消失）
+    expect(wp['bad-0'].nextReview).toBe(1e300);
+  });
+
   it('should_not_rerun_when_already_at_current_version', () => {
     ls.setItem('mindspeak.schemaVersion', '2');
     ls.setItem('word_progress', JSON.stringify({ 'test-0': { nextReview: '2026-10-01', status: 'learning' } }));
@@ -145,6 +156,17 @@ describe('UserState — reset() 全量清除', () => {
 });
 
 describe('UserState — isDue()', () => {
+  // BUG 测试（审查 P3 #17）：读取收敛必须与备份 sanitize 同口径，streak/totalWords/totalExercises 封顶
+  it('should_cap_streak_and_totals_on_read_like_points', () => {
+    ls.setItem('gamification', JSON.stringify({ points: 999999999, level: 100, streak: 1e300, totalWords: 1e300, totalExercises: 1e300 }));
+    const g = US().get('gamification');
+    expect(g.points).toBe(999999);
+    expect(g.level).toBe(99);
+    expect(g.streak).toBeLessThanOrEqual(999999);
+    expect(g.totalWords).toBeLessThanOrEqual(999999);
+    expect(g.totalExercises).toBeLessThanOrEqual(999999);
+  });
+
   it('should_return_true_when_string_nextReview_is_due', () => {
     expect(US().isDue({ status: 'learning', nextReview: '2026-09-10' }, '2026-09-11')).toBe(true);
   });

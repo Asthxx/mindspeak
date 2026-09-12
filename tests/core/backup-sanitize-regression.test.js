@@ -75,3 +75,16 @@ describe('F7 自定义背景图导出/导入丢失', () => {
     expect(body).toContain("data.customBg.indexOf('data:image/') === 0");
   });
 });
+
+describe('重置数据残留（审查 P3 #15）', () => {
+  it('resetData 的 appKeys 必须包含精选开关与 AI 聊天历史', () => {
+    const body = extractFn(read('js/app.js'), 'App.prototype.resetData', 'App.prototype._applyBackup');
+    expect(body).toContain("'learn_selected_only'");
+    expect(body).toContain("'ai_chat_history'");
+  });
+
+  it('resetData 必须按分类循环清除 selected_words_ 动态键', () => {
+    const body = extractFn(read('js/app.js'), 'App.prototype.resetData', '// ==================== IndexedDB');
+    expect(body).toContain("Storage.remove('selected_words_' + i);");
+  });
+});
