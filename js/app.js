@@ -4305,6 +4305,8 @@ var PomodoroModule = (function() {
     this.isRunning = false;
     this.sessions = DataStore.getProgress('pomodoro_sessions', 0);
     this.totalMinutes = DataStore.getProgress('pomodoro_minutes', 0);
+    // 完成提醒音开关（弹窗不受此开关影响，总是显示）；设置页切换时即时更新本字段
+    this.soundEnabled = DataStore.getProgress('pomodoro_sound_enabled', true) !== false;
     // 按 select 当前选中值初始化剩余秒数，让初始显示就是 MM:00 而不是 00:00
     var durSel = document.getElementById('pomodoro-duration');
     var minutes = durSel ? (parseInt(durSel.value) || 25) : 25;
@@ -4406,10 +4408,12 @@ PomodoroModule.prototype.start = function() {
     this.timeLeft = minutes * 60;
     this.updateDisplay();
     Toast.success('番茄钟完成！');
-    // 到时间提醒：弹窗（跨页面可见）+ 三连提示音 + 震动兜底
+    // 到时间提醒：弹窗（跨页面可见，不受开关影响）+ 三连提示音/震动（可设置关闭）
     ConfirmBox.alert('🎉 专注完成！休息一下吧。', { title: '番茄钟完成', okText: '知道了' });
-    this._playAlertSound();
-    this._vibrate();
+    if (this.soundEnabled) {
+      this._playAlertSound();
+      this._vibrate();
+    }
     if (window.app) window.app.recordActivity('pomodoro');
   };
   // 三连提示音：WebAudio 合成（880Hz 正弦短音 ×3），离线可用、无音频资源依赖；
@@ -6061,6 +6065,17 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
       Toast.info(adaptiveToggle.checked ? '已开启自适应复习间隔' : '已关闭自适应复习间隔（恢复固定艾宾浩斯间隔）');
     });
   }
+  // 番茄钟完成提醒音开关：关掉后完成时仅弹窗，不播提示音/震动；即时同步到运行中的 PomodoroModule
+  var pomodoroSoundToggle = document.getElementById('toggle-pomodoro-sound');
+  if (pomodoroSoundToggle) {
+    pomodoroSoundToggle.checked = DataStore.getProgress('pomodoro_sound_enabled', true) !== false;
+    pomodoroSoundToggle.addEventListener('change', function() {
+      var isOn = pomodoroSoundToggle.checked;
+      DataStore.setProgress('pomodoro_sound_enabled', isOn);
+      if (self.pomodoroModule) self.pomodoroModule.soundEnabled = isOn;
+      Toast.info(isOn ? '已开启番茄钟提醒音' : '已关闭番茄钟提醒音（弹窗仍会显示）');
+    });
+  }
   // 自动保存开关：开启后按自定义间隔自动备份进度（默认 5 分钟，范围 1-1440）
   var autoSaveToggle = document.getElementById('auto-save');
   var autoSaveIntervalInput = document.getElementById('auto-save-interval');
@@ -6542,7 +6557,8 @@ if (name) {
     ['shortcutsEnabled','shortcuts_enabled','1',false], ['reminderEnabled','reminder_enabled',false,false],
     ['reminderTime','reminder_time','',false], ['autoSaveEnabled','auto_save_enabled','1',false],
     ['autoSaveInterval','auto_save_interval','',false], ['pomodoroSessions','pomodoro_sessions',0,false],
-    ['pomodoroMinutes','pomodoro_minutes',0,false], ['activeRecall','active_recall','0',false],
+    ['pomodoroMinutes','pomodoro_minutes',0,false], ['pomodoroSoundEnabled','pomodoro_sound_enabled',true,false],
+    ['activeRecall','active_recall','0',false],
     ['dailyReviewPlan','daily_review_plan',{},false], ['dailyChallenge','daily_challenge',null,false],
     ['adaptiveReview','adaptive_review',true,false], ['badges','badges',{},false], ['badgeStats','badge_stats',{},false],
     ['items','items',{},false], ['itemBuffs','item_buffs',{},false],
@@ -7185,7 +7201,7 @@ App.prototype.resetData = function() {
       if (window.app.wordModule.wordProgress) window.app.wordModule.wordProgress = {};
     }
     window.__resettingData = true;
-    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','custom_voice','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice'];
+    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','custom_voice','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice'];
     appKeys.forEach(function(k) { Storage.remove(k); });
     var _cats = DataStore.getDefaultWords().categories || [];
     for (var i = 0; i < _cats.length; i++) Storage.remove('custom_words_' + i);

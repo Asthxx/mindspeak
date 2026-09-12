@@ -35,6 +35,7 @@ window.UserState = (function() {
     phoneticProgress: 'phonetic_progress',
     pomodoroSessions: 'pomodoro_sessions',
     pomodoroMinutes: 'pomodoro_minutes',
+    pomodoroSoundEnabled: 'pomodoro_sound_enabled',
     pkHistory: 'pk_history',
     wordCardPos: 'word_card_pos',
     wordCategoryIndex: 'word_category_index',

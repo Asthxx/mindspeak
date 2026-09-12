@@ -50,4 +50,42 @@ describe('PomodoroModule 完成提醒', () => {
     delete window.webkitAudioContext;
     expect(() => getPomo().complete()).not.toThrow();
   });
+
+  it('should_skip_sound_and_vibrate_when_disabled', async () => {
+    window.DataStore.setProgress('pomodoro_sound_enabled', false);
+    getPomo().soundEnabled = false; // 模拟设置页切换后即时同步
+    let created = 0;
+    class MockAC2 {
+      constructor() { created++; this.currentTime = 0; this.destination = {}; }
+      createOscillator() { return { type: '', frequency: { value: 0 }, connect() {}, start() {}, stop() {} }; }
+      createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; }
+    }
+    window.AudioContext = MockAC2;
+    window.webkitAudioContext = undefined;
+    let vibrated = 0;
+    navigator.vibrate = () => { vibrated++; return true; };
+    getPomo().complete();
+    expect(created).toBe(0);
+    expect(vibrated).toBe(0);
+    // 弹窗仍必现
+    expect(document.getElementById('modal-confirm').classList.contains('hidden')).toBe(false);
+    // 恢复默认
+    window.DataStore.setProgress('pomodoro_sound_enabled', true);
+  });
+
+  it('should_sync_setting_toggle_to_module_and_store', () => {
+    const toggle = document.getElementById('toggle-pomodoro-sound');
+    expect(toggle).toBeTruthy();
+    expect(toggle.checked).toBe(true); // 默认开
+    // 关闭 → 存储与运行模块即时同步
+    toggle.checked = false;
+    toggle.dispatchEvent(new window.Event('change'));
+    expect(window.DataStore.getProgress('pomodoro_sound_enabled', true)).toBe(false);
+    expect(getPomo().soundEnabled).toBe(false);
+    // 重新打开 → 同步恢复
+    toggle.checked = true;
+    toggle.dispatchEvent(new window.Event('change'));
+    expect(window.DataStore.getProgress('pomodoro_sound_enabled', true)).toBe(true);
+    expect(getPomo().soundEnabled).toBe(true);
+  });
 });
