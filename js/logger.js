@@ -219,7 +219,12 @@
       warn:  function(mod, msg, data) { logEntry('warn',  mod, msg, data); },
       info:  function(mod, msg, data) { logEntry('info',  mod, msg, data); },
       debug: function(mod, msg, data) { logEntry('debug', mod, msg, data); }, // debug 不上报 server（见 server.js）
-      log:   function(mod, msg, data) { logEntry('info',  mod, msg, data); }   // Logger.log() 兼容（映射到 info）
+      log:   function(mod, msg, data) {
+        // Logger.log(msg) 单参兼容：app.js 等历史调用把整条消息传给 mod 位置（mod=消息, msg 空）。
+        // 归一为 mod='log' + msg=消息，保证上报的 mod 聚合与 msg 检索语义正确。
+        if (msg === undefined && data === undefined) { msg = mod; mod = 'log'; }
+        logEntry('info', mod, msg, data);
+      }   // Logger.log() 兼容（映射到 info）
     };
     // 兼容别名：android-ui-init / notification-manager 等模块用 Logger.log()
     window.Logger = window.Log;
