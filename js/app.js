@@ -2448,7 +2448,9 @@ cat.words = merged;
   };
   WordModule.prototype.getSelectedWords = function() {
     var arr = DataStore.getProgress(this._selectionKey(), []);
-    return Array.isArray(arr) ? arr : [];
+    // 防御：storage 被外部写成非数组（备份导入/手改）时降级为空；非字符串项一律剔除，避免 indexOf/勾选渲染异常
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(function(x) { return typeof x === 'string' && x !== ''; });
   };
   WordModule.prototype.isWordSelected = function(word) {
     return this.getSelectedWords().indexOf(word) !== -1;
@@ -2467,26 +2469,30 @@ cat.words = merged;
       // 精选池变化可能导致当前卡片越界或被移出：钳制后刷新卡片与统计
       this._clampCardIndex();
       this.showCurrentWord();
-      this.renderStats();
+      this._refreshStats();
     }
   };
   WordModule.prototype.selectAllWords = function() {
-    var words = this.getCurrentWords();
-    var all = [];
-    for (var i = 0; i < words.length; i++) all.push(words[i].word);
-    this._saveSelection(all);
-    if (this.learnSelectedOnly) { this._clampCardIndex(); this.showCurrentWord(); this.renderStats(); }
+    // "全选本页"：只勾选当前列表视图可见的页内词，保留其它页已有勾选
+    var arr = this.getSelectedWords();
+    var rows = document.querySelectorAll('#word-list-body .select-check');
+    for (var i = 0; i < rows.length; i++) {
+      var w = rows[i].getAttribute('data-word');
+      if (w && arr.indexOf(w) === -1) arr.push(w);
+    }
+    this._saveSelection(arr);
+    if (this.learnSelectedOnly) { this._clampCardIndex(); this.showCurrentWord(); this._refreshStats(); }
   };
   WordModule.prototype.clearSelection = function() {
     this._saveSelection([]);
-    if (this.learnSelectedOnly) { this._clampCardIndex(); this.showCurrentWord(); this.renderStats(); }
+    if (this.learnSelectedOnly) { this._clampCardIndex(); this.showCurrentWord(); this._refreshStats(); }
   };
   WordModule.prototype.toggleLearnSelected = function() {
     this.learnSelectedOnly = !this.learnSelectedOnly;
     DataStore.setProgress('learn_selected_only', this.learnSelectedOnly);
     this._clampCardIndex();
     this.showCurrentWord();
-    this.renderStats();
+    this._refreshStats();
     this._syncLearnSwitchUI();
     this._syncSelectUI();
     Toast.info(this.learnSelectedOnly ? '已开启精选学习：卡片只学勾选的词' : '已关闭精选学习：学习全部单词');
@@ -2504,6 +2510,11 @@ cat.words = merged;
     var words = this.getCardWords();
     if (!words.length) { this.currentIndex = 0; }
     else if (this.currentIndex >= words.length) { this.currentIndex = words.length - 1; }
+  };
+  // 精选池变化后统计必须全量重算：renderStats 缓存含 total（旧池），直接命中会把 10000 当精选总词
+  WordModule.prototype._refreshStats = function() {
+    this._statsCache = null;
+    this.renderStats();
   };
   // 同步精选 UI：列表勾选框 / 卡片挑入按钮 / 头部计数（元素不存在时安全跳过）。
   // showCurrentWord 末尾调用，保证当前词变化后按钮状态即时正确。
@@ -2722,6 +2733,7 @@ WordModule.prototype.saveCardPos = function() {
     var words = this.getCardWords();
     if (!words.length) return;
     var w = words[this.currentIndex];
+    if (!w) return; // 防御：currentIndex 越界且无有效词时避免 undefined.word 抛错
     var key = w.word + '-' + this.currentCategoryIndex;
     var today = this.getToday();
     // 记录旧状态用于统计缓存增量维护（避免翻牌热路径每次全量遍历当前分类）
@@ -2847,7 +2859,7 @@ WordModule.prototype.renderStats = function() {
         else if (p && p.status !== 'mastered' && (window.UserState && window.UserState.isDue ? window.UserState.isDue(p, today) : (p.nextReview && p.nextReview <= today))) d++;
       }
       mastered = m; due = d; total = words.length;
-      this._statsCache = { catIdx: ci, mastered: m, due: d, total: words.length, today: today };
+      this._statsCache = { catIdx: ci, mastered: m, due: d, total: words.length, today: today, valid: true };
     }
     document.getElementById('ws-total').textContent = total;
     document.getElementById('ws-learning').textContent = Math.max(total - mastered, 0);
@@ -6478,7 +6490,8 @@ if (name) {
     ['assessment','assessment',null,false], ['assessmentHistory','assessment_history',[],false],
     ['assessmentLast','assessment_last_keys',[],false],
     ['wordCategoryIndex','word_category_index',0,false], ['onboardingDone','onboarding_done',false,false],
-    ['navCollapsed','nav_collapsed',{},false], ['ttsVoice','tts_voice','',false]
+    ['navCollapsed','nav_collapsed',{},false], ['ttsVoice','tts_voice','',false],
+    ['learnSelectedOnly','learn_selected_only',false,false]
   ];
 // 收集全部进度数据（custom_words 单列成组；背景图在 IndexedDB，单独取）
 // includeBig=true 用于导出文件（Blob 无配额限制，含 word_progress/custom_voice 全量）；
@@ -6492,6 +6505,16 @@ if (name) {
       for (var i = 0; i < cats.length; i++) customWords.push(Storage.getJSON('custom_words_' + i, []));
     }
     data.customWords = customWords;
+    // 精选勾选（每分类一组）只在导出文件携带：勾选集可能随词库膨胀至数百 KB，
+    // 本地自动备份 english_app_backup 有 5MB 配额约束，与 word_progress 同一取舍
+    var selectedWords = [];
+    if (includeBig) {
+      for (var j = 0; j < cats.length; j++) {
+        var sw = DataStore.getProgress('selected_words_' + j, []);
+        selectedWords.push(Array.isArray(sw) ? sw : []);
+      }
+    }
+    data.selectedWords = selectedWords;
     return data;
   };
 // 导入备份：字段名 → localStorage 键写回；custom_words 逐库写回；背景图写回 IDB
@@ -6538,6 +6561,13 @@ if (name) {
     }
     if (Array.isArray(data.customWords)) {
       sanitized.customWords = data.customWords.slice(0, 50);
+    }
+    // 精选勾选（每分类一组）：导入时做数组收敛，非数组/非字符串项剔除，防脏数据进入勾选区
+    if (Array.isArray(data.selectedWords)) {
+      sanitized.selectedWords = data.selectedWords.slice(0, 100).map(function(arr) {
+        if (!Array.isArray(arr)) return [];
+        return arr.filter(function(x) { return typeof x === 'string' && x !== '' && x.length <= 64; }).slice(0, 5000);
+      });
     }
     // —— 深度清洗：导入的备份 JSON 是存储型 XSS 的唯一污染源。
     // 渲染层各汇点已补 escapeHtml，这里再做类型收敛，双层防御 ——
@@ -6648,6 +6678,11 @@ if (name) {
       var cats = DataStore.getDefaultWords().categories || [];
       for (var i = 0; i < cats.length && i < safe.customWords.length; i++) {
         if (Array.isArray(safe.customWords[i]) && Storage.setJSON('custom_words_' + i, safe.customWords[i]) === false) ok = false;
+      }
+    }
+    if (Array.isArray(safe.selectedWords)) {
+      for (var k = 0; k < safe.selectedWords.length; k++) {
+        if (Array.isArray(safe.selectedWords[k])) DataStore.setProgress('selected_words_' + k, safe.selectedWords[k]);
       }
     }
     if (safe.customBg) {

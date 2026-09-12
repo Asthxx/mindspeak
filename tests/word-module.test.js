@@ -172,6 +172,44 @@ describe('WordModule 行为', () => {
     expect(wm.getCardWords().length).toBe(5);
   });
 
+  it('should_refresh_stats_cache_after_pool_change', () => {
+    const wm = showWordTab();
+    expect(document.getElementById('ws-total').textContent).toBe('5');
+    wm.toggleSelectWord('apple');
+    wm.toggleSelectWord('book');
+    wm.toggleLearnSelected();
+    expect(document.getElementById('ws-total').textContent).toBe('2');
+    // 关开关恢复全量
+    wm.toggleLearnSelected();
+    expect(document.getElementById('ws-total').textContent).toBe('5');
+  });
+
+  it('should_ignore_dirty_selection_data', () => {
+    const wm = showWordTab();
+    window.DataStore.setProgress('selected_words_0', 'not-an-array');
+    expect(wm.getSelectedWords()).toEqual([]);
+    expect(wm.isWordSelected('apple')).toBe(false);
+    window.DataStore.setProgress('selected_words_0', ['apple', 42, null, 'book']);
+    expect(wm.getSelectedWords()).toEqual(['apple', 'book']);
+  });
+
+  it('should_select_all_only_visible_page', () => {
+    const wm = showWordTab();
+    // 扩到 30 词制造 2 页（每页 20）
+    for (let i = 0; i < 25; i++) {
+      wm.categories[0].words.push({ word: 'w' + i, phonetic: '', pos: '', chinese: '', example: '', example_cn: '' });
+    }
+    document.getElementById('btn-view-list').click();
+    wm.listPage = 2;
+    wm.renderWordList();
+    wm.selectAllWords();
+    const sel = wm.getSelectedWords();
+    expect(sel.length).toBe(10);
+    expect(sel.indexOf('w0')).toBe(-1); // 第一页词不应被全选
+    expect(sel.indexOf('w20')).toBeGreaterThan(-1);
+    expect(document.getElementById('learn-selected-count').textContent).toBe('10');
+  });
+
   it('should_default_card_pool_to_full_category', () => {
     const wm = showWordTab();
     expect(wm.learnSelectedOnly).toBe(false);
@@ -230,6 +268,7 @@ describe('WordModule 行为', () => {
 
   it('should_select_all_and_clear_current_category', () => {
     const wm = showWordTab();
+    document.getElementById('btn-view-list').click(); // 全选本页从列表可见行读取
     wm.selectAllWords();
     expect(wm.getSelectedWords().length).toBe(5);
     wm.clearSelection();
