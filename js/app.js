@@ -122,11 +122,32 @@ var ConfirmBox = {
       okBtn.textContent = opts.okText || '确定';
       okBtn.classList.toggle('btn-danger', !!opts.danger);
     }
+    var cancelBtn = document.getElementById('confirm-cancel');
+    if (cancelBtn) cancelBtn.classList.remove('hidden');
     this._onCancel = opts.onCancel || null;
     this._cb = onOk || null;
     document.getElementById('modal-confirm').classList.remove('hidden');
-    var cancelBtn = document.getElementById('confirm-cancel');
     if (cancelBtn) cancelBtn.focus();
+  },
+  // 单按钮提示弹窗：替代 alert()，无取消按钮。微信 webview 原生 alert 行为不稳定，统一走自定义弹窗。
+  alert: function(message, opts) {
+    this.init();
+    opts = opts || {};
+    var msgEl = document.getElementById('confirm-msg');
+    if (msgEl) msgEl.textContent = message;
+    var titleEl = document.getElementById('confirm-title');
+    if (titleEl) titleEl.textContent = opts.title || '提示';
+    var okBtn = document.getElementById('confirm-ok');
+    if (okBtn) {
+      okBtn.textContent = opts.okText || '知道了';
+      okBtn.classList.remove('btn-danger');
+    }
+    var cancelBtn = document.getElementById('confirm-cancel');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    this._onCancel = opts.onCancel || null;
+    this._cb = opts.onOk || null;
+    document.getElementById('modal-confirm').classList.remove('hidden');
+    if (okBtn) okBtn.focus();
   },
   close: function(ok) {
     var el = document.getElementById('modal-confirm');
@@ -4385,7 +4406,45 @@ PomodoroModule.prototype.start = function() {
     this.timeLeft = minutes * 60;
     this.updateDisplay();
     Toast.success('番茄钟完成！');
+    // 到时间提醒：弹窗（跨页面可见）+ 三连提示音 + 震动兜底
+    ConfirmBox.alert('🎉 专注完成！休息一下吧。', { title: '番茄钟完成', okText: '知道了' });
+    this._playAlertSound();
+    this._vibrate();
     if (window.app) window.app.recordActivity('pomodoro');
+  };
+  // 三连提示音：WebAudio 合成（880Hz 正弦短音 ×3），离线可用、无音频资源依赖；
+  // 无 AudioContext 环境（低版本 WebView/测试）静默跳过，绝不抛错。
+  PomodoroModule.prototype._playAlertSound = function() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      var ctx = new AC();
+      var delays = [0, 0.35, 0.7];
+      for (var i = 0; i < delays.length; i++) {
+        (function(delay) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = 880;
+          var t0 = ctx.currentTime + delay;
+          gain.gain.setValueAtTime(0.001, t0);
+          gain.gain.exponentialRampToValueAtTime(0.4, t0 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t0);
+          osc.stop(t0 + 0.28);
+        })(delays[i]);
+      }
+    } catch (e) {
+      Logger.log('提醒音播放失败（静默跳过）');
+    }
+  };
+  // 震动兜底：Android（Capacitor WebView）支持，iOS 忽略；仅做能力探测，失败不报错
+  PomodoroModule.prototype._vibrate = function() {
+    try {
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    } catch (e) {}
   };
   PomodoroModule.prototype.updateDisplay = function() {
     var min = Math.floor(this.timeLeft / 60);
