@@ -93,6 +93,23 @@ var TTSManager = (function() {
       return null;
     }
 
+    // 挑一个系统英文男声（网页版男声源不可达时的男声兜底）；一个都没有返回 null。
+    // 网页版（无 server）下 Edge 男声/本地 David/Piper 男声的合成源（/api/edge-tts、
+    // /api/tts、/api/piper-tts）必然 404，旧链路会静默降级到有道/谷歌女声，
+    // 表现"切了男声还是女声"。这里优先用系统男声保住"选了男声就是男声"。
+    _pickMaleVoice() {
+      let voices;
+      try { voices = window.speechSynthesis.getVoices() || []; } catch (e) { return null; }
+      const MALE = ['david','mark','guy','james','george','daniel','alex','fred','peter','steffan','michael','samuel','ryan','thomas','aaron','oliver','toby','will','william','sebastian','simon','steven','victor','paul','roman','male','lessac'];
+      for (let i = 0; i < voices.length; i++) {
+        const v = voices[i];
+        if ((v.lang || '').toLowerCase().indexOf('en') !== 0) continue;
+        const n = (v.name || '').toLowerCase();
+        for (let m = 0; m < MALE.length; m++) if (n.indexOf(MALE[m]) !== -1) return v;
+      }
+      return null;
+    }
+
     // 自动选声优先级：en-US 女声 → Microsoft → Google → voices[0]
     _autoPick() {
       if (!this.voices.length) return null;
@@ -292,6 +309,29 @@ var TTSManager = (function() {
       var _hasRealVoice = !!(opts && opts.voice && typeof opts.voice === 'object' && opts.voice.name && typeof opts.voice.name === 'string');
       if (_vn && !_hasRealVoice && window.SpeechUtil) {
         var _su = window.SpeechUtil;
+        // 网页版/无后端（_serverDown=true）+ 用户选择了依赖 server 的男声
+        // （Edge 美音男声 Guy / 本地男声 David / Piper 男声 Lessac）：这些
+        // 合成源（/api/edge-tts、/api/tts、/api/piper-tts）在无 server 时必然 404，
+        // 旧链路静默降级到有道/谷歌【女声】兜底，表现"切了男声还是女声"。
+        // 改为：设备有系统男声时直接用系统男声朗读；没有才走原降级链。
+        if (_vn === '__online_edge_us_guy__' || _vn === '__local_david__' || _vn === '__local_piper_us_lessac__') {
+          if (_su._serverDown === true) {
+            var _mVoice = this._pickMaleVoice();
+            if (_mVoice) {
+              try { window.speechSynthesis.cancel(); } catch (_e) {}
+              _su._stopLocalAudio();
+              var _ov = {};
+              if (opts) for (var _ko in opts) _ov[_ko] = opts[_ko];
+              _ov.voice = _mVoice;
+              var _mU = this.createUtterance(text, _ov);
+              if (opts.onstart) _mU.onstart = opts.onstart;
+              if (opts.onend) _mU.onend = opts.onend;
+              if (opts.onerror) _mU.onerror = opts.onerror;
+              try { window.speechSynthesis.speak(_mU); } catch (e) { if (_mU.onerror) { try { _mU.onerror(e); } catch (_e) {} } }
+              return _mU;
+            }
+          }
+        }
         // 本地男声/女声（David/Zira）→ server SAPI
         if (_vn === '__local_david__' || _vn === '__local_zira__') {
           var _lvo = {};

@@ -760,6 +760,39 @@ app.use((req, res, next) => {
   if (ok(normRaw) && ok(norm)) return next();
   return res.status(404).json({ ok: false, message: 'Not Found' });
 });
+// 静态文本资源 gzip（无依赖 zlib）——贴近 GitHub Pages 线上行为（Pages 会自动
+// gzip/brotli .js/.css 等）。只为 Accept-Encoding 声明 gzip 的文本静态资源启用，
+// API 与二进制不压缩，避免重复压缩与内存开销。
+const zlib = require('node:zlib');
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || !/\.(?:js|css|html|json|webmanifest|svg|txt)$/.test(req.path)) return next();
+  if (!/gzip/.test(req.headers['accept-encoding'] || '')) return next();
+  const origEnd = res.end.bind(res);
+  const chunks = [];
+  res.write = function (chunk, encoding, cb) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk || '', encoding));
+    if (typeof cb === 'function') cb();
+    return true;
+  };
+  res.end = function (chunk, encoding, cb) {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+    if (typeof cb === 'function') cb();
+    const body = Buffer.concat(chunks);
+    if (body.length < 1024) { res.setHeader('Content-Length', body.length); return origEnd(body); }
+    zlib.gzip(body, (err, gz) => {
+      if (err || gz.length >= body.length) {
+        res.setHeader('Content-Length', body.length);
+        return origEnd(body);
+      }
+      res.removeHeader('Content-Length');
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Content-Length', gz.length);
+      origEnd(gz);
+    });
+    return res;
+  };
+  next();
+});
 app.use(express.static(STATIC_ROOT, {
   index: 'index.html',
   etag: false,

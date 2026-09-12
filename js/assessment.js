@@ -395,6 +395,15 @@ var AssessmentModule = (function() {
     if (this._recognition) { try { this._recognition.stop(); } catch(e) {} this._recognition = null; }
     this._recIndex = undefined;
     this._finished = false;
+    // 词库脚本（data/all-data.js 等）async 加载中（手机/慢网首开）：
+    // DOMContentLoaded 不再被 9.8MB 数据阻塞、页面立即可用，但点「开始测评」时词库
+    // 可能尚未就绪 → 提示加载中并自动重试，而非直接报"词库数据为空"
+    if (typeof WORD_LIBRARY === 'undefined' || !WORD_LIBRARY.categories || WORD_LIBRARY.categories.length === 0) {
+      Toast.info('词库加载中，请稍候…');
+      var self = this;
+      setTimeout(function() { self.start(); }, 800);
+      return;
+    }
     var includePron = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     var made = AssessmentEngine.createPaper({ includePron: includePron });
     if (!made.questions || !made.questions.length) {

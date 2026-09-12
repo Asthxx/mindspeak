@@ -2438,9 +2438,21 @@ function WordModule() {
     var self = this;
     this.categories = DataStore.getDefaultWords().categories;
     if (!this.categories || this.categories.length === 0) {
+      // 词库脚本 async 加载中（手机/慢网首开）：页面已可用但词库未到，
+      // 不误报「加载失败」，等词库就绪后自动重新填充
+      if (typeof WORD_LIBRARY === 'undefined' || !WORD_LIBRARY || !WORD_LIBRARY.categories || WORD_LIBRARY.categories.length === 0) {
+        this._wordTries = (this._wordTries || 0) + 1;
+        if (this._wordTries <= 30) {
+          if (!this._wordWaitNotified) { this._wordWaitNotified = true; Toast.info('词库加载中，请稍候…'); }
+          setTimeout(function() { self.populateCategories(); }, 500);
+          return;
+        }
+      }
       Toast.error('词库加载失败，请检查 data/ 文件是否齐全或刷新页面');
       this.categories = [];
     }
+    this._wordTries = 0;
+    this._wordWaitNotified = false;
     this.categories.forEach(function(cat, i) {
       var custom = DataStore.getProgress('custom_words_' + i, null);
       if (custom && Array.isArray(custom) && custom.length > 0) {
