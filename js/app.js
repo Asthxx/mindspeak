@@ -4423,6 +4423,11 @@ PomodoroModule.prototype.start = function() {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       var ctx = new AC();
+      // iOS：定时器触发的 AudioContext 初始可能 suspended，resume 一下（autoplay 被拒则静默）
+      if (ctx.resume && typeof ctx.resume === 'function') {
+        var rp = ctx.resume();
+        if (rp && typeof rp.catch === 'function') rp.catch(function() {});
+      }
       var delays = [0, 0.35, 0.7];
       for (var i = 0; i < delays.length; i++) {
         (function(delay) {
@@ -4439,6 +4444,10 @@ PomodoroModule.prototype.start = function() {
           osc.start(t0);
           osc.stop(t0 + 0.28);
         })(delays[i]);
+      }
+      // 三连音最晚 0.7s 起播 + 0.28s 收尾 ≈ 1s；1.5s 后显式释放，防弱 WebView 不回收
+      if (ctx.close && typeof ctx.close === 'function') {
+        setTimeout(function() { try { ctx.close(); } catch (e) {} }, 1500);
       }
     } catch (e) {
       Logger.log('提醒音播放失败（静默跳过）');

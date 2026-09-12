@@ -45,6 +45,31 @@ describe('PomodoroModule 完成提醒', () => {
     expect(created).toBe(1);
   });
 
+  it('should_release_audio_context_after_beep', () => {
+    vi.useFakeTimers();
+    let created = 0, closed = 0, resumed = 0;
+    class MockAC3 {
+      constructor() { created++; this.currentTime = 0; this.destination = {}; }
+      createOscillator() {
+        return { type: '', frequency: { value: 0 }, connect() {}, start() {}, stop() {} };
+      }
+      createGain() {
+        return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} };
+      }
+      resume() { resumed++; return Promise.resolve(); }
+      close() { closed++; return Promise.resolve(); }
+    }
+    window.AudioContext = MockAC3;
+    window.webkitAudioContext = undefined;
+    getPomo().complete();
+    expect(created).toBe(1);
+    expect(resumed).toBe(1);
+    expect(closed).toBe(0);
+    vi.advanceTimersByTime(1600);
+    expect(closed).toBe(1);
+    vi.useRealTimers();
+  });
+
   it('should_be_silent_safe_without_any_audio_context', () => {
     delete window.AudioContext;
     delete window.webkitAudioContext;
