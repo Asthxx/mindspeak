@@ -2165,11 +2165,19 @@ function WordModule() {
     this.searchQuery = '';
     this.searchFilter = 'all';
     this.loadProgress();
+    // 精选学习：全局开关（开 = 卡片流只走勾选词）；勾选集按分类存 selected_words_<N>
+    this.learnSelectedOnly = DataStore.getProgress('learn_selected_only', false) === true;
     this.initUI();
   }
+  // 精选开关按钮外观同步：仅存储态 → class，供加载恢复（initUI）与点击翻转（toggleLearnSelected）共用
+  WordModule.prototype._syncLearnSwitchUI = function() {
+    var sw = document.getElementById('btn-learn-selected');
+    if (sw) sw.classList.toggle('active', this.learnSelectedOnly);
+  };
   WordModule.prototype.initUI = function() {
     this.bindEvents();
     this.populateCategories();
+    this._syncLearnSwitchUI();
     this.showCurrentWord();
     this.renderStats();
     renderEbbinghausPlan(this.currentReviewCount());
@@ -2184,6 +2192,13 @@ function WordModule() {
     safeBind('btn-hesitate', 'click', function() { self.markWord('hesitate'); });
     safeBind('btn-known', 'click', function() { self.markWord('known'); });
     safeBind('btn-fav-word', 'click', function() { self.favoriteCurrent(); });
+    safeBind('btn-select-word', 'click', function() {
+      var w = self.getCurrentWords()[self.currentIndex];
+      if (w) self.toggleSelectWord(w.word);
+    });
+    safeBind('btn-learn-selected', 'click', function() { self.toggleLearnSelected(); });
+    safeBind('btn-select-all', 'click', function() { self.selectAllWords(); });
+    safeBind('btn-select-clear', 'click', function() { self.clearSelection(); });
     safeBind('word-category', 'change', function(e) { self.selectCategory(e.target.value); });
     safeBind('btn-add-word', 'click', function() { self.showAddModal(); });
     safeBind('btn-reset-card-pos', 'click', function() { self.resetCardPos(); });
@@ -2219,6 +2234,16 @@ function WordModule() {
         self.renderWordList();
       });
     });
+    // 列表视图精选勾选：行内勾选框（动态渲染，用事件委托）
+    var listBodyEl = document.getElementById('word-list-body');
+    if (listBodyEl) {
+      listBodyEl.addEventListener('change', function(e) {
+        var t = e.target;
+        if (t && t.classList && t.classList.contains('select-check') && t.getAttribute('data-word')) {
+          self.toggleSelectWord(t.getAttribute('data-word'));
+        }
+      });
+    }
   };
   WordModule.prototype.switchView = function(view) {
     this.currentView = view;
@@ -2289,7 +2314,9 @@ function WordModule() {
         else if (window.UserState && window.UserState.isDue ? window.UserState.isDue(p, today) : (p.nextReview && p.nextReview <= today)) { status = '待复习'; statusCls = 'status-due'; }
         else { status = '学习中'; statusCls = 'status-learning'; }
       }
+      var isSel = self.getSelectedWords().indexOf(w.word) !== -1;
       return '<div class="wl-row">' +
+        '<span class="wl-col wl-select"><input type="checkbox" class="select-check" data-word="' + escapeHtml(w.word) + '"' + (isSel ? ' checked' : '') + ' title="挑入精选"></span>' +
         '<span class="wl-col wl-word">' + escapeHtml(w.word) + '</span>' +
         '<span class="wl-col wl-phonetic">' + escapeHtml(w.phonetic || '') + '</span>' +
         '<span class="wl-col wl-pos">' + escapeHtml(w.pos || '') + '</span>' +
@@ -2304,6 +2331,8 @@ function WordModule() {
     document.getElementById('wl-page-info').textContent = this.listPage + '/' + totalPages;
     document.getElementById('wl-prev').disabled = this.listPage <= 1;
     document.getElementById('wl-next').disabled = this.listPage >= totalPages;
+    // 刷新行内勾选框选中态与头部精选计数
+    this._syncSelectUI();
     // 本地即时语音：后台预合成本页单词，点击即出声
     if (window.SpeechUtil) SpeechUtil.prefetch(pageWords.map(function(w) { return w.word; }));
   };
@@ -2397,9 +2426,9 @@ cat.words = merged;
     var searchEl = document.getElementById('word-search');
     if (searchEl) searchEl.value = '';
     document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.filter === 'all'); });
-    // 恢复上次翻到的位置 + 列表页码，越界按本词库页数钳制
+    // 恢复上次翻到的位置 + 列表页码，越界按本词库页数钳制（精选模式时按精选池长度钳制）
     var saved = this.loadCardPos(this.currentCategoryIndex);
-    var maxLen = (this.categories[this.currentCategoryIndex] || { words: [] }).words.length;
+    var maxLen = this.getCardWords().length;
     this.currentIndex = (saved.index < maxLen) ? saved.index : 0;
     var totalPages = this.getListTotalPages();
     this.listPage = (saved.listPage && saved.listPage <= totalPages) ? saved.listPage : 1;
@@ -2411,6 +2440,90 @@ cat.words = merged;
   WordModule.prototype.getCurrentWords = function() {
     if (this.currentCategoryIndex >= this.categories.length) return [];
     return this.categories[this.currentCategoryIndex].words;
+  };
+  // ── 精选学习：全局开关 + 每分类勾选词 ──
+  // 开关关 = 卡片流按分类全量学习；开 = 只学勾选词。列表浏览/搜索/筛选始终全量，勾选在此进行。
+  WordModule.prototype._selectionKey = function() {
+    return 'selected_words_' + this.currentCategoryIndex;
+  };
+  WordModule.prototype.getSelectedWords = function() {
+    var arr = DataStore.getProgress(this._selectionKey(), []);
+    return Array.isArray(arr) ? arr : [];
+  };
+  WordModule.prototype.isWordSelected = function(word) {
+    return this.getSelectedWords().indexOf(word) !== -1;
+  };
+  WordModule.prototype._saveSelection = function(arr) {
+    DataStore.setProgress(this._selectionKey(), arr);
+    this._syncSelectUI();
+  };
+  WordModule.prototype.toggleSelectWord = function(word) {
+    var arr = this.getSelectedWords();
+    var i = arr.indexOf(word);
+    if (i === -1) arr.push(word);
+    else arr.splice(i, 1);
+    this._saveSelection(arr);
+    if (this.learnSelectedOnly) {
+      // 精选池变化可能导致当前卡片越界或被移出：钳制后刷新卡片与统计
+      this._clampCardIndex();
+      this.showCurrentWord();
+      this.renderStats();
+    }
+  };
+  WordModule.prototype.selectAllWords = function() {
+    var words = this.getCurrentWords();
+    var all = [];
+    for (var i = 0; i < words.length; i++) all.push(words[i].word);
+    this._saveSelection(all);
+    if (this.learnSelectedOnly) { this._clampCardIndex(); this.showCurrentWord(); this.renderStats(); }
+  };
+  WordModule.prototype.clearSelection = function() {
+    this._saveSelection([]);
+    if (this.learnSelectedOnly) { this._clampCardIndex(); this.showCurrentWord(); this.renderStats(); }
+  };
+  WordModule.prototype.toggleLearnSelected = function() {
+    this.learnSelectedOnly = !this.learnSelectedOnly;
+    DataStore.setProgress('learn_selected_only', this.learnSelectedOnly);
+    this._clampCardIndex();
+    this.showCurrentWord();
+    this.renderStats();
+    this._syncLearnSwitchUI();
+    this._syncSelectUI();
+    Toast.info(this.learnSelectedOnly ? '已开启精选学习：卡片只学勾选的词' : '已关闭精选学习：学习全部单词');
+    return this.learnSelectedOnly;
+  };
+  // 卡片流词池：开关开时仅返回当前分类中勾选过的词；零勾选返回空池（由调用方 Toast 提示）
+  WordModule.prototype.getCardWords = function() {
+    var all = this.getCurrentWords();
+    if (!this.learnSelectedOnly) return all;
+    var sel = this.getSelectedWords();
+    return all.filter(function(w) { return sel.indexOf(w.word) !== -1; });
+  };
+  // 卡片池缩小后把 currentIndex 钳回边界；空池归零（showCurrentWord 对空池会安全 return）
+  WordModule.prototype._clampCardIndex = function() {
+    var words = this.getCardWords();
+    if (!words.length) { this.currentIndex = 0; }
+    else if (this.currentIndex >= words.length) { this.currentIndex = words.length - 1; }
+  };
+  // 同步精选 UI：列表勾选框 / 卡片挑入按钮 / 头部计数（元素不存在时安全跳过）。
+  // showCurrentWord 末尾调用，保证当前词变化后按钮状态即时正确。
+  WordModule.prototype._syncSelectUI = function() {
+    var sel = this.getSelectedWords();
+    var checks = document.querySelectorAll('#word-list-body input.select-check');
+    for (var i = 0; i < checks.length; i++) {
+      checks[i].checked = sel.indexOf(checks[i].getAttribute('data-word')) !== -1;
+    }
+    var btn = document.getElementById('btn-select-word');
+    if (btn) {
+      var w = this.getCurrentWords()[this.currentIndex];
+      var on = !!(w && sel.indexOf(w.word) !== -1);
+      btn.classList.toggle('active', on);
+      btn.title = on ? '从精选移除' : '挑入精选';
+      var svg = btn.querySelector('svg');
+      if (svg && svg.firstElementChild) svg.firstElementChild.setAttribute('href', '#i-check');
+    }
+    var badge = document.getElementById('learn-selected-count');
+    if (badge) badge.textContent = String(sel.length);
   };
   // 音标解析：将 "/həˈloʊ/" 拆成 ["h","ə","ˈl","oʊ"] 等音素段（保留分段排版，仅展示不可点击）
   WordModule.parsePhonetic = function(str) {
@@ -2442,7 +2555,7 @@ cat.words = merged;
   };
 
   WordModule.prototype.showCurrentWord = function() {
-    var words = this.getCurrentWords();
+    var words = this.getCardWords();
     if (!words.length) return;
     // 防御：currentIndex 越界（词库被外部缩短/边界场景）时归零，避免下面 words[currentIndex].word 抛错
     if (this.currentIndex < 0 || this.currentIndex >= words.length) this.currentIndex = 0;
@@ -2480,6 +2593,8 @@ cat.words = merged;
     this._recallPassed = false;
     // 收藏按钮状态同步：当前词是否已收藏 → 实心书签+填色 / 描边书签+描边
     this._syncFavBtn();
+    // 精选按钮状态同步：当前词是否已挑入精选
+    this._syncSelectUI();
     // 本地即时语音：后台预合成当前词 + 接下来几个词，点击即出声
     if (window.SpeechUtil) {
       var pf = [];
@@ -2548,14 +2663,14 @@ WordModule.prototype.speakCurrent = function() {
     this._syncFavBtn();
   };
   WordModule.prototype.prevWord = function() { if (this.currentIndex > 0) { this.currentIndex--; this.showCurrentWord(); this.saveCardPos(); } };
-  WordModule.prototype.nextWord = function() { var words = this.getCurrentWords(); if (this.currentIndex < words.length - 1) { this.currentIndex++; this.showCurrentWord(); this.saveCardPos(); } };
+  WordModule.prototype.nextWord = function() { var words = this.getCardWords(); if (this.currentIndex < words.length - 1) { this.currentIndex++; this.showCurrentWord(); this.saveCardPos(); } };
   // 按输入序号跳转：1 起，边界内合法即跳，越界 toast 提示
   WordModule.prototype.jumpWord = function() {
     var input = document.getElementById('word-jump-input');
     if (!input) return;
     var n = parseInt(input.value, 10);
     if (isNaN(n) || n < 1) { Toast.warning('请输入有效页码（≥1）'); return; }
-    var words = this.getCurrentWords();
+    var words = this.getCardWords();
     if (!words.length) { Toast.info('当前词库无单词'); return; }
     if (n > words.length) { Toast.warning('超过总数 ' + words.length + '，已跳到末页'); n = words.length; }
     this.currentIndex = n - 1;  // 输入是 1 起，转成 0 基
@@ -2604,7 +2719,7 @@ WordModule.prototype.saveCardPos = function() {
     this._evalLock = true;
     var self = this;
     setTimeout(function() { self._evalLock = false; }, 250);
-    var words = this.getCurrentWords();
+    var words = this.getCardWords();
     if (!words.length) return;
     var w = words[this.currentIndex];
     var key = w.word + '-' + this.currentCategoryIndex;
@@ -2722,7 +2837,7 @@ WordModule.prototype.renderStats = function() {
       due = cache.due;
       total = cache.total;
     } else {
-      var words = this.getCurrentWords();
+      var words = this.getCardWords();
       var self = this;
       var m = 0, d = 0;
       for (var i = 0; i < words.length; i++) {

@@ -157,4 +157,82 @@ describe('WordModule 行为', () => {
     document.getElementById('form-add-word').dispatchEvent(new Event('submit', { cancelable: true }));
     expect(wm.categories[0].words.length).toBe(before + 1);
   });
+
+  it('should_sync_switch_active_state_from_storage', () => {
+    const wm = showWordTab();
+    const sw = document.getElementById('btn-learn-selected');
+    // 模拟 reload 后从 storage 恢复到开启态
+    window.DataStore.setProgress('learn_selected_only', true);
+    wm.learnSelectedOnly = true;
+    wm._syncLearnSwitchUI();
+    expect(sw.classList.contains('active')).toBe(true);
+    wm.learnSelectedOnly = false;
+    wm._syncLearnSwitchUI();
+    expect(sw.classList.contains('active')).toBe(false);
+    expect(wm.getCardWords().length).toBe(5);
+  });
+
+  it('should_default_card_pool_to_full_category', () => {
+    const wm = showWordTab();
+    expect(wm.learnSelectedOnly).toBe(false);
+    expect(wm.getCardWords().length).toBe(5);
+    expect(wm.isWordSelected('apple')).toBe(false);
+  });
+
+  it('should_toggle_selection_and_filter_card_pool', () => {
+    const wm = showWordTab();
+    wm.toggleSelectWord('apple');
+    wm.toggleSelectWord('book');
+    wm.toggleSelectWord('book'); // 再点一次取消
+    expect(wm.isWordSelected('apple')).toBe(true);
+    expect(wm.isWordSelected('book')).toBe(false);
+    wm.toggleLearnSelected();
+    expect(wm.learnSelectedOnly).toBe(true);
+    expect(document.getElementById('btn-learn-selected').classList.contains('active')).toBe(true);
+    const pool = wm.getCardWords();
+    expect(pool.length).toBe(1);
+    expect(pool[0].word).toBe('apple');
+    // 关闭后恢复全量
+    wm.toggleLearnSelected();
+    expect(document.getElementById('btn-learn-selected').classList.contains('active')).toBe(false);
+    expect(wm.getCardWords().length).toBe(5);
+  });
+
+  it('should_return_empty_pool_when_switch_on_but_no_selection', () => {
+    const wm = showWordTab();
+    wm.toggleLearnSelected();
+    expect(wm.getCardWords().length).toBe(0);
+  });
+
+  it('should_mark_word_under_selected_pool_with_same_progress_key', () => {
+    const wm = showWordTab();
+    wm.toggleSelectWord('apple');
+    wm.toggleLearnSelected();
+    // 开启开关后卡片流走精选池：当前第 1 张就是 apple
+    expect(document.getElementById('word-front').textContent).toContain('apple');
+    expect(document.getElementById('word-progress').textContent).toBe('1/1');
+    document.getElementById('btn-known').click();
+    expect(wm.wordProgress['apple-0']).toBeTruthy();
+    expect(wm.wordProgress['apple-0'].reviewCount).toBe(1);
+    expect(wm.wordProgress['apple-0'].status).toBe('learning');
+  });
+
+  it('should_keep_selection_isolated_per_category', () => {
+    const wm = showWordTab();
+    wm.toggleSelectWord('apple');
+    wm.selectCategory(1);
+    expect(wm.isWordSelected('abandon')).toBe(false);
+    wm.toggleSelectWord('abandon');
+    expect(wm.getSelectedWords()).toEqual(['abandon']);
+    wm.selectCategory(0);
+    expect(wm.getSelectedWords()).toEqual(['apple']);
+  });
+
+  it('should_select_all_and_clear_current_category', () => {
+    const wm = showWordTab();
+    wm.selectAllWords();
+    expect(wm.getSelectedWords().length).toBe(5);
+    wm.clearSelection();
+    expect(wm.getSelectedWords().length).toBe(0);
+  });
 });

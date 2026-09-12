@@ -557,6 +557,7 @@
           <button class="view-btn active" id="btn-view-card" title="卡片视图"><svg class="icon"><use href="#i-carousel" xlink:href="#i-carousel"/></svg></button>
           <button class="view-btn" id="btn-view-list" title="列表视图"><svg class="icon"><use href="#i-list" xlink:href="#i-list"/></svg></button>
         </div>
+        <button class="btn-sm learn-selected-toggle" id="btn-learn-selected" title="开启后卡片只学勾选过的词；勾选在列表视图中进行"><svg class="icon"><use href="#i-check" xlink:href="#i-check"/></svg> 精选学习 <span id="learn-selected-count" class="learn-selected-count">0</span></button>
         <button class="btn-sm" id="btn-add-word"><svg class="icon"><use href="#i-add" xlink:href="#i-add"/></svg> 添加新词</button>
         <button class="btn-sm" id="btn-reset-card-pos" title="把当前词库的翻页位置重置到第 1 张"><svg class="icon"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 重置翻页进度</button>
       </div>
@@ -591,6 +592,7 @@
         </div>
         <div class="word-actions">
           <button class="btn btn-fav" id="btn-fav-word" title="收藏"><svg class="icon"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg></button>
+          <button class="btn btn-fav" id="btn-select-word" title="挑入精选"><svg class="icon"><use href="#i-check" xlink:href="#i-check"/></svg></button>
           <button class="btn btn-difficult" id="btn-forgot"><svg class="icon"><use href="#i-thumb-down" xlink:href="#i-thumb-down"/></svg> 不认识</button>
           <button class="btn btn-uncertain" id="btn-hesitate"><svg class="icon"><use href="#i-help" xlink:href="#i-help"/></svg> 有点印象</button>
           <button class="btn btn-know" id="btn-known"><svg class="icon"><use href="#i-thumb-up" xlink:href="#i-thumb-up"/></svg> 认识</button>
@@ -657,9 +659,11 @@
             <button class="filter-btn" data-filter="failed">不认识</button>
             <button class="filter-btn" data-filter="mastered">已掌握</button>
           </div>
+          <button class="btn btn-sm" id="btn-select-all">全选本页</button>
+          <button class="btn btn-sm" id="btn-select-clear">清空勾选</button>
         </div>
         <div class="word-list-header">
-          <span class="wl-col wl-num">#</span>
+          <span class="wl-col wl-select" title="精选勾选">✓</span>
           <span class="wl-col wl-word">单词</span>
           <span class="wl-col wl-phonetic">音标</span>
           <span class="wl-col wl-pos">词性</span>

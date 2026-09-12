@@ -38,6 +38,9 @@ window.UserState = (function() {
     pkHistory: 'pk_history',
     wordCardPos: 'word_card_pos',
     wordCategoryIndex: 'word_category_index',
+    // 精选学习：全局开关 + 每分类勾选词（动态 key = selected_words_ + 分类索引）
+    learnSelectedOnly: 'learn_selected_only',
+    selectedWordsBase: 'selected_words_',
     theme: 'theme',
     themeColor: 'theme_color',
     customThemeColor: 'custom_theme_color',

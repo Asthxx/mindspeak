@@ -131,6 +131,23 @@
   background:var(--coral-deep);border-color:var(--coral-deep);
 }
 
+/* 精选挑入按钮：同收藏按钮基础样式，但 active 用 sage 绿与收藏区分 */
+#btn-select-word{
+  border-color:var(--sage);
+  color:var(--sage);
+}
+#btn-select-word:hover{
+  background:var(--sage-surface);
+  box-shadow:0 4px 12px rgba(90,150,120,0.28);
+}
+#btn-select-word.active{
+  background:var(--sage);border-color:var(--sage);
+  color:#fff;box-shadow:0 4px 12px rgba(90,150,120,0.28);
+}
+#btn-select-word.active:hover{
+  background:var(--sage-deep);border-color:var(--sage-deep);
+}
+
 @media (max-width:768px){
   .listening-card{padding:var(--sp-7) var(--sp-5);border-radius:var(--radius-lg)}
   .btn-lg{padding:var(--sp-3) var(--sp-6);font-size:1.1rem}
