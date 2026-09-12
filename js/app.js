@@ -28,6 +28,23 @@ function shuffleSample(arr, n) {
   }
   return arr.slice(0, k);
 }
+// 练习取样（单词PK/听力/语境/跟读共用）：只从「已学过」的词里抽，杜绝出未学词必错的题。
+// word_progress 有 status 记录 = 学过（mastered/learning/new 任一状态都算）。
+// 已学不足 n 时返回全部已学词（不掺未学词补齐）；返回空数组表示没有任何已学词，调用方提示并中止开局。
+function sampleLearnedWords(wordList, n) {
+  var wp = {};
+  try {
+    wp = (window.app && window.app.wordModule && window.app.wordModule.wordProgress)
+      ? window.app.wordModule.wordProgress
+      : DataStore.getProgress('word_progress', {});
+  } catch (e) {}
+  var learned = [];
+  for (var i = 0; i < wordList.length; i++) {
+    var w = wordList[i];
+    if (w && w.word && wp[w.word] && wp[w.word].status) learned.push(w);
+  }
+  return shuffleSample(learned, Math.min(n, learned.length));
+}
 // 本地日期字符串（YYYY-MM-DD）。全局统一用这个取"今天/某天"，
 // 避免 toISOString 按 UTC 转日期导致东八区凌晨 0-8 点记到昨天。
 function getLocalDateStr(d) {
@@ -1800,6 +1817,7 @@ if (typeof window !== 'undefined') {
   window.Storage = Storage;
   window.DataStore = DataStore;
   window.SpeechUtil = SpeechUtil;
+  window.sampleLearnedWords = sampleLearnedWords;
 }
 
 // ==================== 主题切换 ====================
@@ -3431,7 +3449,8 @@ this.mode = document.getElementById('listening-mode').value;
     var catIdx = safeNumber(document.getElementById('listening-category').value, 0);
     var cats = DataStore.getDefaultWords().categories;
     if (catIdx >= cats.length || !cats[catIdx] || !cats[catIdx].words) { Toast.warning('词库尚未加载，请稍后再试'); return; }
-    this.words = shuffleSample(cats[catIdx].words, 20);
+    this.words = sampleLearnedWords(cats[catIdx].words, 20);
+    if (!this.words.length) { Toast.warning('这个分类还没有学过的单词，先去背单词吧'); return; }
     this.currentIndex = 0;
     this.correct = 0;
     this.wrong = 0;
@@ -3909,7 +3928,8 @@ var cats = DataStore.getDefaultWords().categories;
     this.customVoiceCancelPending = false;
     this.isEnded = false; // 重置结束标记，允许新一局正常结算
     this.categoryName = cats[catIdx].name;
-    this.words = shuffleSample(cats[catIdx].words, 20);
+    this.words = sampleLearnedWords(cats[catIdx].words, 20);
+    if (!this.words.length) { Toast.warning('这个分类还没有学过的单词，先去背单词吧'); return; }
     this.currentIndex = 0;
     this.correctCount = 0;
     this.wrongCount = 0;
@@ -4206,8 +4226,9 @@ ContextModule.prototype.start = function() {
       this._pool = pool;
       this._poolInvalid = false;
     }
-    var picked = shuffleSample(this._pool, 20);
-    this.exercises = picked.map(function(w) {
+    var pickedWords = sampleLearnedWords(this._pool, 20);
+    if (!pickedWords.length) { Toast.warning('还没有学过的单词，先去背单词吧'); return; }
+    this.exercises = pickedWords.map(function(w) {
       var sentence = w.example;
       var safeWord = escapeReg(w.word || '');
       var blank = sentence.replace(new RegExp('\\b' + safeWord + '\\b', 'i'), '______');
@@ -4868,7 +4889,8 @@ var SpeakModule = (function() {
     var catIdx = safeNumber(document.getElementById('speak-category').value, 0);
     var cats = DataStore.getDefaultWords().categories;
     if (!cats || !cats.length || catIdx >= cats.length || !cats[catIdx] || !cats[catIdx].words) { Toast.warning('词库尚未加载，请稍后再试'); return; }
-this.words = shuffleSample(cats[catIdx].words, 15);
+    this.words = sampleLearnedWords(cats[catIdx].words, 15);
+    if (!this.words.length) { Toast.warning('这个分类还没有学过的单词，先去背单词吧'); return; }
     this.currentIndex = 0;
     this.correct = 0;
     this.wrong = 0;

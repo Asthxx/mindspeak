@@ -6,6 +6,12 @@ describe('ContextModule 行为', () => {
   beforeEach(async () => {
     vi.resetModules();
     await bootstrapApp();
+    // 新取样语义：语境练习只抽已学词，这里把全部词标为已学以便开局
+    const cats = window.DataStore.getDefaultWords().categories;
+    const wp = {};
+    cats.forEach((c) => (c.words || []).forEach((w) => { wp[w.word] = { status: 'learning' }; }));
+    window.DataStore.setProgress('word_progress', wp);
+    window.app.wordModule.wordProgress = wp;
   });
 
   it('should_generate_blank_sentence_from_example', () => {

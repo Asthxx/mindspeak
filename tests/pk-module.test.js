@@ -6,6 +6,12 @@ describe('PKModule 行为', () => {
   beforeEach(async () => {
     vi.resetModules();
     await bootstrapApp();
+    // 新取样语义：练习模式只抽已学词，这里把全部词标为已学以便开局
+    const cats = window.DataStore.getDefaultWords().categories;
+    const wp = {};
+    cats.forEach((c) => (c.words || []).forEach((w) => { wp[w.word] = { status: 'learning' }; }));
+    window.DataStore.setProgress('word_progress', wp);
+    window.app.wordModule.wordProgress = wp;
   });
 
   function startGame() {
