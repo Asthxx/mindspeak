@@ -440,6 +440,49 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 .btn:active{transform:scale(0.98)}
 .stat-card,.report-card{transition:all var(--duration-normal) var(--ease-out)}
 
+/* ===== 手机质感升级 · 默认模式（主题模式由 theme-fx 接管，html 带 data-theme-id 时自动不生效） ===== */
+@media (max-width:768px){
+  /* 1) 首屏/切页 · 卡片组 stagger 渐进浮现 */
+  .page.active > *{animation:fadeUp .40s var(--ease-out) both}
+  .page.active > *:nth-child(1){animation-delay:.03s}
+  .page.active > *:nth-child(2){animation-delay:.08s}
+  .page.active > *:nth-child(3){animation-delay:.13s}
+  .page.active > *:nth-child(4){animation-delay:.18s}
+  .page.active > *:nth-child(5){animation-delay:.23s}
+  .page.active > *:nth-child(6){animation-delay:.28s}
+
+  /* 2) 卡片 · 非对称晨光微晕（叠加在底色上，不改动主题） */
+  html:not([data-theme-id]) .dash-card{
+    background-image:radial-gradient(130% 100% at 100% 0%,rgba(122,155,109,0.10),transparent 55%);
+  }
+  html:not([data-theme-id]) .stat-card{
+    background-image:radial-gradient(140% 100% at 0% 100%,rgba(223,129,89,0.06),transparent 60%);
+  }
+  html:not([data-theme-id]) .report-card{
+    background-image:radial-gradient(130% 100% at 100% 0%,rgba(122,155,109,0.06),transparent 55%);
+  }
+  html:not([data-theme-id]) .word-card{
+    background-image:radial-gradient(120% 80% at 50% 0%,rgba(223,129,89,0.08),transparent 60%);
+  }
+
+  /* 3) 按钮 · 顶部冷光高光 + 实按下沉 */
+  .btn{position:relative;overflow:hidden}
+  .btn::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,0.28),transparent 52%);opacity:.45}
+  .btn-primary:active,.btn-coral:active{transform:scale(0.96);filter:brightness(0.97)}
+  .icon-btn:active{transform:scale(0.9)}
+
+  /* 4) 底部导航 · 选中胶囊浮起 + 图标轻提 + 按压底色 */
+  .bottom-nav-btn .icon{transition:transform .22s var(--ease-out)}
+  .bottom-nav-btn.active .icon{transform:translateY(-2px)}
+  .bottom-nav-btn:active{background:rgba(122,155,109,0.12)}
+
+  /* 5) 小组件 · 进度条动效 + 徽章微浮 */
+  .progress-fill{transition:width .6s var(--ease-out)}
+  .badge-progress-fill{transition:width .6s var(--ease-out)}
+  .badge-card.earned{box-shadow:0 6px 18px -10px rgba(122,155,109,0.5)}
+}
+
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
 /* 触屏：移除 hover 悬浮变形/位移，避免"粘住" */
 @media (hover:none){
