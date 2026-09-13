@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import vm from 'node:vm';
 import { setupGlobals } from '../helpers/mocks.js';
 
 const HTML_PATH = resolve(__dirname, '../../index.html');
@@ -14,10 +15,41 @@ describe('数据脚本 async 化（手机打开就弹测评的根因修复）', 
     expect(html).not.toMatch(/data\/all-extra\.js"[^>]*defer/);
   });
 
-  it('不应再单独引用 words-topup.js（其内容已内建进 all-data.js，冗余重复加载）', () => {
-    expect(html).not.toMatch(/data\/words-topup\.js/);
+  it('words-topup.js 仍须引用（补足各阶段至 10000 词，不可删）；async + 就绪重试守卫', () => {
+    expect(html).toMatch(/<script src="data\/words-topup\.js" async[^>]*><\/script>/);
+    const topup = readFileSync(resolve(__dirname, '../../data/words-topup.js'), 'utf8');
+    expect(topup).toMatch(/typeof WORD_LIBRARY\s*===\s*"undefined"/);
+    expect(topup).toMatch(/setTimeout\(run,\s*\d+\)/);
   });
 });
+
+describe('words-topup 回归——上轮误删独立标签导致词汇量 12万→6万', () => {
+  it('先于 all-data 执行不抛错；词库就绪后自动补足至 10 万级以上', async () => {
+    const sb = { window: {}, setTimeout };
+    sb.window.window = sb.window;
+    sb.self = sb.window;
+    sb.globalThis = sb;
+    vm.createContext(sb);
+    const topup = readFileSync(resolve(__dirname, '../../data/words-topup.js'), 'utf8');
+    // 顺序倒置：words-topup 先执行（WORD_LIBRARY 未定义）→ 只排重试，不抛错、不补词
+    expect(() => vm.runInContext(topup, sb)).not.toThrow();
+    await new Promise((r) => setTimeout(r, 30));
+    vm.runInContext(readFileSync(resolve(__dirname, '../../data/all-data.js'), 'utf8'), sb);
+    const base = countWords(sb.WORD_LIBRARY);
+    expect(base).toBeLessThan(70000);
+    // 等 ≥2 个重试周期（80ms×2）
+    await new Promise((r) => setTimeout(r, 260));
+    const full = countWords(sb.WORD_LIBRARY);
+    expect(full).toBeGreaterThan(100000);
+    expect(full - base).toBeGreaterThan(40000);
+  });
+});
+
+function countWords(lib) {
+  let t = 0;
+  (lib.categories || []).forEach((c) => (t += c.words.length));
+  return t;
+}
 
 describe('AssessmentModule.start — 词库未就绪（async 数据未到）守卫', () => {
   let startSpy;

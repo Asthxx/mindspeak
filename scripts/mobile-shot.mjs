@@ -77,13 +77,16 @@ async function main() {
   await sleep(2500);
   const evalJs = async (expr) => { const r = await cdp.send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }, S); return r.exceptionDetails ? null : r.result?.value; };
   await evalJs(`(async () => { const ob = document.getElementById('onboarding-modal'); if (ob) ob.classList.add('hidden'); })()`);
-  await sleep(400);
+  await sleep(1600);
   // ---- 布局审计（无图像环境下用 DOM 指标评估手机端）----
   const audit = await evalJs(`(() => {
     const r = s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), pad: getComputedStyle(e).padding, f: getComputedStyle(e).fontSize }; };
     const txt = (s, sel) => { const e = document.querySelector(sel); if (!e) return null; const es = getComputedStyle(e); return { fs: es.fontSize, lh: es.lineHeight, mb: es.marginBottom }; };
+    const wl = window.WORD_LIBRARY;
     return {
       vw: window.innerWidth, vh: window.innerHeight,
+      words: wl && wl.categories ? wl.categories.reduce((t, c) => t + (c.words ? c.words.length : 0), 0) : 0,
+      overflow: document.documentElement.scrollWidth > window.innerWidth,
       scrollW: document.documentElement.scrollWidth,
       overflow: document.documentElement.scrollWidth > window.innerWidth,
       header: r('.app-header'), stats: r('.stats-bar'), logo: r('.logo'),
