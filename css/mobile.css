@@ -6,7 +6,7 @@
 html.forced-mobile .bottom-nav{display:flex}
 html.forced-mobile .sidebar{position:fixed;top:var(--header);left:0;width:260px;max-width:80vw;height:calc(100dvh - var(--header));transform:translateX(-110%);transition:transform var(--duration-slower) var(--ease-out);z-index:100;overflow-y:auto}
 html.forced-mobile .sidebar.open{transform:translateX(0)}
-html.forced-mobile .content{margin-left:0;margin-top:var(--header);padding-bottom:calc(var(--sp-6) + 76px + env(safe-area-inset-bottom,0px));overflow-x:hidden}
+html.forced-mobile .content{margin-left:0;margin-top:var(--header);padding-bottom:calc(var(--sp-6) + 92px + env(safe-area-inset-bottom,0px));overflow-x:hidden}
 html.forced-mobile .app-header{height:var(--header);padding-top:env(safe-area-inset-top,0px)}
 html.forced-mobile .btn-menu{display:flex;width:44px;height:44px}
 html.forced-mobile .sidebar-scrim{position:fixed;inset:0;background:rgba(0,0,0,0.35);opacity:0;visibility:hidden;z-index:90}
@@ -111,22 +111,26 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .content{
     margin-left:0;margin-top:var(--header);
     padding:var(--sp-3) var(--sp-3);
-    padding-bottom:calc(var(--sp-6) + 76px + env(safe-area-inset-bottom,0px));
+    padding-bottom:calc(var(--sp-6) + 92px + env(safe-area-inset-bottom,0px));
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;
   }
 
-  /* ---- 移动端底部导航（App 级） ---- */
-  .bottom-nav{
-    position:fixed;left:0;right:0;bottom:0;z-index:95;
+  /* ---- 移动端底部导航（App 级）· 悬浮药丸壳体 ---- */
+  .bottom-nav,html.platform-ios .bottom-nav,html.platform-android .bottom-nav{
+    position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:95;
     display:flex;align-items:stretch;justify-content:space-around;
-    height:calc(60px + env(safe-area-inset-bottom,0px));
-    padding-bottom:env(safe-area-inset-bottom,0px);
-    background:var(--surface);
-    border-top:1px solid var(--border);
-    box-shadow:0 -4px 16px rgba(0,0,0,0.06);
-    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    height:64px;padding:6px;
+    background:rgba(255,255,255,0.94);
+    border:1px solid rgba(150,165,150,0.35);
+    border-radius:22px;
+    box-shadow:0 12px 32px -10px rgba(60,80,70,0.30),0 2px 6px rgba(0,0,0,0.05);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  }
+  html[data-theme="dark"] .bottom-nav{
+    background:rgba(24,30,38,0.92);
+    border:1px solid rgba(150,165,160,0.22);
   }
   .bottom-nav-btn{
     flex:1;min-width:0;
@@ -135,36 +139,38 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
     border:none;background:none;cursor:pointer;
     color:var(--text-tertiary);
     font-family:var(--font);font-size:0.68rem;font-weight:500;
-    transition:color var(--duration-normal) var(--ease),background var(--duration-normal) var(--ease);
+    border-radius:18px;
+    transition:color var(--duration-normal) var(--ease),background var(--duration-normal) var(--ease),transform .18s var(--ease-out);
     -webkit-tap-highlight-color:transparent;
   }
   .bottom-nav-btn .icon{width:22px;height:22px}
-  /* 选中态：浅色胶囊背景 + 主色图标 + 字号微增，iOS/Android 原生式导航反馈 */
+  /* 选中态：全圆角胶囊 + 主色，原生式导航反馈 */
   .bottom-nav-btn.active{
     color:var(--sage-deep);
     background:var(--sage-surface);
-    border-radius:16px 16px 0 0;
+    border-radius:18px;
   }
   .bottom-nav-btn.active .icon{color:var(--sage-deep)}
   .bottom-nav-btn:active{opacity:0.7}
-  h2{font-size:1.1rem;margin-bottom:var(--sp-3)}
-  h3{font-size:0.95rem}
+  h2{font-size:1.3rem;margin-bottom:var(--sp-3);letter-spacing:-0.01em}
+  h3{font-size:1.02rem}
 
   /* ================= 首页 控制面板 ================= */
   .dash-greeting{flex-direction:column;align-items:stretch;gap:var(--sp-3)}
-  .dash-greeting .btn{width:100%;min-height:48px}
-  .dash-stat-card{padding:12px 12px;gap:8px;border-radius:var(--radius-lg)}
+  .dash-greeting .btn{width:100%;min-height:54px;font-size:1rem;border-radius:16px}
+  .dash-stat-card{padding:12px 12px;gap:8px;border-radius:18px}
   .dash-stat-icon{width:38px;height:38px;border-radius:12px}
   .dash-stat-num{font-size:1.25rem}
   .dash-stat-label{font-size:0.68rem;line-height:1.4}
-  .dash-card{padding:14px 14px;border-radius:var(--radius-lg)}
+  .dash-card{padding:14px 14px;border-radius:24px;box-shadow:0 8px 24px -14px rgba(60,80,70,0.25)}
 
   /* ================= 学习卡片 ================= */
   .card-area{max-width:100%;padding:0 var(--sp-1)}
   .word-card{
     min-height:min(44vh,340px);
     padding:var(--sp-6) var(--sp-3);
-    border-radius:var(--radius-lg);
+    border-radius:28px;
+    box-shadow:0 16px 40px -18px rgba(60,80,70,0.35);
   }
   .word-card::before,.word-card::after{width:26px;height:26px}
   .word-main{font-size:2.3rem;word-break:break-word}
