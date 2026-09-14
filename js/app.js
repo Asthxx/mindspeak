@@ -675,14 +675,9 @@ _speakTTS: function(text, lang, opts) {
     var failedVoices = [];
 var attempt = function() {
       if (self._speakSeq !== mySeq) return;
-      // 网页部署（无 server）：server 不可达时，交由远程发音/系统默认语音兜底。
+      // 网页部署（无 server）：server 不可达时，优先用所选声音朗读（speechSynthesis），
+      // 只有选声不可用/朗读失败后才降级到远程发音链（_speakServerless）。
       var useDeviceVoice = (self._serverDown === true);
-      if (useDeviceVoice) {
-        self._burstMode = 'device';
-        self._burstUntil = Date.now() + 3000;
-        self._speakServerless(text, lang, opts);
-        return;
-      }
       // voices 列表是异步加载的：未就绪时最多等 3 次（共约 2.4s），仍无则先裸 speak
       var voices;
       try { voices = window.speechSynthesis.getVoices() || []; } catch(e) { voices = []; }
