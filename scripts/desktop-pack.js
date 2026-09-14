@@ -128,13 +128,7 @@ async function main() {
 
   cp(DIST, path.join(RES, 'static'));
 
-  cp(path.join(ROOT, 'server'), path.join(RES, 'server'));
-  const nodeModulesSrc = path.join(ROOT, 'server', 'node_modules');
-  if (!fs.existsSync(nodeModulesSrc)) {
-    console.log('[desktop-pack] server node_modules 缺失，安装依赖...');
-    execSync('npm install --omit=dev --no-audit --no-fund', { cwd: path.join(ROOT, 'server'), stdio: 'inherit' });
-  }
-  cp(nodeModulesSrc, path.join(RES, 'server', 'node_modules'));
+  packServerResources(ROOT, RES);
 
   fs.mkdirSync(path.join(RES, 'node'), { recursive: true });
   if (nodeFile) fs.copyFileSync(nodeFile, path.join(RES, 'node', path.basename(nodeFile)));
@@ -143,7 +137,65 @@ async function main() {
   rmrf(path.join(RES, 'server', 'logs'));
   rmrf(path.join(RES, 'server', 'data'));
 
+  // 审计 F-2.2 护栏：资源中不得残留任何密钥文件（与上方 CSP 校验同风格的构建期断言），
+  // 一旦检出立即失败，防止密钥随发行版外流。
+  assertNoSecretsInResources(RES);
+
   console.log('[desktop-pack] 资源组装完成');
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// ==================== 审计 F-2.2：server 目录白名单复制 + 密钥断言 ====================
+// 仅复制 server 目录的运行必需文件，排除 .env 等 dotfile 与本地配置，防止
+// POLLINATIONS_API_KEY / MS_TOKEN 随桌面安装包分发。
+const SERVER_KEEP = new Set([
+  'server.js', 'config.js', 'logger.js', 'db.js', 'piper-check.js', 'rate-limit.js',
+  'package.json', 'package-lock.json', 'node_modules',
+]);
+
+function packServerResources(rootDir, resDir) {
+  const serverSrc = path.join(rootDir, 'server');
+  const resServer = path.join(resDir, 'server');
+  fs.mkdirSync(resServer, { recursive: true });
+  for (const e of fs.readdirSync(serverSrc, { withFileTypes: true })) {
+    if (!SERVER_KEEP.has(e.name)) continue;
+    const s = path.join(serverSrc, e.name);
+    const d = path.join(resServer, e.name);
+    if (e.isDirectory()) cp(s, d); // 目录整体复制（node_modules 内部不套 filter）
+    else if (e.isFile()) fs.copyFileSync(s, d);
+  }
+  const nodeModulesSrc = path.join(serverSrc, 'node_modules');
+  if (!fs.existsSync(nodeModulesSrc)) {
+    console.log('[desktop-pack] server node_modules 缺失，安装依赖...');
+    execSync('npm install --omit=dev --no-audit --no-fund', { cwd: serverSrc, stdio: 'inherit' });
+  }
+  cp(nodeModulesSrc, path.join(resServer, 'node_modules'));
+}
+
+// 递归收集密钥类文件（.env 变体 / pem / key / p12 / jks / keystore）
+function findSecretFiles(dir) {
+  const leaked = [];
+  (function walk(d) {
+    let entries = [];
+    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
+    for (const e of entries) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/^\.env/.test(e.name) || /\.(pem|key|p12|jks|keystore)$/i.test(e.name)) leaked.push(p);
+    }
+  })(dir);
+  return leaked;
+}
+
+function assertNoSecretsInResources(resDir) {
+  const leaked = findSecretFiles(resDir);
+  if (leaked.length) {
+    throw new Error('[desktop-pack] 资源中检出密钥文件，拒绝打包: ' + leaked.join(', '));
+  }
+}
+
+module.exports = { packServerResources, assertNoSecretsInResources, findSecretFiles, SERVER_KEEP };
+
+// require.main 保护：被测试导入时不执行打包（导出的可测函数见文件末尾）
+if (require.main === module) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}

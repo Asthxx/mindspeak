@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
+import http from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -166,5 +167,70 @@ describe('限流覆盖 /api/edge-tts', () => {
     expect(r1.status).toBe(400);
     const r2 = await fetch(BASE + '/api/edge-tts?text=');
     expect(r2.status).toBe(429);
+  });
+});
+
+// ---- F-2.1：Host 白名单防 DNS 重绑 ----
+// fetch 无法覆盖 Host 头（forbidden header），改用 node:http 显式指定：
+// 连接目标是 127.0.0.1:PORT（socket 为回环，模拟重绑后浏览器的真实连接），
+// 而 Host 为攻击者域名——修复前该组合可同时骗过令牌门与 CORS。
+function reqWithHost(method, pathname, hostHeader, extraHeaders = {}, body = null) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(new URL(BASE + pathname), {
+      method,
+      headers: { ...extraHeaders, host: hostHeader },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({
+        status: res.statusCode,
+        acao: res.headers['access-control-allow-origin'] || null,
+        body: Buffer.concat(chunks).toString('utf8'),
+      }));
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+describe('F-2.1 Host 白名单防 DNS 重绑', () => {
+  it('重绑读日志：连接回环但 Host 为攻击者域名 → 403', async () => {
+    const r = await reqWithHost('GET', '/api/logs/read?n=1', 'evil.com');
+    expect(r.status).toBe(403);
+  });
+
+  it('重绑完整链：Host 与 Origin 同为攻击者域名 → 403，且不回写攻击者 ACAO', async () => {
+    const r = await reqWithHost('POST', '/api/logs', 'evil.com',
+      { Origin: 'http://evil.com', 'Content-Type': 'application/json' },
+      JSON.stringify([{ lvl: 'warn', mod: 'evil', msg: 'x', ts: 1 }]));
+    expect(r.status).toBe(403);
+    expect(r.acao).not.toBe('http://evil.com');
+  });
+
+  it('重绑预检 OPTIONS：Host=Origin=攻击者域名 → 403', async () => {
+    const r = await reqWithHost('OPTIONS', '/api/logs', 'evil.com',
+      { Origin: 'http://evil.com', 'Access-Control-Request-Method': 'POST' });
+    expect(r.status).toBe(403);
+  });
+
+  it('Host 为 localhost（本机别名）不误伤', async () => {
+    const r = await reqWithHost('GET', '/api/health', 'localhost:' + PORT);
+    expect(r.status).toBe(200);
+  });
+
+  it.skipIf(!LAN_IP)('Host 为本机网卡 IP（局域网手机访问形态）不误伤', async () => {
+    const r = await reqWithHost('GET', '/api/health', LAN_IP + ':' + PORT);
+    expect(r.status).toBe(200);
+  });
+
+  it('Host 为其他未知外部域名（含端口）→ 403', async () => {
+    const r = await reqWithHost('GET', '/api/health', 'rebound.attacker.example:9931');
+    expect(r.status).toBe(403);
+  });
+
+  it('Host 大小写混淆不绕过（EVIL.COM）→ 403', async () => {
+    const r = await reqWithHost('GET', '/api/health', 'EVIL.COM');
+    expect(r.status).toBe(403);
   });
 });

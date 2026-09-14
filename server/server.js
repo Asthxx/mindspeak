@@ -36,9 +36,51 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// ==================== Host 白名单（审计 F-2.1 修复：防 DNS 重绑） ====================
+// 此前的信任判据有两个洞：令牌中间件看「socket 地址是否回环」，CORS 看「Origin 的
+// host 是否等于 Host」。DNS 重绑同时满足两者——浏览器把攻击者域名解析到 127.0.0.1 后，
+// 请求 socket 确实来自回环（令牌门被跳过），而 Origin 与 Host 同为攻击者域名（CORS 判
+// 同源并回写 ACAO），实测可无凭据读写本地 API。
+// 修复：在任何 CORS/令牌判定之前固定校验 Host——只接受本机实际地址（回环 + 所有网卡
+// IP）、localhost，以及显式配置的域名（ALLOWED_ORIGINS 的 hostname，覆盖反向代理/隧道
+// 部署；另有 MS_ALLOWED_HOSTS 环境变量可补充）。重绑请求的 Host 是攻击者域名，在这里
+// 直接 403，永远到不了后面的 CORS/令牌逻辑。按 hostname（不含端口）比较，兼容桌面版
+// MINISPEAK_DESKTOP_PORT 等任意端口。
+const TRUSTED_HOSTNAMES = (function () {
+  const s = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+  try {
+    const ifs = os.networkInterfaces();
+    for (const name of Object.keys(ifs)) {
+      for (const ni of ifs[name] || []) {
+        if (ni && ni.address) s.add(String(ni.address).toLowerCase());
+      }
+    }
+  } catch (e) { /* 枚举失败则仅信任回环，仍优于修复前 */ }
+  for (const o of config.allowedOrigins) {
+    try { s.add(new URL(o).hostname.toLowerCase()); } catch (e) {}
+  }
+  for (const h of String(process.env.MS_ALLOWED_HOSTS || '').split(',')) {
+    const t = h.trim().toLowerCase();
+    if (t) s.add(t);
+  }
+  return s;
+})();
+app.use((req, res, next) => {
+  const raw = String(req.headers.host || '');
+  let hostname = '';
+  try { hostname = new URL('http://' + raw).hostname.toLowerCase(); } catch (e) { hostname = raw.toLowerCase(); }
+  if (!hostname || !TRUSTED_HOSTNAMES.has(hostname)) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.status(403).json({ ok: false, message: 'Forbidden: 未知 Host（可能为 DNS 重绑访问，已拒绝）' });
+  }
+  next();
+});
+
 // 跨域策略：放行"与请求同源"的浏览器 Origin（同源部署到任意 IP/域名都自动放行：
 // localhost、127.0.0.1、局域网 IP、公网 IP/域名全部可用），同时拒绝远程恶意站点
 // 跨源调用未鉴权接口（防远程恶意站点滥用）。
+// 审计 F-2.1 修复后：能走到这里的请求 Host 已通过上方白名单校验（只可能是本机地址或
+// 显式配置的域名），因此下方 sameOrigin 判定不再可被重绑伪造。
 // file://（Origin:null）默认拒绝：其既非同源也不携带可验证身份，任何引用了本地服务的
 // 网页都能读取日志/滥用 TTS；仍需要在浏览器内以 file:// 直连本服务时，显式设
 // ALLOW_NULL_ORIGIN=1。
@@ -55,6 +97,8 @@ app.use((req, res, next) => {
     || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
   if (!allowed) return res.status(403).json({ ok: false, message: '禁止跨源访问' });
   res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  // ACAO 随 Origin 动态变化，告知缓存按 Origin 区分（审计 F-2.1 加固）
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Ms-Token');
   // Chromium 正在弃用 unload 事件，默认会打印
