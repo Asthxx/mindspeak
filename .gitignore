@@ -46,7 +46,13 @@ src-tauri/node-runtime/
 
 # 开发辅助产物（技能/浏览器调试截图与临时备份）
 .superpowers/
+.workbuddy/
 browser-shots/
 test-screenshots/
 *.bak
 *draft-backup.js
+
+# 调试脚本输出截图（mobile-shot.mjs 等的产物，非源码）。
+# 不能用裸 *.png：assets/pwa/ 与 src-tauri/icons/ 下 27 个图标是合法源码，
+# 裸规则会让将来新增图标必须 git add -f 强推。
+scripts/*.png
