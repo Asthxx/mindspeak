@@ -1,7 +1,10 @@
 # 相对本脚本定位仓库根，避免硬编码本机绝对路径导致换机即废
 $root = Split-Path -Parent $PSScriptRoot
-$html = [Text.Encoding]::GetEncoding('GB18030').GetString([IO.File]::ReadAllBytes("$root\index.html"))
-$app  = [Text.Encoding]::GetEncoding('GB18030').GetString([IO.File]::ReadAllBytes("$root\js\app.js"))
+# index.html / js/app.js 实测为无 BOM 的 UTF-8（首字节 3C-21 / 2F-2F，非 GB 系）。
+# 早前按 GB18030 解码会把中文标签解成乱码（"按回车发送" -> "按回车发?"），污染输出。
+$utf8 = [Text.UTF8Encoding]::new($false, $true)   # 抛异常而非静默替换，便于发现编码不符
+$html = $utf8.GetString([IO.File]::ReadAllBytes("$root\index.html"))
+$app  = $utf8.GetString([IO.File]::ReadAllBytes("$root\js\app.js"))
 
 # 1) 收集 HTML 中"交互控件"id：button / input(type!=hidden|submit) / select / a / textarea
 $ids = [System.Collections.Generic.HashSet[string]]::new()
