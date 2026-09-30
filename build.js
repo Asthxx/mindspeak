@@ -19,7 +19,6 @@ const jsOrder = [
   'js/notification-manager.js', // Android 本地通知管理（学习提醒、复习调度）
   'js/responsive-layout.js', // 响应式断点布局（手机/平板/桌面自适应）
   'js/app.js',
-  'js/badges.js',
   'js/daily-plan.js',
   'js/dashboard.js',
   'js/items.js',

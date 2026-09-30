@@ -253,9 +253,6 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .dp-val{min-width:110px}
   .dp-bar{min-width:80px}
 
-  /* ================= 徽章 ================= */
-  .badge-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--sp-3)}
-
   /* ================= 听力跟读 ================= */
   .la-display{padding:var(--sp-4) var(--sp-3)}
   .la-word{font-size:1.9rem}
@@ -483,10 +480,8 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .bottom-nav-btn.active .icon{transform:translateY(-2px)}
   .bottom-nav-btn:active{background:rgba(122,155,109,0.12)}
 
-  /* 5) 小组件 · 进度条动效 + 徽章微浮 */
+  /* 5) 小组件 · 进度条动效 */
   .progress-fill{transition:width .6s var(--ease-out)}
-  .badge-progress-fill{transition:width .6s var(--ease-out)}
-  .badge-card.earned{box-shadow:0 6px 18px -10px rgba(122,155,109,0.5)}
 }
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}

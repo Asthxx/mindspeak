@@ -22,10 +22,3 @@ describe('加固：日志弹窗 showErr 转义', () => {
     expect(body).toContain('escapeHtml(msg)');
   });
 });
-
-describe('加固：徽章日期渲染转义', () => {
-  it('badges 渲染的 earned 值必须转义（纵深防御，防未来直写存储路径复活）', () => {
-    const body = extractFn(read('js/badges.js'), 'BadgeSystem.prototype.render', 'return BadgeSystem');
-    expect(body).toContain('escapeHtml(String(self.earned[b.id] || \'\'))');
-  });
-});

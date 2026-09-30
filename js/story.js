@@ -145,8 +145,6 @@ var StoryModule = (function() {
     if (wordsEl) wordsEl.classList.remove('hidden');
     this.renderWordList();
     if (!reshuffle) Toast.success('短文生成完毕，共 ' + picked.length + ' 个单词');
-    // 仅首次生成计入"故事达人"成就；"换一批"反复点不再刷成就
-    if (!reshuffle && window.app && window.app.badgeSystem) window.app.badgeSystem.onEvent('story');
   };
 
   StoryModule.prototype.buildSentences = function(picked) {

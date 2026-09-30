@@ -151,7 +151,6 @@ const MODULES = [
   'js/api-config.js',
   'js/tts-manager.js',
   'js/story.js',
-  'js/badges.js',
   'js/listen-along.js',
   'js/daily-plan.js',
   'js/items.js',

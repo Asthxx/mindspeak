@@ -2218,45 +2218,6 @@ h2{
 .dp-msg{font-size:0.8rem;color:var(--text-tertiary);margin-top:var(--sp-1)}
 .dp-msg-done{color:var(--success);font-weight:600}
 
-/* ============ 成就徽章 ============ */
-.badge-summary{
-  font-size:0.9rem;font-weight:600;color:var(--sage-deep);
-  background:var(--sage-surface);border:1px solid var(--border-sage);
-  border-radius:var(--radius-md);padding:var(--sp-3) var(--sp-4);
-  margin-bottom:var(--sp-4);
-}
-.badge-grid{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
-  gap:var(--sp-4);
-}
-.badge-card{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius-lg);padding:var(--sp-4);
-  display:flex;flex-direction:column;align-items:center;text-align:center;
-  gap:var(--sp-2);box-shadow:var(--shadow-sm);
-}
-.badge-card.earned{border-color:var(--gold,#D4A017);background:linear-gradient(180deg,var(--sage-surface),var(--surface))}
-.badge-icon{
-  width:56px;height:56px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  background:var(--sage-surface);color:var(--sage-deep);
-  border:2px solid var(--border-sage);
-}
-.badge-card.earned .badge-icon{
-  background:var(--gold-surface,#FBF3D9);color:var(--gold,#B8860B);
-  border-color:var(--gold,#D4A017);
-  box-shadow:0 0 12px rgba(212,160,23,0.28);
-}
-.badge-icon .icon{width:28px;height:28px}
-.badge-name{font-weight:700;color:var(--text)}
-.badge-card.locked .badge-name{color:var(--text-secondary)}
-.badge-desc{font-size:0.78rem;color:var(--text-tertiary);line-height:1.5}
-.badge-progress{width:100%;height:6px;background:var(--border);border-radius:var(--radius-full);overflow:hidden}
-.badge-progress-fill{height:100%;background:var(--sage);border-radius:var(--radius-full)}
-.badge-prog-text{font-size:0.72rem;color:var(--text-tertiary)}
-.badge-date{font-size:0.72rem;color:var(--sage-deep);font-weight:600}
-.badge-card.locked .badge-date{color:var(--text-tertiary);font-weight:400}
-
 /* ============ 随声听 ============ */
 .la-toolbar{
   display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);

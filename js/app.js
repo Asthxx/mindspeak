@@ -88,7 +88,7 @@ function getLocalDateStr(d) {
   return y + '-' + m + '-' + day;
 }
 
-// 计算连续打卡天数：从今天往回数连续的 days（今天没学则从昨天起算），与徽章口径一致
+// 计算连续打卡天数：从今天往回数连续的 days（今天没学则从昨天起算）
 function calculateStreak(checkins) {
   checkins = checkins || {};
   var d = new Date();
@@ -3107,7 +3107,7 @@ var GrammarModule = (function() {
     if (selected === ex.answer) {
       if (buttons[selected]) buttons[selected].classList.add('btn-correct');
       this.correct++;
-      if (window.app) { window.app.recordActivity('grammar', 1); window.app.markCheckin(1); if (window.app.badgeSystem) window.app.badgeSystem.onEvent('grammar'); }
+      if (window.app) { window.app.recordActivity('grammar', 1); window.app.markCheckin(1); }
     } else {
       if (buttons[selected]) buttons[selected].classList.add('btn-wrong');
       if (buttons[ex.answer]) buttons[ex.answer].classList.add('btn-correct');
@@ -3123,7 +3123,7 @@ var GrammarModule = (function() {
     this.answered = true;
     var ex = this.exercises[this.currentIndex];
     var userAns = document.getElementById('gq-answer').value.trim().toLowerCase();
-    if (userAns === ex.correct_answer.toLowerCase()) { this.correct++; Toast.success('正确！'); if (window.app) { window.app.recordActivity('grammar', 1); window.app.markCheckin(1); if (window.app.badgeSystem) window.app.badgeSystem.onEvent('grammar'); } }
+    if (userAns === ex.correct_answer.toLowerCase()) { this.correct++; Toast.success('正确！'); if (window.app) { window.app.recordActivity('grammar', 1); window.app.markCheckin(1); } }
     else {
       this.wrong++;
       Toast.error('错误！正确答案：' + ex.correct_answer);
@@ -3141,7 +3141,7 @@ var GrammarModule = (function() {
     if (userAns.toLowerCase() === ex.correct_answer.toLowerCase()) {
       resultEl.innerHTML = '<span style="color:var(--success)">✓ 正确！</span>';
       this.correct++;
-      if (window.app) { window.app.recordActivity('grammar', 1); window.app.markCheckin(1); if (window.app.badgeSystem) window.app.badgeSystem.onEvent('grammar'); }
+      if (window.app) { window.app.recordActivity('grammar', 1); window.app.markCheckin(1); }
     } else {
       resultEl.innerHTML = '<span style="color:var(--danger)">✗ 正确答案：' + escapeHtml(ex.correct_answer) + '</span>';
       this.wrong++;
@@ -4154,9 +4154,6 @@ PKModule.prototype.checkAnswer = function(btn, isCorrect, w) {
     this.saveHistory();
     this.renderHistory();
     if (window.app) window.app.recordActivity('pk');
-    if (window.app && window.app.badgeSystem) {
-      window.app.badgeSystem.onEvent('pk', { correct: this.correctCount, wrong: this.wrongCount });
-    }
   };
   // ── 历史记录：保存 / 渲染 / 单删 / 清空 ──
   PKModule.prototype.saveHistory = function() {
@@ -5260,7 +5257,7 @@ var GamificationSystem = (function() {
   function GamificationSystem() {
     this.data = DataStore.getProgress('gamification', {
       points: 0, level: 1, streak: 0, lastActiveDate: null,
-      totalWords: 0, totalExercises: 0, achievements: []
+      totalWords: 0, totalExercises: 0
     });
   }
   GamificationSystem.prototype.addPoints = function(amount) {
@@ -5701,7 +5698,6 @@ function App() {
   this.itemSystem = init('ItemSystem', function() { return new ItemSystem(); });
   this.themeShop = init('ThemeShop', function() { return new ThemeShop(); });
   this.listenAlongModule = init('ListenAlongModule', function() { return new ListenAlongModule(); });
-  this.badgeSystem = init('BadgeSystem', function() { return new BadgeSystem(); });
   this.dailyPlanModule = init('DailyPlanModule', function() { return new DailyPlanModule(); });
   this.dashboardModule = init('DashboardModule', function() { return new DashboardModule(); });
   this.aiCoachModule = init('AiCoachModule', function() { return new AiCoachModule(); });
@@ -5925,8 +5921,6 @@ App.prototype.showTab = function(tab) {
   if (tab === 'story' && this.storyModule && !this.storyModule.generated) this.storyModule.generate();
   // 收藏夹：进入时重新从 storage 渲染（收藏/取消收藏后列表需即时更新）
   if (tab === 'favorites' && this.favoritesModule) this.favoritesModule.renderList();
-// 成就徽章：进入时先检查有没有新解锁的，再刷新渲染
-  if (tab === 'badges' && this.badgeSystem) { this.badgeSystem.checkAll(); this.badgeSystem.render(); }
   // 每日计划：进入背单词页刷新卡片
   if (tab === 'word' && this.dailyPlanModule) this.dailyPlanModule.render();
   // 道具页：进入时刷新背包/商店/主题（购买后积分可能变化）
@@ -6052,7 +6046,6 @@ App.prototype.recordActivity = function(type, count, isNewWord, wordKey) {
       for (var i = 0; i < n; i++) this.gamification.recordActivity(type);
     }
     if (this.dailyChallenge) this.dailyChallenge.updateProgress(type, count, isNewWord, wordKey);
-    if (this.badgeSystem) this.badgeSystem.checkAll();
     this.updateGlobalStats();
   } catch(e) { console.error('[recordActivity] bridge failed:', e); }
 };
@@ -6601,7 +6594,6 @@ if (name) {
         self.pomodoroModule.totalMinutes = DataStore.getProgress('pomodoro_minutes', 0);
         self.pomodoroModule.updateStats();
       }
-      else if ((e.key === 'badges' || e.key === 'badge_stats') && self.badgeSystem) { self.badgeSystem.render(); }
       else if (e.key === 'daily_challenge' && self.dailyChallenge) {
         // 重载任务数据再归一当天，防止旧 tab 整表写回把任务进度/已领取状态刷新掉
         self.dailyChallenge.data = DataStore.getProgress('daily_challenge', null);
@@ -6617,7 +6609,7 @@ if (name) {
   });
 };
   // 备份字段表：[导出字段名, localStorage 键, 默认值, 是否大体积]。与 resetData 的清除列表对齐，
-  // 保证导出→导入不丢任何进度（道具/徽章/番茄钟/每日挑战/自定义词库等此前全被漏掉）。
+  // 保证导出→导入不丢任何进度（道具/番茄钟/每日挑战/自定义词库等此前全被漏掉）。
   // big 字段（wordProgress / customVoice）只在导出文件里出现：
   // 本地 english_app_backup 不重复存它们（word_progress / custom_voice 本就实时独立落盘，
   // 重复序列化会把 5MB 配额直接打爆，12 万词词库下必现 QuotaExceeded）。
@@ -6636,7 +6628,7 @@ if (name) {
     ['pomodoroMinutes','pomodoro_minutes',0,false], ['pomodoroSoundEnabled','pomodoro_sound_enabled',true,false],
     ['activeRecall','active_recall','0',false],
     ['dailyReviewPlan','daily_review_plan',{},false], ['dailyChallenge','daily_challenge',null,false],
-    ['adaptiveReview','adaptive_review',true,false], ['badges','badges',{},false], ['badgeStats','badge_stats',{},false],
+    ['adaptiveReview','adaptive_review',true,false],
     ['items','items',{},false], ['itemBuffs','item_buffs',{},false],
     ['assessment','assessment',null,false], ['assessmentHistory','assessment_history',[],false],
     ['assessmentLast','assessment_last_keys',[],false],
@@ -6796,26 +6788,6 @@ if (name) {
         if (++_itemsN >= 200) break;
       }
       sanitized.items = _items;
-    }
-    // badges：真实存储已升级为 "id -> 'YYYY-MM-DD'"（badges.js today() 直接写字符串），
-    // 对象形（{date,achieved,count}）属于旧/攻防变体。字符串日期走白名单原样保留，
-    // 若只收对象形会把合法徽章全部清空，恢复备份后再次发奖（F6 重复加分延迟回归）。
-    if (sanitized.badges && typeof sanitized.badges === 'object' && !Array.isArray(sanitized.badges)) {
-      var _badges = {}, _badgesN = 0;
-      for (var _bk in sanitized.badges) {
-        var _b = sanitized.badges[_bk];
-        if (typeof _b === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(_b)) {
-          _badges[_bk] = _b;
-        } else if (_b && typeof _b === 'object') {
-          var _bo = {};
-          if (typeof _b.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(_b.date)) _bo.date = _b.date;
-          if (_b.achieved === true) _bo.achieved = true;
-          if (typeof _b.count === 'number' && isFinite(_b.count)) _bo.count = _b.count;
-          _badges[_bk] = _bo;
-        }
-        if (++_badgesN >= 200) break;
-      }
-      sanitized.badges = _badges;
     }
     // customBg：自定义背景图 dataURL 很长，string 分支的 1000 截断会损坏图片；
     // 仅在 data:image 前缀时完整保留（F7 修复），随备份导出/导入由 _applyBackup 写回 IDB。
@@ -7246,15 +7218,11 @@ if (data && typeof data === 'object' && (data.wordProgress || data.mistakes || d
               }
               if (self.mistakesModule && self.mistakesModule.renderList) self.mistakesModule.renderList();
             } catch(_e) {}
-            // 其余模块的内存态同样必须重载：否则积分/道具/徽章/每日挑战等仍是旧值，
+            // 其余模块的内存态同样必须重载：否则积分/道具/每日挑战等仍是旧值，
             // 下一次加积分/用道具/自动保存会把刚导入的数据整体覆盖回 localStorage
             try {
               if (self.gamification) self.gamification.data = DataStore.getProgress('gamification', self.gamification.data);
               if (self.itemSystem && self.itemSystem.reload) self.itemSystem.reload();
-              if (self.badgeSystem) {
-                self.badgeSystem.earned = DataStore.getProgress('badges', {});
-                self.badgeSystem.render && self.badgeSystem.render();
-              }
               if (self.dailyChallenge && self.dailyChallenge._ensureToday) {
                 self.dailyChallenge.data = DataStore.getProgress('daily_challenge', null);
                 self.dailyChallenge._ensureToday();
@@ -7268,7 +7236,6 @@ if (data && typeof data === 'object' && (data.wordProgress || data.mistakes || d
               if (self.calendarModule && self.calendarModule.render) self.calendarModule.render();
               if (self.chartModule && self.chartModule.render) self.chartModule.render();
             } catch(_e2) {}
-            if (self.badgeSystem) self.badgeSystem.checkAll();
             if (self.updateGlobalStats) self.updateGlobalStats();
             if (imported) Toast.success('数据已导入');
             else Toast.error('导入不完整：存储空间不足，部分数据未写入（请先导出并清理存储）');

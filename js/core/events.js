@@ -16,7 +16,6 @@ window.MS.EVENTS = {
   STREAK_CHANGED: 'STREAK_CHANGED',             // 连续打卡变化
   DAILY_PLAN_CHANGED: 'DAILY_PLAN_CHANGED',     // 每日学习计划/目标变化
   ITEM_USED: 'ITEM_USED',                       // 道具使用/消耗
-  ACHIEVEMENT_UNLOCKED: 'ACHIEVEMENT_UNLOCKED', // 解锁成就徽章
   ASSESSMENT_COMPLETED: 'ASSESSMENT_COMPLETED', // 能力测评完成
   SETTINGS_CHANGED: 'SETTINGS_CHANGED'          // 设置变化
 };

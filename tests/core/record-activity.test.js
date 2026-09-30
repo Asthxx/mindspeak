@@ -9,7 +9,6 @@ beforeEach(() => {
   ctx = {
     gamification: { recordActivity: vi.fn() },
     dailyChallenge: { updateProgress: vi.fn() },
-    badgeSystem: { checkAll: vi.fn() },
     updateGlobalStats: vi.fn(),
   };
   recordActivity = function(type, count, isNewWord, wordKey) {
@@ -19,7 +18,6 @@ beforeEach(() => {
         for (var i = 0; i < n; i++) ctx.gamification.recordActivity(type);
       }
       if (ctx.dailyChallenge) ctx.dailyChallenge.updateProgress(type, count, isNewWord, wordKey);
-      if (ctx.badgeSystem) ctx.badgeSystem.checkAll();
       ctx.updateGlobalStats();
     } catch(e) { console.error('[recordActivity] bridge failed:', e); }
   };
@@ -36,11 +34,6 @@ describe('recordActivity — 正常路径', () => {
     expect(ctx.dailyChallenge.updateProgress).toHaveBeenCalledWith('word', 5, true, 'hello');
   });
 
-  it('should_call_badgeSystem_checkAll', () => {
-    recordActivity('word');
-    expect(ctx.badgeSystem.checkAll).toHaveBeenCalled();
-  });
-
   it('should_call_updateGlobalStats', () => {
     recordActivity('word');
     expect(ctx.updateGlobalStats).toHaveBeenCalled();
@@ -49,7 +42,6 @@ describe('recordActivity — 正常路径', () => {
   it('should_handle_missing_subsystems_gracefully', () => {
     ctx.gamification = null;
     ctx.dailyChallenge = null;
-    ctx.badgeSystem = null;
     expect(() => recordActivity('word')).not.toThrow();
   });
 });
