@@ -5933,12 +5933,10 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
     try { document.getElementById('modal-logs').classList.add('hidden'); } catch(e) {}
   });
   safeBind('btn-reset-data', 'click', function() { self.resetData(); });
-  // 之前漏绑的设置页按钮（导出单词本/错题本、生成分享卡片、保存分享图片）
+  // 之前漏绑的设置页按钮（导出单词本/错题本）
   safeBind('btn-export-fav', 'click', function() { self.exportFavorites(); });
   safeBind('btn-export-mistakes', 'click', function() { self.exportMistakes(); });
-  safeBind('btn-share-card', 'click', function() { self.generateShareCard(); });
-  safeBind('btn-download-card', 'click', function() { self.downloadShareCard(); });
-  // 主动回忆模式开关：只持久化，下次背词页生效
+// 主动回忆模式开关：只持久化，下次背词页生效
   var recallToggle = document.getElementById('toggle-active-recall');
   if (recallToggle) {
     recallToggle.checked = DataStore.getProgress('active_recall', false) === true;
@@ -7130,91 +7128,6 @@ App.prototype.removeCustomBg = function() {
     // 清掉旧版本可能残留的 inline position，让 CSS 的 position:fixed 重新生效
     sidebarEl.style.position = '';
   }
-};
-
-// ==================== 分享卡片 ====================
-App.prototype.generateShareCard = function() {
-  var canvas = document.getElementById("share-canvas");
-  var ctx = canvas.getContext("2d");
-  var w = canvas.width, h = canvas.height;
-  
-  // 背景渐变
-  var grad = ctx.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, "#5B82A6");
-  grad.addColorStop(1, "#3E5F7F");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
-  
-  // 装饰圆
-  ctx.globalAlpha = 0.1;
-  ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.arc(350, 50, 80, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(50, 170, 60, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = 1;
-  
-// 标题
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 20px sans-serif";
-  ctx.fillText("闻道 MindSpeak", 20, 32);
-  ctx.font = "12px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
-  ctx.fillText("每天 5 分钟，坚持学英语", 20, 52);
-
-  // 分割线
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(20, 62); ctx.lineTo(380, 62); ctx.stroke();
-  
-  // 统计数据
-  var progress = DataStore.getProgress("word_progress", {});
-  var mastered = Object.keys(progress).filter(function(k) { return progress[k] && progress[k].status === "mastered"; }).length;
-  var gami = DataStore.getProgress("gamification", { points: 0, level: 1, streak: 0 });
-  var mistakes = DataStore.getProgress("mistakes", []);
-  var favs = DataStore.getProgress("favorites", []);
-  
-  ctx.font = "14px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillText("学习数据统计", 20, 70);
-  
-  ctx.font = "bold 28px sans-serif";
-  ctx.fillStyle = "#fff";
-  ctx.fillText(mastered + " 词", 20, 110);
-  ctx.font = "14px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("已掌握单词", 20, 130);
-  
-  ctx.font = "bold 28px sans-serif";
-  ctx.fillStyle = "#fff";
-  ctx.fillText("Lv." + gami.level, 150, 110);
-  ctx.font = "14px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("当前等级", 150, 130);
-  
-ctx.font = "bold 28px sans-serif";
-  ctx.fillStyle = "#fff";
-  ctx.fillText(calculateStreak(DataStore.getProgress("checkins", {})) + " 天", 280, 110);
-  ctx.font = "14px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("连续打卡", 280, 130);
-  
-  // 底部信息
-  ctx.font = "12px sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  var date = new Date().toLocaleDateString("zh-CN");
-  ctx.fillText("生成日期: " + date + "  |  闻道 MindSpeak", 20, 185);
-  
-  // 显示预览
-  document.getElementById("share-card-preview").style.display = "block";
-  Toast.success("分享卡片已生成");
-};
-
-App.prototype.downloadShareCard = function() {
-  var canvas = document.getElementById("share-canvas");
-  var link = document.createElement("a");
-  link.download = "english-learning-share-" + getLocalDateStr() + ".png";
-  link.href = canvas.toDataURL("image/png");
-  link.click();
-  Toast.success("图片已保存");
 };
 
 // ==================== CSV 辅助 ====================
