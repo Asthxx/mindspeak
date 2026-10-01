@@ -46,7 +46,6 @@ window.UserState = (function() {
     themeColor: 'theme_color',
     customThemeColor: 'custom_theme_color',
     customBgOpacity: 'custom_bg_opacity',
-    customVoice: 'custom_voice',
     voiceName: 'voice_name',
     voiceRate: 'voice_rate',
     voicePitch: 'voice_pitch',

@@ -328,44 +328,12 @@ getSettings: function() {
       if (window.Toast) Toast.warning('未检测到本地发音服务（' + localBase + '），已自动切换为浏览器语音朗读');
     }
   },
-  // 自定义发音映射（单词 → dataURL 音频），文件名即单词名；读一次后缓存
-  getCustomVoice: function() {
-    if (!this._customVoice) this._customVoice = Storage.getJSON('custom_voice', {});
-    return this._customVoice;
-  },
 speak: function(text, lang, opts) {
     var self = this;
-    // 单词（无空格）且有自定义录音 → 优先播真人录音（不依赖 speechSynthesis）
     var key = (text || '').trim().toLowerCase();
-    var custom = this.getCustomVoice();
-    // 校验录音值合法：只认 data:/blob:/http 开头的音频，避免 __PENDING__（批量录音还没下载完的占位）
-    // 或损坏的 dataURL 走 audio.play() 静默失败导致"点了没声音"
-    if (key && key.indexOf(' ') === -1 && custom[key]
-        && typeof custom[key] === 'string' && /^(data:|blob:|https?:)/.test(custom[key])) {
-      try {
-TTSManager.cancel();
-        this._stopLocalAudio();
-        var audio = new Audio(custom[key]);
-        this._localAudio = audio; // 登记到共享句柄：连续点击时 _stopLocalAudio 能停掉上一个，防叠加播放
-        this._attachAudioEl(audio);
-        var that = this;
-        if (opts && opts.onend) {
-          audio.onended = function() { that._localAudio = null; that._detachAudioEl(audio); if (opts.onend) opts.onend(); };
-        } else {
-          audio.onended = function() { that._localAudio = null; that._detachAudioEl(audio); };
-        }
-        audio.onerror = function() { that._localAudio = null; that._detachAudioEl(audio); };
-        var pr = audio.play();
-        // play() 是异步的：同步抛错或 Promise 拒绝都兜底走 speechSynthesis，绝不静默
-        if (pr && pr.catch) pr.catch(function() { that._speakTTS(text, lang, opts); });
-        return;
-      } catch(e) {
-        // 构造/播放同步失败 → 落到 speechSynthesis
-      }
-    }
     // 单个英文字母（A-Z）：统一经 SpeechUtil.speakLetter → 所选声音 TTS 裸读 "A"（在线优先）；
     // 未选任何声音时兜底 assets/letters/A.wav 字母音频资源。绝不输出 "Letter A" 组合文本。
-    // 用户自己的录音仍优先（见上方 custom）；失败降级链由 speakLetter 内部保留。
+    // 失败降级链由 speakLetter 内部保留。
     if (/^[a-z]$/.test(key) && /^en/i.test(String(lang || 'en-US'))) {
       this.speakLetter(key, opts);
       return;
@@ -6248,143 +6216,6 @@ if (name) {
     // 注意不能用含 "test" 的句子：有道 dictvoice 对含 test 的词组会拒绝（500）。
     SpeechUtil.speak('Hello, nice to meet you.', 'en-US');
   });
-  // 自定义发音：上传录音（文件名即单词名），朗读该单词时优先播放
-  var cvFileInput = document.getElementById('cv-file');
-  var cvDirInput = document.getElementById('cv-file-dir');
-  var cvList = document.getElementById('cv-list');
-  if ((cvFileInput || cvDirInput) && cvList) {
-    var customVoiceMap = SpeechUtil.getCustomVoice();
-    var CV_BUDGET = 4 * 1024 * 1024; // dataURL 字符数的 0.75 为字节数，预算 4MB 音频
-    function mapSize() {
-      var total = 0;
-      for (var k in customVoiceMap) total += customVoiceMap[k].length * 0.75;
-      return total;
-    }
-    function saveCustomVoice() {
-      if (!Storage.setJSON('custom_voice', customVoiceMap)) {
-        // 配额失败：回退到原数据，保证列表一致
-        SpeechUtil._customVoice = Storage.getJSON('custom_voice', {});
-        customVoiceMap = SpeechUtil._customVoice;
-        renderCVList();
-        return false;
-      }
-      SpeechUtil._customVoice = customVoiceMap;
-      return true;
-    }
-    function renderCVList() {
-      var keys = Object.keys(customVoiceMap);
-      cvList.innerHTML = '';
-      if (!keys.length) {
-        cvList.innerHTML = '<span style="font-size:0.8rem;color:var(--text-tertiary)">暂无自定义发音，可单独上传或用发音包批量导入</span>';
-        return;
-      }
-      var used = Math.round(mapSize() / 1024);
-      cvList.innerHTML = '<span style="font-size:0.78rem;color:var(--text-tertiary)">已导入 <b>' + keys.length + '</b> 个单词发音，共 ' + used + ' KB</span>';
-      keys.sort();
-      keys.forEach(function(w) {
-        var row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;flex-wrap:wrap';
-        var sizeKB = Math.round(customVoiceMap[w].length * 0.75 / 1024);
-        row.innerHTML = '<span style="font-weight:600;font-size:0.9rem;flex:1;word-break:break-all">' + escapeHtml(w) + '</span>' +
-          '<span style="font-size:0.72rem;color:var(--text-tertiary)">' + sizeKB + ' KB</span>' +
-          '<button class="btn btn-sm" title="试听" data-act="play"><svg class="icon"><use href="#i-volume"/></svg></button>' +
-          '<button class="btn btn-sm btn-danger" title="删除" data-act="del"><svg class="icon"><use href="#i-delete"/></svg></button>';
-        row.querySelector('[data-act="play"]').addEventListener('click', function() {
-          try {
-            var a = new Audio(customVoiceMap[w]);
-            SpeechUtil._attachAudioEl(a);
-            a.onended = function() { SpeechUtil._detachAudioEl(a); };
-            a.onerror = function() { SpeechUtil._detachAudioEl(a); };
-            a.play();
-          } catch(e) {}
-        });
-        row.querySelector('[data-act="del"]').addEventListener('click', function() {
-          delete customVoiceMap[w];
-          if (saveCustomVoice()) Toast.success('已删除 ' + w + ' 的录音');
-          renderCVList();
-        });
-        cvList.appendChild(row);
-      });
-    }
-    renderCVList();
-    safeBind('btn-cv-add', 'click', function() { if (cvFileInput) cvFileInput.click(); });
-    safeBind('btn-cv-dir', 'click', function() { if (cvDirInput) cvDirInput.click(); });
-    // 批量导入发音包（文件夹）：按文件名自动映射，超出容量自动跳过
-    function importAudioFiles(files, bulk) {
-      if (!files || !files.length) return;
-      var audioFiles = [];
-      for (var i = 0; i < files.length; i++) {
-        var f = files[i];
-        if (f.type && f.type.indexOf('audio') === 0) audioFiles.push(f);
-      }
-      if (!audioFiles.length) { Toast.warning('文件夹里没有找到音频文件'); return; }
-      var added = 0, skipped = 0, used = mapSize();
-      audioFiles.forEach(function(f) {
-        var word = f.name.replace(/\.[^.]+$/, '').trim().toLowerCase();
-        if (!word || word.length > 60) { skipped++; return; }
-        if (customVoiceMap[word]) { skipped++; return; }
-        if (used + f.size > CV_BUDGET) { skipped++; return; }
-        used += f.size;
-        customVoiceMap[word] = '__PENDING__';
-        added++;
-      });
-      if (!added) { Toast.warning('没有可导入的音频（已有相同单词或超出容量限制）'); return; }
-      var pending = [];
-      for (var k in customVoiceMap) if (customVoiceMap[k] === '__PENDING__') pending.push(k);
-      var done = 0;
-      var reader = new FileReader();
-      function readNext() {
-        if (done >= pending.length) {
-          renderCVList();
-          if (saveCustomVoice()) {
-            Toast.success('成功导入 ' + added + ' 个发音' + (skipped ? '，跳过 ' + skipped + ' 个（重复或超出容量）' : ''));
-          } else {
-            renderCVList();
-          }
-          return;
-        }
-        var idx = done++;
-        var word = pending[idx];
-        var file = null;
-        for (var i = 0; i < audioFiles.length; i++) {
-          if (audioFiles[i].name.replace(/\.[^.]+$/, '').trim().toLowerCase() === word) { file = audioFiles[i]; break; }
-        }
-        if (!file) { readNext(); return; }
-        var r2 = new FileReader();
-        r2.onload = function() { customVoiceMap[word] = r2.result; readNext(); };
-        r2.onerror = function() { delete customVoiceMap[word]; readNext(); };
-        r2.readAsDataURL(file);
-      }
-      readNext();
-    }
-    if (cvFileInput) {
-      cvFileInput.addEventListener('change', function() {
-        var f = this.files && this.files[0];
-        this.value = '';
-        if (!f) return;
-        if (f.size > 1024 * 1024) { Toast.warning('单文件不能超过 1MB'); return; }
-        var word = f.name.replace(/\.[^.]+$/, '').trim().toLowerCase();
-        if (!word) { Toast.warning('请把文件名改成单词名，如 hello.wav'); return; }
-        var reader = new FileReader();
-        reader.onload = function() {
-          customVoiceMap[word] = reader.result;
-          if (saveCustomVoice()) {
-            renderCVList();
-            Toast.success('已添加 ' + word + ' 的真人发音');
-            SpeechUtil.speak(word);
-          }
-        };
-        reader.readAsDataURL(f);
-      });
-    }
-    if (cvDirInput) {
-      cvDirInput.addEventListener('change', function() {
-        var files = this.files;
-        this.value = '';
-        importAudioFiles(files, true);
-      });
-    }
-  }
   safeBind('btn-save-goal', 'click', function() {
     var val = parseInt(document.getElementById('daily-goal').value);
     if (isNaN(val) || val < 1 || val > 100) { Toast.warning('请输入1-100之间的数字'); return; }
@@ -6453,14 +6284,14 @@ if (name) {
 };
   // 备份字段表：[导出字段名, localStorage 键, 默认值, 是否大体积]。与 resetData 的清除列表对齐，
   // 保证导出→导入不丢任何进度（道具/番茄钟/每日挑战/自定义词库等此前全被漏掉）。
-  // big 字段（wordProgress / customVoice）只在导出文件里出现：
-  // 本地 english_app_backup 不重复存它们（word_progress / custom_voice 本就实时独立落盘，
+  // big 字段（wordProgress）只在导出文件里出现：
+  // 本地 english_app_backup 不重复存它们（word_progress 本就实时独立落盘，
   // 重复序列化会把 5MB 配额直接打爆，12 万词词库下必现 QuotaExceeded）。
   App.prototype._backupFields = [
     ['wordProgress','word_progress',{},true], ['favorites','favorites',[],false], ['mistakes','mistakes',[],false],
     ['gamification','gamification',{},false], ['phoneticProgress','phonetic_progress',{},false],
     ['pkHistory','pk_history',[],false], ['wordCardPos','word_card_pos',{},false], ['checkins','checkins',{},false],
-    ['customVoice','custom_voice',{},true], ['voiceName','voice_name','',false], ['voiceRate','voice_rate','',false],
+    ['voiceName','voice_name','',false], ['voiceRate','voice_rate','',false],
     ['voicePitch','voice_pitch','',false], ['voiceInstant','voice_instant','1',false],
     ['ownedThemes','owned_themes',{},false], ['appliedTheme','applied_theme','',false],
     ['dailyGoal','daily_goal',10,false], ['theme','theme','',false], ['themeColor','theme_color','',false],
@@ -6479,7 +6310,7 @@ if (name) {
     ['learnSelectedOnly','learn_selected_only',false,false]
   ];
 // 收集全部进度数据（custom_words 单列成组；背景图在 IndexedDB，单独取）
-// includeBig=true 用于导出文件（Blob 无配额限制，含 word_progress/custom_voice 全量）；
+// includeBig=true 用于导出文件（Blob 无配额限制，含 word_progress 全量）；
 // includeBig=false 用于本地自动/手动保存 english_app_backup（只存小字段，避免双份超配额）
   App.prototype._collectBackup = function(includeBig) {
     var data = {};
@@ -6550,9 +6381,6 @@ if (name) {
           }
         }
       }
-    }
-    if (data.customVoice && typeof data.customVoice === 'object') {
-      sanitized.customVoice = data.customVoice;
     }
     if (Array.isArray(data.customWords)) {
       sanitized.customWords = data.customWords.slice(0, 50);
@@ -6638,9 +6466,6 @@ if (name) {
     if (safe.wordProgress !== undefined && safe.wordProgress !== null) {
       if (DataStore.setProgress('word_progress', safe.wordProgress) === false) ok = false;
     }
-    if (safe.customVoice !== undefined && safe.customVoice !== null) {
-      if (DataStore.setProgress('custom_voice', safe.customVoice) === false) ok = false;
-    }
     if (Array.isArray(safe.customWords)) {
       var cats = DataStore.getDefaultWords().categories || [];
       for (var i = 0; i < cats.length && i < safe.customWords.length; i++) {
@@ -6660,7 +6485,7 @@ if (name) {
 App.prototype.saveProgress = function() {
     var self = this;
     try {
-      // 本地备份只存小字段大字段（word_progress/custom_voice）本来就实时落盘，
+      // 本地备份只存小字段大字段（word_progress）本来就实时落盘，
       // 避免 12 万词词库下 english_app_backup 双份超 5MB 配额
       Storage.setJSON('english_app_backup', self._collectBackup(false));
       self._afterSave();
@@ -7037,8 +6862,7 @@ if (data && typeof data === 'object' && (data.wordProgress || data.mistakes || d
               self.phoneticModule.phoneticProgress = DataStore.getProgress('phonetic_progress', {});
               if (self.phoneticModule.renderGrid) self.phoneticModule.renderGrid();
             }
-            SpeechUtil._settings = null;
-            SpeechUtil._customVoice = null;
+SpeechUtil._settings = null;
             // 重新加载内存数据：避免旧内存里的 wordProgress 下一次翻牌时覆盖刚导入的新进度
             try {
               if (self.wordModule) {
@@ -7087,7 +6911,7 @@ App.prototype.resetData = function() {
       if (window.app.wordModule.wordProgress) window.app.wordModule.wordProgress = {};
     }
     window.__resettingData = true;
-    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','custom_voice','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
+    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
     appKeys.forEach(function(k) { Storage.remove(k); });
     var _cats = DataStore.getDefaultWords().categories || [];
     for (var i = 0; i < _cats.length; i++) {

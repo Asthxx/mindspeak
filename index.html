@@ -1462,19 +1462,8 @@
         </label>
         <button class="btn btn-sm btn-primary" id="btn-voice-test"><svg class="icon"><use href="#i-volume" xlink:href="#i-volume"/></svg> 试听声音</button>
         <p style="margin:var(--sp-3) 0 0;font-size:0.78rem;color:var(--text-tertiary);line-height:1.6">可选<b>在线音色</b>（百度/有道/谷歌，需联网，听觉一致、手机/网页同样生效）：百度·美音国内直连最快；有道美音/英音国内直连；谷歌音色多（美/英/澳）但国内手机可能连不上。也可选<b>系统声音</b>：取决于你的设备（Windows 通常有 David 男声 / Zira、Aria 女声，Chrome 有 Google 合成音）。切换后对背单词、随声听、听力等所有朗读生效。<br>在线自然声音色好，但每次点击需连服务器（约 0.5~1 秒）；勾选「本地即时语音」则用系统自带语音，几乎零延迟、不依赖网络。</p>
-        <div style="margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--border)">
-          <div style="font-weight:600;margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-coral"><use href="#i-mic" xlink:href="#i-mic"/></svg> 自定义发音（真人录音）</div>
-          <p style="margin:0 0 var(--sp-3);font-size:0.78rem;color:var(--text-tertiary);line-height:1.6">两种添加方式：<br>1. 单独上传：文件名就是单词名（如 hello.mp3 → hello）<br>2. 批量导入发音包：选择整个文件夹，自动按文件名映射所有音频（发音包可从网上按单词下载，一次导入几千个）。<br>朗读该单词时优先播放真人录音，没导入的单词仍用系统声音。本地存储最多约 4MB，导入超出部分会自动跳过。</p>
-          <div style="display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center">
-            <input type="file" id="cv-file" accept="audio/*" style="display:none">
-            <input type="file" id="cv-file-dir" accept="audio/*" webkitdirectory directory style="display:none">
-            <button class="btn btn-sm btn-primary" id="btn-cv-add"><svg class="icon"><use href="#i-add" xlink:href="#i-add"/></svg> 添加录音</button>
-            <button class="btn btn-sm" id="btn-cv-dir"><svg class="icon"><use href="#i-upload" xlink:href="#i-upload"/></svg> 批量导入发音包（文件夹）</button>
-            <span style="font-size:0.78rem;color:var(--text-tertiary)">支持 MP3 / WAV / M4A</span>
-          </div>
-          <div id="cv-list" style="margin-top:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2)"></div>
-        </div>
       </div>
+
       <div class="settings-group">
         <h3>每日学习目标</h3>
         <label>
