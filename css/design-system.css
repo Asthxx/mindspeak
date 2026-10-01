@@ -545,6 +545,32 @@ body {
   border-width: 0;
 }
 
+/* 跳转到主内容：默认移出视口，获得键盘焦点时才显现（WCAG 2.4.1） */
+.skip-link {
+  position: absolute;
+  left: var(--sp-4);
+  top: -100px;
+  z-index: 9999;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--sage-deep);
+  color: var(--text-inverse);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: top var(--duration-fast) var(--ease);
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: var(--sp-4);
+  outline: 2px solid var(--text-inverse);
+  outline-offset: 2px;
+}
+
+/* 主内容区接收锚点焦点时不显示默认焦点框（只有键盘跳转才会到这里） */
+#main-content:focus { outline: none; }
+#main-content:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
 .hidden { display: none !important; }
 .visible { display: block !important; }
 .flex { display: flex; }

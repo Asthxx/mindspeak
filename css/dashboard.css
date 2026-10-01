@@ -1,18 +1,28 @@
-/* ==================== 首页 Dashboard ==================== */
+/* ==================== 首页 Dashboard ====================
+   重构要点：
+   1. 间距/字号/圆角统一走 design-system 令牌（--sp-* / --text-* / --radius-*），
+      不再混用 7px / 13px / 14px / 18px 这类游离数值；
+   2. 删除 .dash-week* / .dash-weak* 死代码（7 天柱状图与薄弱分析已迁至设置页）；
+   3. 合并 .dp-bar 与 .dp-progress 两条完全相同的规则；
+   4. 修复统计卡 4 张卡挤在 3 列导致第 4 张单独换行的错位；
+   5. 补齐 :focus-visible 焦点环、按钮 hover/active 状态、prefers-reduced-motion 降级。
+   ======================================================== */
+
+/* ---------- 顶部问候区 ---------- */
 #page-home .dash-greeting {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
-  margin-bottom: 20px;
-  padding: 4px 0;
+  margin-bottom: var(--sp-5);
+  padding: var(--sp-1) 0;
 }
 #page-home .dash-greeting h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 4px;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-1);
   font-size: var(--text-xl);
   font-weight: var(--weight-bold);
   letter-spacing: -0.01em;
@@ -23,23 +33,29 @@
   font-size: var(--text-sm);
 }
 
-/* 顶部统计卡 */
+/* ---------- 顶部统计卡 ----------
+   原为固定 3 列，但卡片有 4 张，第 4 张会孤零零换到第二行；
+   改用 auto-fit + minmax，桌面 4 列、平板 2 列、手机 1~2 列自动适配。 */
 .dash-stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-4);
+  margin: 0 0 var(--sp-5);
+  padding: 0;
+  list-style: none;
 }
 .dash-stat-card {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 16px 18px;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  transition: all var(--duration-normal) var(--ease);
+  transition: box-shadow var(--duration-normal) var(--ease),
+              border-color var(--duration-normal) var(--ease),
+              transform var(--duration-normal) var(--ease);
 }
 .dash-stat-card:hover {
   transform: translateY(-2px);
@@ -56,13 +72,21 @@
   flex-shrink: 0;
 }
 .dash-stat-icon svg { width: 22px; height: 22px; }
-.icon-fire { background: var(--coral-light); color: var(--coral-deep); }
-.icon-check { background: var(--sage-light); color: var(--sage-deep); }
-.icon-today { background: var(--info-light); color: var(--info); }
-.icon-level { background: var(--warning-light); color: var(--warning); }
+/* 统计卡改用 ul/li + span 承载列表语义后，内部元素由块级变为行内，
+   显式声明 display 保持原有堆叠排版不变 */
+.dash-stat-main,
+.dash-stat-num,
+.dash-stat-label { display: block; }
+.icon-fire   { background: var(--coral-light);   color: var(--coral-deep); }
+.icon-check  { background: var(--sage-light);    color: var(--sage-deep); }
+.icon-today  { background: var(--info-light);    color: var(--info); }
+/* .icon-level 与 .icon-review 原为两条完全相同的规则，合并 */
+.icon-level,
 .icon-review { background: var(--warning-light); color: var(--warning); }
+
+.dash-stat-main { min-width: 0; }
 .dash-stat-num {
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
   color: var(--text);
   line-height: 1.15;
@@ -72,20 +96,21 @@
   color: var(--text-secondary);
 }
 
-/* 卡片网格 */
+/* ---------- 卡片通用 ---------- */
 .dash-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-  margin-bottom: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
 }
 .dash-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  padding: 18px 20px;
+  padding: var(--sp-5);
   box-shadow: var(--shadow-sm);
-  transition: all var(--duration-normal) var(--ease);
+  transition: box-shadow var(--duration-normal) var(--ease),
+              border-color var(--duration-normal) var(--ease);
 }
 .dash-card:hover {
   box-shadow: var(--shadow-md);
@@ -94,31 +119,35 @@
 .dash-card-title {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin: 0 0 14px;
-  font-size: 1.05rem;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4);
+  font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
 }
 
-/* 今日任务行 */
+/* ---------- 今日任务行 ---------- */
 .dash-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
   flex-wrap: wrap;
   font-size: var(--text-sm);
 }
-.dash-label { width: 64px; color: var(--text-secondary); font-size: var(--text-sm); }
-.dash-val { flex: 1; font-size: var(--text-sm); min-width: 120px; }
-.dash-val b { font-weight: var(--weight-semibold); }
-.dp-bar {
-  flex-basis: 100%;
-  height: 9px;
-  background: var(--surface-hover);
-  border-radius: var(--radius-full);
-  overflow: hidden;
+.dash-label {
+  width: 64px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
+.dash-val {
+  flex: 1;
+  min-width: 120px;
+  font-size: var(--text-sm);
+}
+.dash-val b { font-weight: var(--weight-semibold); }
+
+/* 进度条轨道：原 .dp-bar 与 .dp-progress 规则完全相同，合并为一条 */
+.dp-bar,
 .dp-progress {
   flex-basis: 100%;
   height: 9px;
@@ -133,107 +162,91 @@
   transition: width var(--duration-slow) var(--ease);
 }
 .dash-master-bar { background: linear-gradient(90deg, var(--coral), var(--coral-deep)); }
+
 .dash-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 14px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
   flex-wrap: wrap;
 }
 
-/* 最近 7 天柱状图 */
-.dash-week {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  height: 140px;
-  padding-top: 6px;
-}
-.dash-week-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  height: 100%;
-}
-.dash-week-bar {
-  flex: 1;
-  width: 70%;
-  max-width: 38px;
-  display: flex;
-  align-items: flex-end;
-  background: var(--surface-hover);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.dash-week-fill {
-  width: 100%;
-  background: linear-gradient(180deg, var(--sage-muted), var(--sage));
-  border-radius: var(--radius-sm);
-  transition: height var(--duration-normal) var(--ease-out);
-}
-.dash-week-col.is-today .dash-week-fill { background: linear-gradient(180deg, var(--coral), var(--coral-deep)); }
-.dash-week-col.is-today .dash-week-label { color: var(--coral-deep); font-weight: var(--weight-semibold); }
-.dash-week-label { font-size: var(--text-xs); color: var(--text-secondary); }
-.dash-week-num { font-size: var(--text-xs); color: var(--text-tertiary); }
-.dash-week-foot {
-  margin-top: 8px;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-/* 薄弱能力分析 */
-.dash-weak-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px dashed var(--border-light);
-  font-size: var(--text-sm);
-}
-.dash-weak-item:last-child { border-bottom: none; }
-.dash-weak-item span { flex: 1; }
-.dash-weak-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  padding: 10px 0;
-}
-
-/* AI 学习建议 */
+/* ---------- AI 学习建议 ---------- */
 .dash-tips {
   margin: 0;
-  padding-left: 18px;
+  padding-left: var(--sp-5);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .dash-tips li {
   font-size: var(--text-sm);
-  color: var(--text-base);
+  /* 原为 var(--text-base)，该令牌并不存在（令牌是 --text-xs~--text-3xl），
+     声明无效导致继承父级颜色；改用主文本色令牌，保证对比度达标 */
+  color: var(--text);
   line-height: 1.6;
 }
 
-/* 快捷入口 */
+/* ---------- 快捷入口 ---------- */
 .dash-quick {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--sp-3);
 }
 .dash-quick-btn {
   min-width: 96px;
+  min-height: 38px;
   justify-content: flex-start;
 }
-
-/* 移动端适配 */
-@media (max-width: 900px) {
-  .dash-stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .dash-grid { grid-template-columns: 1fr; }
+/* 原快捷入口按钮只有 .btn 通用样式，缺 hover / 焦点反馈，与其它按钮不一致 */
+.dash-quick-btn:hover {
+  background: var(--sage-surface);
+  border-color: var(--sage-light);
+  color: var(--sage-deep);
 }
-@media (max-width: 480px) {
-  .dash-stat-grid { grid-template-columns: 1fr 1fr; }
-  .dash-stat-card { padding: 10px 12px; }
-  .dash-stat-num { font-size: 1.1rem; }
+.dash-quick-btn:active { transform: scale(0.97); }
+
+/* 能力测评 CTA */
+.dash-cta-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.dash-cta-text { flex: 1; min-width: 220px; }
+
+/* ---------- 统一的键盘焦点可见性（WCAG 2.4.7） ---------- */
+#page-home .btn:focus-visible,
+#page-home .dash-quick-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 900px) {
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .dash-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+  .dash-card { padding: var(--sp-4); border-radius: var(--radius-lg); }
+  .dash-stat-card { padding: var(--sp-3); gap: var(--sp-2); }
+  .dash-stat-icon { width: 38px; height: 38px; border-radius: var(--radius-sm); }
+  .dash-stat-num { font-size: var(--text-xl); }
+  /* 触摸目标 ≥44px（WCAG 2.5.5），并让操作按钮在小屏铺满便于点按 */
+  .dash-actions .btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+  .dash-quick-btn { min-height: 44px; flex: 1 1 44%; }
+}
+@media (max-width: 380px) {
+  .dash-stat-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- 降低动效偏好（WCAG 2.3.3） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .dash-stat-card,
+  .dash-card,
+  .dp-bar-fill,
+  .dash-quick-btn {
+    transition: none;
+  }
+  .dash-stat-card:hover { transform: none; }
 }

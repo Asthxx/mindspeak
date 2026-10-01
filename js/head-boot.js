@@ -83,6 +83,26 @@ window.addEventListener('unhandledrejection', function(e) {
   }
 })();
 
+// ---------- 4b. Android 专用样式按需注入（首屏减 3 个阻塞请求） ----------
+// android.css / android-nav.css / android-animations.css 的所有规则都以
+// html.platform-android 为前缀，非 Android 平台加载后不产生任何视觉效果，
+// 却要付出 3 次请求 + CSSOM 解析成本。这里复用上面已算好的 isAndroid 判定，
+// 只在真正需要的平台插入 <link>；插入位置在 mobile.css 之前，保持原有层叠顺序。
+(function(){
+  // 直接读第 4 段已经打好的平台 class，避免重复 UA 解析
+  if (!document.documentElement.classList.contains('platform-android')) return;
+  var files = ['css/android.css', 'css/android-nav.css', 'css/android-animations.css'];
+  var anchor = document.querySelector('link[href*="css/mobile.css"]');
+  for (var i = 0; i < files.length; i++) {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = files[i];
+    if (i === 0) link.id = 'android-css';   // 保留原 id，便于调试/排查
+    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(link, anchor);
+    else document.head.appendChild(link);
+  }
+})();
+
 // ---------- 5. PWA 离线缓存注册（原内联 L1968） ----------
 // 仅在 HTTPS / localhost 环境注册（file:// 直接打开时跳过）。
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {

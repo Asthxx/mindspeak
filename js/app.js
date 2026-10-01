@@ -5721,8 +5721,18 @@ App.prototype.showTab = function(tab) {
       if (window.history && window.history.state && window.history.state.msDrawer) window.history.back();
     } catch (e) {}
   }
-  document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === tab); });
-  document.querySelectorAll('.bottom-nav-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tab === tab); });
+  // 同步 aria-current：原来仅靠 .active 类名表达当前页，读屏用户无从知晓，
+  // 键盘 / 读屏依赖 aria-current="page" 播报「当前页面」
+  document.querySelectorAll('.nav-btn').forEach(function(b) {
+    var on = b.dataset.tab === tab;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('.bottom-nav-btn').forEach(function(b) {
+    var on = b.dataset.tab === tab;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
   document.querySelectorAll('.page').forEach(function(p) { p.classList.toggle('active', p.id === 'page-' + tab); });
   // 目标按钮所在的折叠分组自动展开
   var activeBtn = document.querySelector('.nav-btn[data-tab="' + tab + '"]');
