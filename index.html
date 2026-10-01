@@ -102,7 +102,6 @@
 <symbol id="i-psychology" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v1.5A3.5 3.5 0 0 0 4 12a3.5 3.5 0 0 0 2 3.16V17a3 3 0 0 0 3 3h1v-3"/><path d="M12 2a5 5 0 0 1 5 5v1.5A3.5 3.5 0 0 1 20 12a3.5 3.5 0 0 1-2 3.16V17a3 3 0 0 1-3 3h-1v-3"/><path d="M12 7v2"/><path d="M9 11h6"/><path d="M10 17h4"/></symbol>
     <symbol id="i-gift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></symbol>
     <!-- 错词强化训练专用：靶心图标，区分于错题本的 i-error -->
-    <symbol id="i-shop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></symbol>
     <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
     <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
@@ -272,7 +271,6 @@
       <div class="stats-bar">
         <span title="等级"><svg class="icon icon-coral"><use href="#i-trophy" xlink:href="#i-trophy"/></svg> <span id="stat-level">Lv.1</span></span>
         <span title="积分"><svg class="icon icon-sage"><use href="#i-diamond" xlink:href="#i-diamond"/></svg> <span id="stat-points">0</span></span>
-        <span class="stat-items-btn" title="道具（点击进入商店）"><svg class="icon icon-coral"><use href="#i-shop" xlink:href="#i-shop"/></svg> <span id="stat-items">0</span></span>
         <span title="连续打卡"><svg class="icon icon-coral"><use href="#i-fire" xlink:href="#i-fire"/></svg> <span id="stat-streak">0</span> 天</span>
         <span title="已掌握单词"><svg class="icon icon-sage"><use href="#i-check" xlink:href="#i-check"/></svg> <span id="stat-words">0</span> 词</span>
       </div>
@@ -363,10 +361,10 @@
         <span class="label">成长</span>
         <svg class="nav-chevron"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg>
       </button>
-      <button class="nav-btn" data-tab="items">
-        <svg class="icon"><use href="#i-shop" xlink:href="#i-shop"/></svg>
-        <span class="label">道具商店</span>
-      </button>
+        <button class="nav-btn" data-tab="items">
+          <svg class="icon"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg>
+          <span class="label">主题商店</span>
+        </button>
     </div>
 
     <!-- 工具 -->
@@ -787,7 +785,6 @@
 
         <div class="spelling-card" id="spelling-card">
           <div class="spelling-prompt" id="spelling-prompt">点击"开始测试"开始拼写练习</div>
-          <div class="item-tools" id="spelling-tools" style="display:none"></div>
           <div class="spelling-input-area" id="spelling-input-area" style="display:none;">
             <input type="text" id="spelling-answer" placeholder="请输入答案..." autocomplete="off">
             <button class="btn btn-primary" id="btn-spelling-submit">提交</button>
@@ -1233,7 +1230,6 @@
         </div>
         <div class="pk-card" id="pk-card">
           <div class="pk-prompt" id="pk-prompt"></div>
-          <div class="item-tools" id="pk-tools" style="display:none"></div>
           <div class="pk-options" id="pk-options"></div>
           <div class="pk-result hidden" id="pk-result"></div>
           <div class="pk-actions" id="pk-actions" style="display:none;">
@@ -1573,18 +1569,9 @@
       </div>
     </section>
 
-    <!-- 道具商店页面 -->
+    <!-- 主题商店页面（页面保留仅承载主题兑换） -->
     <section id="page-items" class="page">
-        <h2><svg class="icon icon-sage"><use href="#i-shop" xlink:href="#i-shop"/></svg> 道具背包</h2>
-      <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">在这里使用道具。双倍卡/护盾卡激活后下次单词PK自动生效；提示卡/跳过卡/幸运卡点击"去练习"进入对应练习后使用</p>
-      <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-bookmark" xlink:href="#i-bookmark"/></svg> 我的背包</h3>
-        <div class="item-bag" id="item-bag"></div>
-      </div>
-      <div class="settings-group">
-        <h3><svg class="icon icon-sage"><use href="#i-shop" xlink:href="#i-shop"/></svg> 道具商店</h3>
-        <div class="item-shop-grid" id="item-shop-grid"></div>
-      </div>
+        <h2><svg class="icon icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg> 主题商店</h2>
       <div class="settings-group">
         <h3><svg class="icon icon-sage"><use href="#i-sparkle" xlink:href="#i-sparkle"/></svg> 专属主题（积分兑换）</h3>
         <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:var(--sp-3)">用积分兑换专属主题，永久拥有、随时切换。兑换后立即生效，明暗模式切换依然有效。</p>
@@ -1641,7 +1628,6 @@
         <div class="context-sentence-area">
           <div id="context-sentence" class="context-sentence"></div>
           <div id="context-hint" class="context-hint"></div>
-          <div class="item-tools" id="context-tools" style="display:none"></div>
           <div id="context-translation" class="context-translation hidden"></div>
         </div>
         <div class="context-input-area">

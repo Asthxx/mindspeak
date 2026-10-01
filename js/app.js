@@ -3645,41 +3645,6 @@ var SpellingModule = (function() {
     document.getElementById('spelling-result').classList.add('hidden');
     document.getElementById('spelling-actions').style.display = 'none';
     this.answered = false;
-    if (window.app && window.app.itemSystem) {
-      window.app.itemSystem.renderToolbar('spelling-tools',
-        (this.mode === 'en2cn' ? [{ id: 'lucky' }] : [{ id: 'hint' }]).concat([{ id: 'skip' }]),
-        {
-          hint: function() {
-            var cw = self.words[self.currentIndex];
-            if (!cw) return;
-            var input = document.getElementById('spelling-answer');
-            input.value = input.value || cw.word[0];
-            Toast.info('提示：共 ' + cw.word.length + ' 个字母，首字母是 ' + cw.word[0]);
-            input.focus();
-          },
-          skip: function() {
-            self.next();
-            if (window.app && window.app.gamification) {
-              window.app.gamification.addPoints(5);
-              Toast.success('跳过卡生效：跳过本题，+5 积分');
-            } else {
-              Toast.success('跳过卡生效：跳过本题');
-            }
-          },
-          lucky: function() {
-            var correct = self.words[self.currentIndex].chinese;
-            var wrong = [];
-            document.querySelectorAll('#spelling-options .btn').forEach(function(b) {
-              if (b.textContent !== correct && wrong.length < 2) {
-                wrong.push(b);
-                b.disabled = true;
-                b.classList.add('btn-disabled');
-              }
-            });
-            Toast.success('幸运卡生效：已排除两个错误选项');
-          }
-        });
-    }
   };
   SpellingModule.prototype.submit = function() {
     if (this.answered) return;
@@ -3698,7 +3663,6 @@ var SpellingModule = (function() {
       if (window.app) { window.app.addMistake(w, 'spelling'); window.app.markCheckin(1); }
     }
     document.getElementById('spelling-actions').style.display = 'block';
-    document.getElementById('spelling-tools').style.display = 'none';
   };
   SpellingModule.prototype.checkOption = function(btn, selected, correct) {    if (this.answered) return;
     this.answered = true;
@@ -3719,7 +3683,6 @@ var SpellingModule = (function() {
       if (w && window.app) { window.app.addMistake(w, 'spelling'); window.app.markCheckin(1); }
     }
     document.getElementById('spelling-actions').style.display = 'block';
-    document.getElementById('spelling-tools').style.display = 'none';
   };
   SpellingModule.prototype.next = function() {
     // 防连点：双击跳两题
@@ -3974,20 +3937,6 @@ var cats = DataStore.getDefaultWords().categories;
     this.correctCount = 0;
     this.wrongCount = 0;
     this.points = 0;
-    this.shieldActive = false;
-    this.doubleActive = false;
-    this.shieldBorrowed = false;
-    this.doubleBorrowed = false;
-    this.shieldFromToolbar = false;
-    this.doubleFromToolbar = false;
-    if (window.app && window.app.itemSystem) {
-      this.shieldBorrowed = window.app.itemSystem.borrowBuff('shield');
-      this.doubleBorrowed = window.app.itemSystem.borrowBuff('double');
-      this.shieldActive = this.shieldBorrowed;
-      this.doubleActive = this.doubleBorrowed;
-      if (this.shieldActive) Toast.info('护盾卡已自动生效：本局第一次答错不记错误');
-      if (this.doubleActive) Toast.info('双倍卡已自动生效：本局结束积分翻倍');
-    }
     this.timeLeft = 60;
     this.isRunning = true;
     document.getElementById('pk-score').classList.add('hidden');
@@ -4042,40 +3991,6 @@ PKModule.prototype.startTimer = function() {
       btn.addEventListener('click', function() { self.checkAnswer(btn, opt.word === w.word, w); });
       optionsEl.appendChild(btn);
     });
-    if (window.app && window.app.itemSystem) {
-      window.app.itemSystem.renderToolbar('pk-tools',
-        [{ id: 'shield' }, { id: 'lucky' }, { id: 'freeze' }, { id: 'skip' }, { id: 'double' }],
-        {
-          shield: function() { self.shieldActive = true; self.shieldFromToolbar = true; Toast.success('护盾卡生效：本局下一次答错不记错误'); },
-          lucky: function() {
-            var wrong = [];
-            document.querySelectorAll('#pk-options .pk-option-btn').forEach(function(b) {
-              if (b.textContent !== w.word && wrong.length < 2) {
-                wrong.push(b);
-                b.disabled = true;
-                b.classList.add('btn-disabled');
-              }
-            });
-            Toast.success('幸运卡生效：已排除两个错误选项');
-          },
-          freeze: function() {
-            self.timeLeft = Math.min(self.timeLeft + 15, 60);
-            if (self._deadline) self._deadline += 15000;
-            self.updateTimerDisplay();
-            Toast.success('时间冻结卡生效：倒计时 +15 秒');
-          },
-          skip: function() {
-            self.nextQuestion();
-            if (window.app && window.app.gamification) {
-              window.app.gamification.addPoints(5);
-              Toast.success('跳过卡生效：跳过本题，+5 积分');
-            } else {
-              Toast.success('跳过卡生效：跳过本题');
-            }
-          },
-          double: function() { self.doubleActive = true; self.doubleFromToolbar = true; Toast.success('双倍卡生效：本局结束积分翻倍'); }
-        });
-    }
   };
 PKModule.prototype.checkAnswer = function(btn, isCorrect, w) {
     if (this.isEnded) return; // 已结算则忽略，防倒计时归零与答案点击同 tick 时重复入账
@@ -4090,15 +4005,6 @@ PKModule.prototype.checkAnswer = function(btn, isCorrect, w) {
       resultEl.className = 'pk-result success';
       resultEl.textContent = '✓ 正确！';
       if (window.app) { window.app.recordActivity('pk', 1); window.app.markCheckin(1); }
-    } else if (this.shieldActive) {
-      this.shieldActive = false;
-      if (this.shieldBorrowed && !this.shieldFromToolbar && window.app && window.app.itemSystem) {
-        window.app.itemSystem.consumeBuff('shield');
-      }
-      btn.classList.add('wrong');
-      resultEl.className = 'pk-result success';
-      resultEl.textContent = '护盾抵挡！正确答案：' + w.word;
-      Toast.success('护盾生效，本次不记错误');
     } else {
       btn.classList.add('wrong');
       this.wrongCount++;
@@ -4119,29 +4025,11 @@ PKModule.prototype.checkAnswer = function(btn, isCorrect, w) {
   };
   PKModule.prototype.endGame = function() {
     // 幂等守卫：计时归零与“最后一题点下一题”可能在同一 tick 双触发，
-    // 防双倍卡×4、护盾双退回、历史重复入账
+    // 防历史重复入账
     if (this.isEnded) return;
     this.isEnded = true;
     this.isRunning = false;
     if (this.timer) clearInterval(this.timer);
-    if (this.doubleActive) {
-      this.points *= 2;
-      Toast.success('双倍卡生效：积分翻倍！');
-      if (this.doubleBorrowed && window.app && window.app.itemSystem) {
-        window.app.itemSystem.consumeBuff('double');
-      }
-    }
-    if (this.shieldActive) {
-      if (window.app && window.app.itemSystem) {
-        if (this.shieldFromToolbar) {
-          window.app.itemSystem.refund('shield');
-          Toast.info('护盾卡本局未使用，已退回背包');
-        } else {
-          window.app.itemSystem.returnBuff('shield');
-          Toast.info('护盾卡本局未使用，仍保留在背包，下次单词PK继续生效');
-        }
-      }
-    }
     document.getElementById('pk-card').style.display = 'none';
     document.getElementById('pk-score').classList.remove('hidden');
     var total = this.correctCount + this.wrongCount;
@@ -4293,28 +4181,6 @@ ContextModule.prototype.start = function() {
     // 进入练习态：隐藏下方"开始练习"入口（完成页已有"再来一轮"负责重开）
     document.getElementById('btn-start-context').style.display = 'none';
     this.answered = false;
-    if (window.app && window.app.itemSystem) {
-      var self = this;
-      window.app.itemSystem.renderToolbar('context-tools', [{ id: 'hint' }, { id: 'skip' }], {
-        hint: function() {
-          var ce = self.exercises[self.currentIndex];
-          if (!ce) return;
-          var input = document.getElementById('context-answer');
-          input.value = input.value || ce.answer[0];
-          Toast.info('提示：答案共 ' + ce.answer.length + ' 个字母，首字母是 ' + ce.answer[0]);
-          input.focus();
-        },
-        skip: function() {
-          self.next();
-          if (window.app && window.app.gamification) {
-            window.app.gamification.addPoints(5);
-            Toast.success('跳过卡生效：跳过本题，+5 积分');
-          } else {
-            Toast.success('跳过卡生效：跳过本题');
-          }
-        }
-      });
-    }
   };
   ContextModule.prototype.submit = function() {
     if (this.answered) return;
@@ -4334,7 +4200,6 @@ ContextModule.prototype.start = function() {
       if (window.app && ex.wordObj) { window.app.addMistake(ex.wordObj, 'context'); window.app.markCheckin(1); }
     }
     document.getElementById('context-actions').style.display = 'block';
-    document.getElementById('context-tools').style.display = 'none';
   };
   ContextModule.prototype.next = function() {
     // 防连点：双击跳两题
@@ -5261,6 +5126,16 @@ var GamificationSystem = (function() {
     });
   }
   GamificationSystem.prototype.addPoints = function(amount) {
+    amount = Number(amount) || 0;
+    // 扣减前必须先做余额校验。积分是数值型资产，放任负数等于开了透支口子：
+    // 原实现先无条件 `points += amount` 再落盘，且 `return saved` 只表示
+    // "写进 localStorage 了"，与"业务上允许这笔扣减"无关，导致调用方的
+    // `if (!gami.addPoints(-x)) return;` 守卫形同虚设（10 分可被扣成 -20）。
+    // 现改为：扣减后余额为负则整笔拒绝——不改余额、不落盘、不发事件。
+    if (amount < 0 && (this.data.points || 0) + amount < 0) {
+      Toast.warning('积分不足');
+      return false;
+    }
     this.data.points += amount;
     // 注意：不要在加积分时把 lastActiveDate 置为今天 —— 购买道具/领取奖励扣加分
     // 会先把当天"激活"，导致当天第一次 recordActivity 判 lastActiveDate===today
@@ -5273,7 +5148,7 @@ var GamificationSystem = (function() {
       this.data.level = newLevel;
       Toast.success('🎉 升级到 Lv.' + newLevel + '！');
     }
-    var saved = this.save();
+    this.save();
     // 同步顶栏统计
     if (window.app) window.app.updateGlobalStats();
     // P0-04 事件通知：积分/等级变化由事件广播（业务模块不再轮询/互调）
@@ -5283,7 +5158,9 @@ var GamificationSystem = (function() {
       });
       if (leveledUp) window.EventBus.emit(window.MS.EVENTS.LEVEL_UP, { level: newLevel, from: oldLevel });
     }
-    return saved;
+    // 返回值语义：本次积分变更是否成功生效（而非"是否写进 localStorage"）。
+    // 余额不足已在前面整笔拒绝；存盘失败不撤销内存态变更，故此处恒为 true。
+    return true;
   };
   GamificationSystem.prototype.recordActivity = function(type) {
     // 兼容各模块上报的 type 字符串，统一归到两条总计数上
@@ -5489,16 +5366,19 @@ var CalendarModule = (function() {
     if (!dateStr || dateStr >= getLocalDateStr()) return;
     var checkins = DataStore.getProgress('checkins', {});
     if (checkins[dateStr] > 0) return;
-    var items = window.app && window.app.itemSystem;
-    if (!items || items.count('renew') <= 0) {
-      Toast.warning('没有补签卡，可到「道具商店」购买（30 积分/张）');
+    var gami = window.app && window.app.gamification ? window.app.gamification.getStats() : null;
+    // 必须用 getStats() 取到的余额：gami 是系统实例时身上没有 points 属性，
+    // `gami.points < 30` 恒为 false（undefined < 30），守卫形同虚设。
+    if (!gami || !(gami.points >= 30)) {
+      Toast.warning('补签需 30 积分，积分不足');
       return;
     }
-    items.use('renew');
+    // gami 已被换成 stats（纯数据），扣减必须回到系统实例上调用
+    if (!window.app.gamification.addPoints(-30)) return;
     checkins[dateStr] = (checkins[dateStr] || 0) + 1;
     DataStore.setProgress('checkins', checkins);
     this.render();
-    Toast.success('已补签 ' + dateStr + '，补签卡 -1');
+    Toast.success('已补签 ' + dateStr + '，消耗 30 积分');
     if (window.app) {
       if (window.app.analysisModule) window.app.analysisModule.render();
       if (window.app.chartModule) window.app.chartModule.render();
@@ -5695,7 +5575,6 @@ function App() {
   this.chartModule = init('ChartModule', function() { return new ChartModule(); });
   this.analysisModule = init('AnalysisModule', function() { return new AnalysisModule(); });
   this.smartReview = init('SmartReview', function() { return new SmartReview(); });
-  this.itemSystem = init('ItemSystem', function() { return new ItemSystem(); });
   this.themeShop = init('ThemeShop', function() { return new ThemeShop(); });
   this.listenAlongModule = init('ListenAlongModule', function() { return new ListenAlongModule(); });
   this.dailyPlanModule = init('DailyPlanModule', function() { return new DailyPlanModule(); });
@@ -5747,11 +5626,6 @@ App.prototype.initNav = function() {
   document.querySelectorAll('.bottom-nav-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       self.showTab(btn.dataset.tab);
-    });
-  });
-  document.querySelectorAll('.stat-items-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      self.showTab('items');
     });
   });
   // 导航分组：标题点击折叠/展开（状态持久化），移动到隐藏域的同名按钮自动展开所在组
@@ -5923,9 +5797,8 @@ App.prototype.showTab = function(tab) {
   if (tab === 'favorites' && this.favoritesModule) this.favoritesModule.renderList();
   // 每日计划：进入背单词页刷新卡片
   if (tab === 'word' && this.dailyPlanModule) this.dailyPlanModule.render();
-  // 道具页：进入时刷新背包/商店/主题（购买后积分可能变化）
+  // 主题商店页：进入时刷新（购买后积分可能变化）
   if (tab === 'items') {
-    if (this.itemSystem) { this.itemSystem.renderBag(); this.itemSystem.renderShop(); }
     if (this.themeShop) this.themeShop.render();
   }
   // 设置页：进入时按实际宽度重绘图表（隐藏状态下宽高为 0）
@@ -6573,17 +6446,6 @@ if (name) {
         self.gamification.data = DataStore.getProgress('gamification', self.gamification.data);
         self.updateGlobalStats();
       }
-      else if (e.key === 'items' && self.itemSystem) {
-        // 重读最新道具数据再刷新界面，避免本 tab 旧内存快照继续基于过期库存扣减
-        self.itemSystem.data = DataStore.getProgress('items', self.itemSystem.data);
-        self.itemSystem.renderBag();
-        self.itemSystem.renderShop();
-        self.itemSystem.updateGlobalUI();
-      }
-      else if (e.key === 'item_buffs' && self.itemSystem) {
-        // reload 重读激活状态与库存，防止本 tab 过期快照把已消费/过期的 buff 复活
-        self.itemSystem.reload();
-      }
       else if (e.key === 'checkins') {
         if (self.calendarModule) self.calendarModule.render();
         if (self.chartModule) self.chartModule.render();
@@ -6629,7 +6491,6 @@ if (name) {
     ['activeRecall','active_recall','0',false],
     ['dailyReviewPlan','daily_review_plan',{},false], ['dailyChallenge','daily_challenge',null,false],
     ['adaptiveReview','adaptive_review',true,false],
-    ['items','items',{},false], ['itemBuffs','item_buffs',{},false],
     ['assessment','assessment',null,false], ['assessmentHistory','assessment_history',[],false],
     ['assessmentLast','assessment_last_keys',[],false],
     ['wordCategoryIndex','word_category_index',0,false], ['onboardingDone','onboarding_done',false,false],
@@ -6776,18 +6637,6 @@ if (name) {
         _g[_gk] = isFinite(_gv) && _gv >= 0 ? Math.floor(Math.min(_gv, 999999)) : 0;
       });
       sanitized.gamification = _g;
-    }
-    // items：道具数量必须是有限数字（道具商店渲染直接拼接，F2 修复）
-    if (sanitized.items && typeof sanitized.items === 'object' && !Array.isArray(sanitized.items)) {
-      var _items = {}, _itemsN = 0;
-      for (var _ik in sanitized.items) {
-        var _iv = Number(sanitized.items[_ik]);
-        if (!isFinite(_iv) || _iv < 0) continue;
-        if (_iv > 999) _iv = 999;
-        _items[_ik] = _iv;
-        if (++_itemsN >= 200) break;
-      }
-      sanitized.items = _items;
     }
     // customBg：自定义背景图 dataURL 很长，string 分支的 1000 截断会损坏图片；
     // 仅在 data:image 前缀时完整保留（F7 修复），随备份导出/导入由 _applyBackup 写回 IDB。
@@ -7222,7 +7071,6 @@ if (data && typeof data === 'object' && (data.wordProgress || data.mistakes || d
             // 下一次加积分/用道具/自动保存会把刚导入的数据整体覆盖回 localStorage
             try {
               if (self.gamification) self.gamification.data = DataStore.getProgress('gamification', self.gamification.data);
-              if (self.itemSystem && self.itemSystem.reload) self.itemSystem.reload();
               if (self.dailyChallenge && self.dailyChallenge._ensureToday) {
                 self.dailyChallenge.data = DataStore.getProgress('daily_challenge', null);
                 self.dailyChallenge._ensureToday();

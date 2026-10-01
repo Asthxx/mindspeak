@@ -17,17 +17,10 @@ function extractFn(src, marker, nextMarker) {
   return rest.slice(0, end === -1 ? rest.length : end);
 }
 
-describe('F2 道具商店存储型 XSS', () => {
-  it('renderShop 拥有数量必须转义（数量来自可导入数据）', () => {
-    const body = extractFn(read('js/items.js'), 'ItemSystem.prototype.renderShop', 'ItemSystem.prototype.updateGlobalUI');
-    expect(body).toContain('escapeHtml(String(self.count(id)))');
-  });
-
-  it('_sanitizeBackup 对 items 做有限数字收敛（含 <img 注入串被化为 0）', () => {
-    const body = extractFn(read('js/app.js'), 'App.prototype._sanitizeBackup', 'App.prototype._applyBackup');
-    expect(body).toContain('sanitized.items = _items;');
-  });
-});
+// F2 道具商店存储型 XSS 守护已随道具商店下线一并移除：
+// 风险源头是 ItemSystem.prototype.renderShop 直接拼接 escapeHtml 之外的数量文本，
+// 以及 _sanitizeBackup 里对 sanitized.items 的保留。两处代码均已删除
+// （见 tests/core/items-shop-removed.test.js），风险向量不复存在。
 
 describe('F3 AI 概况存储型 XSS', () => {
   it('_overview 的等级与积分必须数字转义', () => {
