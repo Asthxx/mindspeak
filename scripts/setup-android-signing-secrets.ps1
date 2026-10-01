@@ -47,8 +47,26 @@ if ($tracked) {
 }
 Write-Ok '安全闸门通过：keystore 未被 git 跟踪'
 
-$repoArg = @()
-if ($Repo) { $repoArg = @('-R', $Repo) }
+# 目标仓库：显式解析成 owner/repo 并始终以 -R 传入。
+# 背景：本脚本曾在 $Repo 为空时让 gh 自行推导，而 gh 依赖「当前工作目录」
+# 是否为 git 仓库——从任意目录执行（如 C:\Users\Administrator）会直接失败：
+#   failed to run git: fatal: not a git repository
+# keystore 已用 $PSScriptRoot 定位，仓库推导却没对齐，属逻辑漏洞。
+# 修复：同样以 $PSScriptRoot 为准解析 origin，并恒定传 -R，不再依赖 cwd。
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if ($Repo) {
+    $repoSlug = $Repo
+} else {
+    $origin = (& git -C $repoRoot remote get-url origin 2>$null)
+    if (-not $origin) { Die "在 $repoRoot 找不到 git remote 'origin'；请用 -Repo owner/name 显式指定。" }
+    $origin = $origin.Trim()
+    if ($origin -notmatch 'github\.com[:/](?<slug>[^/]+/[^/]+?)(?:\.git)?/?$') {
+        Die "无法从 origin 解析 owner/repo：$origin`n请用 -Repo owner/name 显式指定。"
+    }
+    $repoSlug = $Matches['slug']
+}
+$repoArg = @('-R', $repoSlug)
+Write-Ok "目标仓库：$repoSlug"
 
 # ---------------------------------------------------------------- 读取 alias
 Write-Step '读取 keystore 的 alias（build-apk.yml 需要 ANDROID_KEY_ALIAS）'
@@ -58,6 +76,18 @@ Write-Host ''
 
 $alias = Read-Host '请输入 keystore alias'
 if ([string]::IsNullOrWhiteSpace($alias)) { Die 'alias 不能为空' }
+$alias = $alias.Trim()
+
+# 校验 alias 形态：合法值形如 myapp / mindspeak / app-key-01。
+# 曾出现过用户把整条 keytool 命令粘进提示框的情况——那会把
+# `keytool -list -v -keystore ...` 当成 alias 写进 secret，CI 签名时才发现，
+# 代价是重新配一遍全部 4 个 secret。这里提前拦住明显不是 alias 的输入。
+if ($alias -match '\s|-(list|v|keystore|storetype)\b|^(keytool|java|echo|cat|type)\b|["'']') {
+    Die "输入的 alias 看起来是一条命令而非 alias：$alias`n请只填 keytool -list -v 输出中「别名(Alias)」后面的值，例如：mindspeak"
+}
+if ($alias -notmatch '^[A-Za-z0-9._-]+$') {
+    Die "alias 含非法字符（仅允许字母/数字/._-）：$alias"
+}
 Write-Ok "alias = $alias"
 
 # ---------------------------------------------------------------- 上传 4 个 secret
@@ -87,13 +117,13 @@ gh secret set ANDROID_KEYSTORE_PASS @repoArg
 if ($LASTEXITCODE -ne 0) { Die 'ANDROID_KEYSTORE_PASS 设置失败' }
 Write-Ok 'ANDROID_KEYSTORE_PASS 已设置'
 
-# 3) alias：交互式输入，避免经参数传递
-Write-Host "  [3/4] ANDROID_KEY_ALIAS（直接回车沿用上面输入的：$alias）"
-$alias2 = Read-Host 'alias'
-if ([string]::IsNullOrWhiteSpace($alias2)) { $alias2 = $alias }
-$alias2 | gh secret set ANDROID_KEY_ALIAS @repoArg
+# 3) alias：非机密，直接管道写入，不重复提示
+#    早前版本会再问一次「alias」，既冗余又可能与第 1 步填的值不一致，
+#    导致 ANDROID_KEY_ALIAS 与用户以为的不符，签名到 CI 才暴露。
+Write-Host "  [3/4] ANDROID_KEY_ALIAS（沿用上面已填的：$alias）"
+$alias | gh secret set ANDROID_KEY_ALIAS @repoArg
 if ($LASTEXITCODE -ne 0) { Die 'ANDROID_KEY_ALIAS 设置失败' }
-Write-Ok "ANDROID_KEY_ALIAS 已设置（= $alias2）"
+Write-Ok "ANDROID_KEY_ALIAS 已设置（= $alias）"
 
 # 4) key 密码：交互式隐藏输入
 Write-Host '  [4/4] ANDROID_KEY_PASS（输入不回显）'
