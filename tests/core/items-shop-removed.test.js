@@ -20,6 +20,7 @@ const read = (rel) => readFileSync(join(root, rel), 'utf8');
 const items = read('js/items.js');
 const app = read('js/app.js');
 const html = read('index.html');
+const store = read('js/core/store.js');
 
 describe('ItemSystem 道具系统已移除', () => {
   it('js/items.js 不再定义 ItemSystem', () => {
@@ -95,6 +96,30 @@ describe('旧道具数据仍可被清理（用户数据卫生）', () => {
     expect(fields, '未找到 _backupFields').toBeTruthy();
     expect(fields[0], '道具不应再进备份').not.toContain("['items'");
     expect(fields[0]).not.toContain("['itemBuffs'");
+  });
+});
+
+describe('store.js 的道具键映射已清理（死映射，零风险）', () => {
+  // 与上面「保留 appKeys 以清旧数据」不矛盾：appKeys 负责删除旧用户残留，
+  // store.js 的映射则已无任何读取方（Storage.getJSON('items') 等全仓无调用），
+  // 留着只会让人误以为道具功能还在。
+  it('store.js 不再声明 items 映射', () => {
+    expect(store, 'store.js 的 items 死映射应删除').not.toMatch(/items:\s*'items'/);
+  });
+
+  it('store.js 不再声明 itemBuffs 映射', () => {
+    expect(store, 'store.js 的 itemBuffs 死映射应删除').not.toMatch(/itemBuffs:\s*'item_buffs'/);
+  });
+
+  it('映射删除后全仓无任何读取方（不会静默失效）', () => {
+    // 若将来有人重新读这两个键，这条会先失败，提示需要恢复映射
+    const readers = [];
+    const re = /Storage\.(?:getJSON|setJSON|get|set|remove)\(\s*'(?:items|itemBuffs|item_buffs)'/g;
+    for (const f of ['js/app.js', 'js/core/store.js', 'js/items.js']) {
+      const m = read(f).match(re);
+      if (m) readers.push(f + ' → ' + m.join(', '));
+    }
+    expect(readers, '发现对已删除映射的读取方').toEqual([]);
   });
 });
 

@@ -23,8 +23,6 @@ window.UserState = (function() {
     dailyReviewPlan: 'daily_review_plan',
     adaptiveReview: 'adaptive_review',
     activeRecall: 'active_recall',
-    items: 'items',
-    itemBuffs: 'item_buffs',
     ownedThemes: 'owned_themes',
     appliedTheme: 'applied_theme',
     badges: 'badges',
