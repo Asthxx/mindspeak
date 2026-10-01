@@ -332,6 +332,13 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .settings-group{padding:var(--sp-4)}
   .settings-group .setting-row{flex-wrap:wrap;gap:var(--sp-2)}
   .settings-group input[type="number"]{font-size:1rem}
+  /* 组间距由 style.css 统一提供（.settings-group margin-bottom 12px） */
+  /* 复选框与多行说明文字顶部对齐（同 style.css 全局规则，此处仅兜底旧缓存覆盖） */
+  .settings-group label{align-items:flex-start}
+  .settings-group label input[type="checkbox"]{margin-top:4px;flex-shrink:0}
+  /* 朗读声音等"标签+控件"字段：标签在上、控件全宽在下，扫读更快 */
+  .settings-group label.voice-field{flex-direction:column;align-items:stretch;gap:var(--sp-1)}
+  .settings-group label.voice-field select{width:100%;min-width:0}
   .score-circle{width:100px;height:100px}
   .score-num{font-size:1.6rem}
 
@@ -413,6 +420,14 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .word-actions .btn{flex:1 1 30%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .word-nav{flex-wrap:wrap;justify-content:center;row-gap:var(--sp-2)}
   .word-nav .btn-sm,#word-progress{flex-shrink:0}
+
+  /* 设置页：操作按钮统一全宽块状（原先宽度随文字参差，混排不齐）。
+     仅限 settings-group 直接子按钮；数据管理组走 .dm-grid 单列网格 */
+  #page-settings .settings-group > .btn{display:flex;width:100%;justify-content:center}
+  #page-settings .settings-group > .btn + .btn{margin-top:var(--sp-2)}
+  #page-settings .dm-grid{grid-template-columns:1fr}
+  #page-settings .dm-grid .btn{width:100%}
+  #page-settings .custom-color-area .btn{flex:1;min-width:0}
 }
 
 /* 安全区兜底：不支持 env() 的旧 Android WebView 也能正常显示 */

@@ -50,7 +50,9 @@ self.addEventListener('fetch', e => {
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.includes('/sw.js')) return;
 
-  // 应用壳和静态资源：优先走缓存（离线可用），后台更新缓存
+  // 资源分类：
+  //   代码资源（HTML/CSS/JS）→ 网络优先：样式/脚本改动刷新即见，离线时回退缓存
+  //   数据/大文件（data/assets/manifest）→ 缓存优先：离线可用，网络结果后台更新
   const isShell = (
     url.pathname.indexOf('/js/') >= 0 ||
     url.pathname.indexOf('/css/') >= 0 ||
@@ -59,6 +61,13 @@ self.addEventListener('fetch', e => {
     url.pathname.endsWith('index.html') ||
     url.pathname.endsWith('manifest.json') ||
     url.pathname.endsWith('pwa-manifest.json') ||
+    url.pathname === '/' ||
+    url.pathname.endsWith('/')
+  );
+  const isCode = (
+    url.pathname.indexOf('/js/') >= 0 ||
+    url.pathname.indexOf('/css/') >= 0 ||
+    url.pathname.endsWith('index.html') ||
     url.pathname === '/' ||
     url.pathname.endsWith('/')
   );
@@ -74,8 +83,9 @@ self.addEventListener('fetch', e => {
           return res;
         })
         .catch(() => cached);
-      // 静态资源：用缓存即时返回，网络结果仅在后台更新
-      if (isShell && cached) return cached;
+      // 数据/大文件：用缓存即时返回（离线可用），网络结果仅在后台更新
+      if (isShell && !isCode && cached) return cached;
+      // HTML/CSS/JS：网络优先；离线时 network 的 catch 自动回退缓存
       return network;
     })
   );

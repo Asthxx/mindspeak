@@ -623,14 +623,25 @@ h2{
 .r-trans-popup .rtp-actions{margin-top:var(--sp-3);display:flex;gap:var(--sp-2)}
 
 /* ============ SETTINGS ============ */
+/* 设置页限宽：宽屏上卡片不再拉满整行，阅读线更舒适（手机端视口更窄，不受影响） */
+#page-settings{max-width:860px;margin:0 auto}
 .settings-group{
   background:var(--surface);
   border:1px solid var(--border);
   border-radius:var(--r-lg);
   padding:var(--sp-6);
   box-shadow:var(--shadow-sm);
+  margin-bottom:var(--sp-3);
 }
+.settings-group:last-child{margin-bottom:0}
 .settings-group h3{margin-bottom:var(--sp-4);font-weight:700}
+/* 数据管理：按钮网格化（桌面 3 列，保存按钮跨全行；手机端由 mobile.css 收为单列） */
+.dm-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:var(--sp-2);margin-top:var(--sp-2);
+}
+.dm-grid .btn{justify-content:center;white-space:nowrap}
+.dm-grid .btn-primary{grid-column:1 / -1}
 .support-group .support-note{
   background:var(--bg);
   border:1px solid var(--border);
@@ -817,10 +828,19 @@ h2{
 .dc-progress-text{font-size:0.8rem;color:var(--text-secondary);text-align:center}
 
 .settings-group label{
-  display:flex;align-items:center;gap:var(--sp-3);
+  display:flex;align-items:flex-start;gap:var(--sp-3);
   margin:var(--sp-2) 0;font-size:0.88rem;
   color:var(--text-secondary);cursor:pointer;
 }
+/* 多行说明文字时勾选框与第一行对齐（单行不受影响） */
+.settings-group label input[type="checkbox"]{
+  margin-top:4px;flex-shrink:0;accent-color:var(--sage);
+}
+/* 自动保存行内含较高输入框，保持垂直居中更协调 */
+.settings-group label.auto-save-toggle{align-items:center}
+/* 朗读声音字段：桌面横排，下拉保持可读宽度 */
+.settings-group .voice-field{flex-wrap:wrap}
+.settings-group .voice-field select{min-width:180px}
 .settings-group input[type="number"]{
   width:72px;padding:var(--sp-2) var(--sp-3);
   border:1.5px solid var(--border);
@@ -831,6 +851,8 @@ h2{
   outline:none;border-color:var(--sage);
   box-shadow:0 0 0 3px var(--sage-surface);
 }
+/* 预设声音下拉：桌面保持足够宽度展示音色名（手机端由 mobile.css 全宽覆盖） */
+.settings-group #voice-select{min-width:260px}
 
 /* ============ MODAL ============ */
 .modal{
