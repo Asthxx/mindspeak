@@ -334,40 +334,6 @@ h2{
   font-weight:600;min-width:80px;text-align:center;
 }
 
-.ebbinghaus-plan{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius-lg);
-  padding:var(--sp-4) var(--sp-5);
-  margin-bottom:var(--sp-5);
-  box-shadow:var(--shadow-sm);
-}
-.ebbinghaus-plan h3{
-  font-size:0.95rem;color:var(--text);
-  display:flex;align-items:center;gap:var(--sp-2);
-  margin:0 0 var(--sp-3);
-}
-.plan-table{
-  width:100%;border-collapse:collapse;
-  font-size:0.88rem;
-}
-.plan-table th,.plan-table td{
-  padding:7px 10px;text-align:center;
-  border-bottom:1px solid var(--border-light);
-}
-.plan-table th{
-  color:var(--text-secondary);font-weight:600;
-  background:var(--sage-surface);
-}
-.plan-table td:first-child{color:var(--text-tertiary)}
-.plan-table tr:last-child td{border-bottom:none}
-.plan-table tr.row-done td{color:var(--text-tertiary)}
-.plan-table tr.row-current td{
-  color:var(--sage);font-weight:700;
-  background:var(--sage-light);
-  border-bottom:1px solid transparent;
-}
-.plan-table tr.row-current td:first-child{color:var(--sage)}
 .ebbinghaus-ring{
   width:60px;height:60px;margin:0 auto var(--sp-3);
   position:relative;
@@ -2161,12 +2127,6 @@ h2{
 .story-tag-due{background:#FEF3C7;color:#B45309}
 .story-tag-fresh{background:#E0E7FF;color:#4338CA}
 
-/* ============ 艾宾浩斯表说明 ============ */
-.plan-note{
-  margin:var(--sp-3) 0 0;font-size:0.78rem;
-  color:var(--text-tertiary);line-height:1.6;
-}
-
 /* ============ 打卡日历补签 ============ */
 .cal-day.cal-missed{
   background:var(--surface);border:1.5px dashed var(--coral);
@@ -2183,12 +2143,11 @@ h2{
   border-radius:var(--radius-lg);padding:var(--sp-4) var(--sp-5);
   box-shadow:var(--shadow-sm);margin-bottom:var(--sp-4);
 }
-/* 背单词页各区块间距：今日计划/统计/学习卡片/复习表/列表 之间拉开 */
+/* 背单词页各区块间距：今日计划/统计/学习卡片/列表 之间拉开 */
 #page-word > .daily-plan-card,
 #page-word > .word-stats,
 #page-word > .card-area,
-#page-word > .word-list,
-#page-word > .ebbinghaus-plan{
+#page-word > .word-list{
   margin-bottom:var(--sp-8);
 }
 .dp-header{

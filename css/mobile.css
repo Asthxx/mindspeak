@@ -228,12 +228,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .ph-card .ph-symbol{font-size:1.35rem}
   .ph-card .ph-sound{font-size:0.62rem}
 
-  /* ================= 艾宾浩斯 ================= */
-  .ebbinghaus-plan{overflow-x:auto;padding:var(--sp-3) var(--sp-4);-webkit-overflow-scrolling:touch}
-  .ebbinghaus-plan h3{font-size:0.85rem}
-  .plan-table{min-width:max(100%,280px);font-size:0.8rem}
-  .plan-table th,.plan-table td{padding:6px 6px}
-  .plan-table th,.plan-table td{white-space:nowrap}
+  /* ================= 打卡日历 ================= */
   .calendar-grid{gap:2px}
   .cal-day{font-size:0.72rem;min-height:36px}
   .cal-day.has-data{min-height:36px}

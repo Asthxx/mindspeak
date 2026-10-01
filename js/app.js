@@ -1813,7 +1813,7 @@ var DataStore = {
     if (window.UserState) return window.UserState.set(key, val);
     return Storage.setJSON(key, val);
   },
-  // 艾宾浩斯遗忘曲线：复习次数 → 间隔天数 / 记忆保持率（与背单词页表格、复习环共用同一份数据）
+  // 艾宾浩斯遗忘曲线：复习次数 → 间隔天数 / 记忆保持率（供复习排期与复习环共用）
   ebbinghausIntervals: [1, 2, 4, 7, 15, 30, 60, 120],
   ebbinghausRetention: [58, 72, 80, 85, 90, 93, 96, 100],
   getEbbinghausPlan: function() {
@@ -2192,23 +2192,6 @@ var LearningReminder = {
   }
 };
 // ==================== 背单词模块 ====================
-// 渲染艾宾浩斯遗忘曲线复习表：按当前单词复习次数高亮当前阶段；数据源与复习排期共用 DataStore
-function renderEbbinghausPlan(activeCount) {
-  var tbody = document.querySelector('.plan-table tbody');
-  if (!tbody) return;
-  var rc = parseInt(activeCount, 10);
-  if (isNaN(rc) || rc < 0) rc = 0;
-  var plan = DataStore.getEbbinghausPlan();
-  var html = '';
-  plan.forEach(function(row) {
-    var cls = '';
-    if (rc >= plan.length) cls = 'row-done';
-    else if (row.count === rc) cls = 'row-current';
-    else if (row.count < rc) cls = 'row-done';
-    html += '<tr class="' + cls + '"><td>第' + row.count + '次</td><td>' + row.days + '天</td><td>' + row.retention + '%</td></tr>';
-  });
-  tbody.innerHTML = html;
-}
 // 分类下拉显示排序：阶段0(26个字母)置顶，其余按原顺序；返回真实索引数组
 function orderCategoriesForDisplay(cats) {
   if (!cats || !cats.length) return []; // 词库损坏/未加载时防 TypeError 崩模块
@@ -2247,7 +2230,7 @@ function WordModule() {
     this._syncLearnSwitchUI();
     this.showCurrentWord();
     this.renderStats();
-    renderEbbinghausPlan(this.currentReviewCount());
+    
   };
   WordModule.prototype.bindEvents = function() {
     var self = this;
@@ -2667,9 +2650,7 @@ cat.words = merged;
       else if (reviewCount > 0) stageText = ' | 阶段' + reviewCount + '/8';
     }
     document.getElementById('word-progress').textContent = (this.currentIndex + 1) + '/' + words.length + stageText;
-    // 复习表同步当前单词阶段：已掌握点亮最后一行，否则高亮 reviewCount 对应的第 N 次
-    renderEbbinghausPlan(isMastered ? DataStore.ebbinghausIntervals.length : reviewCount);
-    // 复习环显示当前阶段的记忆保持率（与复习表一致），替代原先的阶段数/8
+    // 复习环显示当前阶段的记忆保持率，替代原先的阶段数/8
     var retention = DataStore.ebbinghausRetention;
     var pct = isMastered ? 100 : (reviewCount > 0 ? retention[Math.min(reviewCount - 1, retention.length - 1)] : 0);
     if (isNaN(pct)) pct = 0;
