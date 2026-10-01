@@ -1399,13 +1399,15 @@
           <svg class="icon icon-sm icon-sage"><use href="#i-save" xlink:href="#i-save"/></svg>
           <span id="save-time">未保存</span>
         </div>
-        <button class="btn btn-primary" id="btn-save-progress"><svg class="icon"><use href="#i-save" xlink:href="#i-save"/></svg> 保存学习进度</button>
-        <button class="btn" id="btn-export-data"><svg class="icon"><use href="#i-upload" xlink:href="#i-upload"/></svg> 导出学习数据</button>
-<button class="btn" id="btn-export-fav"><svg class="icon"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg> 导出单词本</button>
-        <button class="btn" id="btn-export-mistakes"><svg class="icon"><use href="#i-error" xlink:href="#i-error"/></svg> 导出错题本</button>
-        <button class="btn" id="btn-import-data"><svg class="icon"><use href="#i-download" xlink:href="#i-download"/></svg> 导入学习数据</button>
-<button class="btn" id="btn-open-logs"><svg class="icon"><use href="#i-article" xlink:href="#i-article"/></svg> 打开错误日志</button>
-        <button class="btn btn-danger" id="btn-reset-data"><svg class="icon"><use href="#i-delete" xlink:href="#i-delete"/></svg> 重置所有数据</button>
+<div class="dm-grid">
+          <button class="btn btn-primary" id="btn-save-progress"><svg class="icon"><use href="#i-save" xlink:href="#i-save"/></svg> 保存学习进度</button>
+          <button class="btn" id="btn-export-data"><svg class="icon"><use href="#i-upload" xlink:href="#i-upload"/></svg> 导出学习数据</button>
+          <button class="btn" id="btn-export-fav"><svg class="icon"><use href="#i-bookmark-add" xlink:href="#i-bookmark-add"/></svg> 导出单词本</button>
+          <button class="btn" id="btn-export-mistakes"><svg class="icon"><use href="#i-error" xlink:href="#i-error"/></svg> 导出错题本</button>
+          <button class="btn" id="btn-import-data"><svg class="icon"><use href="#i-download" xlink:href="#i-download"/></svg> 导入学习数据</button>
+          <button class="btn" id="btn-open-logs"><svg class="icon"><use href="#i-article" xlink:href="#i-article"/></svg> 打开错误日志</button>
+          <button class="btn btn-danger" id="btn-reset-data"><svg class="icon"><use href="#i-delete" xlink:href="#i-delete"/></svg> 重置所有数据</button>
+        </div>
         <label class="auto-save-toggle">
           <input type="checkbox" id="auto-save" checked> 自动保存
           <span class="auto-save-interval">每 <input type="number" id="auto-save-interval" value="5" min="1" max="1440"> 分钟自动备份</span>
@@ -1434,17 +1436,17 @@
       </div>
       <div class="settings-group">
         <h3><svg class="icon icon-sage"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读声音</h3>
-        <label style="display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap">
+        <label class="voice-field">
           预设声音：
-          <select id="voice-select" style="min-width:260px">
+          <select id="voice-select">
             <option value="">系统默认</option>
           </select>
         </label>
-        <label style="display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-2)">
+        <label>
           <input type="checkbox" id="voice-instant">
           <span>本地即时语音（零延迟，点击立即出声）</span>
         </label>
-        <label style="display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap">
+        <label class="voice-field">
           朗读语速：
           <select id="voice-rate">
             <option value="0.7">慢速</option>
@@ -1452,7 +1454,7 @@
             <option value="1.1">快速</option>
           </select>
         </label>
-        <label style="display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap">
+        <label class="voice-field">
           音调：
           <select id="voice-pitch">
             <option value="0.7">低沉</option>
