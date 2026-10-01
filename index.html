@@ -104,6 +104,7 @@
     <!-- 错词强化训练专用：靶心图标，区分于错题本的 i-error -->
     <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
     <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
     <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
     <symbol id="i-item-hint" viewBox="0 0 48 48">
@@ -466,19 +467,136 @@
         </div>
       </div>
 
-      <!-- AI 对话（AI Coach 对话式交互） -->
-      <div class="ai-chat-card">
-        <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage"" aria-hidden="true" focusable="false"><use href="#i-robot" xlink:href="#i-robot"/></svg> AI 对话</h3>
-        <p class="ai-chat-sub">问我任何学习问题，例如：「解释单词 abandon」「帮我制定学习计划」「分析我的错题」「我学得怎么样？」</p>
-        <div class="ai-chat-window" id="ai-chat-window">
-          <div class="ai-chat-msgs" id="ai-chat-msgs"></div>
-          <div class="ai-chat-chips" id="ai-chat-chips"></div>
-          <div class="ai-chat-input-row">
-            <input type="text" id="ai-chat-input" placeholder="输入你的问题，按回车发送..." maxlength="200" autocomplete="off">
-            <button class="btn btn-primary" id="ai-chat-send"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-send" xlink:href="#i-send"/></svg></button>
+      <!-- AI 对话工作区（v2：历史栏 / 消息流 / 上下文栏 / 输入区 / 设置抽屉）
+           兼容约束：#ai-chat-msgs / #ai-chat-input / #ai-chat-send / #ai-chat-chips 四个 id
+           与 [data-goto] 属性契约保持不变（ai-chat.js 与 dashboard.js 依赖）。 -->
+      <div class="ai-workspace" id="ai-workspace">
+        <!-- ① 历史栏：≥1024 常驻，<1024 变左侧抽屉 -->
+        <aside class="ai-rail ai-rail-history" id="ai-history-rail" aria-label="对话历史">
+          <div class="ai-rail-head"><span class="ai-rail-title">对话历史</span></div>
+          <div class="ai-rail-actions">
+            <button type="button" class="ai-new-chat" id="ai-new-chat">
+              <svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-add" xlink:href="#i-add"/></svg> 新对话
+            </button>
+          </div>
+          <div class="ai-hist-search">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-search" xlink:href="#i-search"/></svg>
+            <input type="search" id="ai-hist-search" placeholder="搜索历史对话" aria-label="搜索历史对话" autocomplete="off">
+          </div>
+          <div class="ai-hist-list" id="ai-hist-list"></div>
+        </aside>
+
+        <!-- ② 对话主区 -->
+        <div class="ai-conv">
+          <header class="ai-conv-head">
+            <button type="button" class="ai-icon-btn ai-rail-toggle" id="ai-hist-toggle" aria-label="打开对话历史" aria-expanded="false" aria-controls="ai-history-rail">
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-menu" xlink:href="#i-menu"/></svg>
+            </button>
+            <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage" aria-hidden="true" focusable="false"><use href="#i-robot" xlink:href="#i-robot"/></svg> AI 英语教练</h3>
+            <span class="ai-conv-spacer"></span>
+            <button type="button" class="ai-icon-btn" id="ai-settings-toggle" aria-label="打开助手设置" aria-expanded="false" aria-controls="ai-settings-drawer">
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-settings" xlink:href="#i-settings"/></svg>
+            </button>
+          </header>
+
+          <div class="ai-conv-body">
+            <div class="ai-msg-scroll" id="ai-msg-scroll">
+              <div class="ai-chat-msgs" id="ai-chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="对话消息"></div>
+            </div>
+            <button type="button" class="ai-jump-latest" id="ai-jump-latest" hidden>
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg> 回到最新
+            </button>
+          </div>
+
+          <div class="ai-composer">
+            <div class="ai-chat-chips" id="ai-chat-chips"></div>
+            <div class="ai-input-shell">
+              <button type="button" class="ai-icon-btn ai-mic" id="ai-mic" aria-label="语音输入" hidden>
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-mic" xlink:href="#i-mic"/></svg>
+              </button>
+              <textarea id="ai-chat-input" rows="1" maxlength="1000" placeholder="问单词、要例句、分析错题…" aria-label="输入你的问题" autocomplete="off"></textarea>
+              <button type="button" class="ai-send" id="ai-chat-send" aria-label="发送" disabled>
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-send" xlink:href="#i-send"/></svg>
+              </button>
+            </div>
+            <div class="ai-composer-meta">
+              <span id="ai-counter">0 / 1000</span>
+              <span class="ai-hint"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</span>
+            </div>
           </div>
         </div>
+
+        <!-- ③ 上下文栏：≥1280 才显示 -->
+        <aside class="ai-rail ai-rail-context" id="ai-context-rail" aria-label="学习上下文">
+          <div class="ai-ctx-card">
+            <h4><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-analytics" xlink:href="#i-analytics"/></svg> 学习概况</h4>
+            <div class="ai-stat-grid" id="ai-ctx-stats"></div>
+          </div>
+          <div class="ai-ctx-card">
+            <h4><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 今日行动</h4>
+            <div id="ai-ctx-tasks"></div>
+          </div>
+          <div class="ai-ctx-card">
+            <h4><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-fire" xlink:href="#i-fire"/></svg> 高频薄弱</h4>
+            <ul class="ai-tip-list" id="ai-ctx-weak"></ul>
+          </div>
+        </aside>
       </div>
+
+      <!-- ④ 设置抽屉（遮罩 + 右侧滑入） -->
+      <div class="ai-scrim" id="ai-scrim"></div>
+      <aside class="ai-drawer" id="ai-settings-drawer" role="dialog" aria-modal="true" aria-labelledby="ai-drawer-title" aria-hidden="true">
+        <div class="ai-drawer-head">
+          <h3 id="ai-drawer-title">助手设置</h3>
+          <span class="ai-conv-spacer"></span>
+          <button type="button" class="ai-icon-btn" id="ai-drawer-close" aria-label="关闭设置">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close" xlink:href="#i-close"/></svg>
+          </button>
+        </div>
+        <div class="ai-drawer-body">
+          <div class="ai-set-group">
+            <span class="ai-set-title">回答方式</span>
+            <div class="ai-set-row">
+              <span class="ai-lbl"><b>LLM 在线增强</b><span>关闭后使用离线规则回复</span></span>
+              <button type="button" class="ai-switch" id="ai-sw-llm" role="switch" aria-checked="true" aria-label="LLM 在线增强"></button>
+            </div>
+            <div class="ai-set-row">
+              <span class="ai-lbl"><b>结构化回答</b><span>释义 / 例句 / 提示分区展示</span></span>
+              <button type="button" class="ai-switch" id="ai-sw-structured" role="switch" aria-checked="true" aria-label="结构化回答"></button>
+            </div>
+            <div class="ai-set-row">
+              <span class="ai-lbl"><b>例句显示中文</b><span>关闭即纯英文沉浸式</span></span>
+              <button type="button" class="ai-switch" id="ai-sw-zh" role="switch" aria-checked="true" aria-label="例句显示中文"></button>
+            </div>
+          </div>
+          <div class="ai-set-group">
+            <span class="ai-set-title">语音</span>
+            <div class="ai-set-row">
+              <span class="ai-lbl"><b>自动朗读回复</b><span>收到回答后自动发音</span></span>
+              <button type="button" class="ai-switch" id="ai-sw-autospeak" role="switch" aria-checked="false" aria-label="自动朗读回复"></button>
+            </div>
+            <div class="ai-set-row">
+              <span class="ai-lbl"><b>发音口音</b><span>影响例句与单词朗读</span></span>
+              <select class="ai-set-select" id="ai-sel-accent" aria-label="发音口音">
+                <option value="en-US">美音 en-US</option>
+                <option value="en-GB">英音 en-GB</option>
+              </select>
+            </div>
+            <div class="ai-set-row">
+              <span class="ai-lbl"><b>语速</b><span id="ai-rate-val">1.0×</span></span>
+              <input type="range" id="ai-rate" min="0.6" max="1.6" step="0.1" value="1" aria-label="语速">
+            </div>
+          </div>
+          <div class="ai-set-group">
+            <span class="ai-set-title">会话</span>
+            <div class="ai-set-row">
+              <span class="ai-lbl"><b>清空当前对话</b><span>保留最近 50 条，超出自动淘汰</span></span>
+              <span id="ai-clear-slot"></span>
+            </div>
+            <button type="button" class="ai-set-link" id="ai-goto-settings">前往完整设置页 →</button>
+          </div>
+        </div>
+      </aside>
     </section>
 
     <!-- 背单词页面 -->
@@ -1778,7 +1896,7 @@
     <script src="js/items.js?v=20260810-2"></script>
     <script src="js/dashboard.js?v=20260810-2"></script>
 <script src="js/ai-coach.js?v=20260810-2"></script>
-<script src="js/ai-chat.js?v=20260810-2"></script>
+<script src="js/ai-chat.js?v=20261001-1"></script>
 <script src="js/assessment.js?v=20260810-2"></script>
 <script src="js/onboarding.js?v=20260810-2"></script>
     <script src="js/notification-manager.js?v=20260810-2"></script>

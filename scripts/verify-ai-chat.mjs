@@ -1,10 +1,6 @@
-// verify-ai-chat.mjs — AI 助手对话区阶段1（纯样式）落地后的定向验证
-// 真实 Chromium + 真实服务，不做 jsdom 模拟：
-//   1. 消息区不再是写死的 360px，随视口自适应且仍是唯一滚动容器
-//   2. 用户气泡对比度浅/深双主题均达 WCAG AA 4.5:1（原浅 4.05:1 / 深 2.50:1）
-//   3. AI 气泡文字不再落到 --text-base（该令牌是 1rem 字号，当颜色用会静默降级为继承色）
-//   4. 移动端 390px 无横向滚动，消息间距收到 12px
-//   5. 控制台零错误
+// verify-ai-chat.mjs — AI 助手对话区（v2 工作区）真实 Chromium 定向验证
+// 覆盖：三栏骨架与断点 / 结构化回答卡 / 例句单独朗读 / 历史栏（新对话·搜索）/
+//       设置抽屉 / 输入区（textarea 自适应·字数·发送态） / 浅深双主题对比度 / 控制台零错误
 // 运行：node scripts/verify-ai-chat.mjs
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -19,10 +15,7 @@ const BASE = `http://localhost:${PORT}/`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const errors = [];
 const results = [];
-
-function check(name, pass, detail) {
-  results.push({ name, pass, detail });
-}
+const check = (name, pass, detail) => results.push({ name, pass, detail });
 
 function findChrome() {
   const cache = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -101,15 +94,12 @@ await cdp.send('Runtime.enable', {}, sessionId);
 await cdp.send('Page.enable', {}, sessionId);
 
 async function evalJs(expr) {
-  const r = await cdp.send('Runtime.evaluate', {
-    expression: expr, returnByValue: true, awaitPromise: true,
-  }, sessionId);
-  if (r.exceptionDetails) return { __error: r.exceptionDetails.text };
+  const r = await cdp.send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }, sessionId);
+  if (r.exceptionDetails) return { __error: r.exceptionDetails.text + ' ' + (r.exceptionDetails.exception?.description || '') };
   return r.result.value;
 }
 
-// 页面里通用的对比度工具（WCAG 2.1 相对亮度）
-const CONTRAST_HELPER = `
+const HELPERS = `
 window.__lum = function (str) {
   var m = String(str).match(/[\\d.]+/g) || [];
   var c = m.slice(0, 3).map(function (v) {
@@ -120,8 +110,14 @@ window.__lum = function (str) {
 };
 window.__ratio = function (a, b) {
   var l1 = window.__lum(a), l2 = window.__lum(b);
-  var hi = Math.max(l1, l2), lo = Math.min(l1, l2);
-  return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
+  return Math.round((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05) * 100) / 100;
+};
+window.__type = function (sel, text) {
+  var el = document.querySelector(sel);
+  if (!el) return 'no-el';
+  el.value = text;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  return 'ok';
 };
 `;
 
@@ -131,106 +127,218 @@ async function boot() {
   await evalJs(`localStorage.setItem('onboarding_done','true'); localStorage.setItem('daily_goal','10'); 'ok'`);
   await cdp.send('Page.navigate', { url: BASE }, sessionId);
   await sleep(4500);
-  await evalJs(CONTRAST_HELPER);
+  await evalJs(HELPERS);
+  // AI 对话在 #page-ai（不是首页），先切过去，否则整页 display:none，量到的尺寸全是 0
+  await evalJs(`(() => {
+    var b = document.querySelector('.nav-btn[data-tab="ai"]') || document.querySelector('.bottom-nav-btn[data-tab="ai"]');
+    if (b) b.click();
+    return !!b;
+  })()`);
+  await sleep(1500);
 }
 
 await boot();
 
-// AI 对话卡片在 #page-ai（不是首页），先切过去；否则整页 display:none，量到的高度全是 0
-const tabSwitched = await evalJs(`(() => {
-  const b = document.querySelector('.nav-btn[data-tab="ai"]') || document.querySelector('.bottom-nav-btn[data-tab="ai"]');
-  if (b) b.click();
-  return !!b;
+// ---------- 1. 骨架与断点 ----------
+await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
+await sleep(800);
+const shell = await evalJs(`(() => {
+  var ws = document.querySelector('.ai-workspace');
+  var cs = ws ? getComputedStyle(ws) : null;
+  var ctx = document.querySelector('#ai-context-rail');
+  return {
+    workspace: !!ws,
+    cols: cs ? cs.gridTemplateColumns.split(' ').length : null,
+    historyVisible: !!document.querySelector('#ai-history-rail') && getComputedStyle(document.querySelector('#ai-history-rail')).display !== 'none',
+    contextVisible: !!ctx && getComputedStyle(ctx).display !== 'none',
+    wsHeight: ws ? Math.round(ws.getBoundingClientRect().height) : null,
+    scrollBox: !!document.querySelector('#ai-msg-scroll'),
+    textarea: document.querySelector('#ai-chat-input') ? document.querySelector('#ai-chat-input').tagName : null,
+    drawer: !!document.querySelector('#ai-settings-drawer'),
+  };
 })()`);
-if (!tabSwitched) { console.log('FAIL: 找不到 AI 页导航按钮'); }
-await sleep(1500);
+check('骨架·工作区存在且有确定高度', shell.workspace && shell.wsHeight > 300, `h=${shell.wsHeight}`);
+check('桌面 1440 为三栏', shell.cols === 3, `grid 列数=${shell.cols}`);
+check('桌面·历史栏与上下文栏均可见', shell.historyVisible && shell.contextVisible, `hist=${shell.historyVisible} ctx=${shell.contextVisible}`);
+check('输入区改为 textarea', shell.textarea === 'TEXTAREA', shell.textarea);
+check('消息区为独立滚动容器', shell.scrollBox === true, `#ai-msg-scroll=${shell.scrollBox}`);
+check('设置抽屉存在', shell.drawer === true, String(shell.drawer));
 
-// ---- 发一条消息，让对话区有用户气泡 + AI 气泡 ----
-await evalJs(`(() => {
-  const el = document.querySelector('.ai-chat-card');
-  if (el) el.scrollIntoView({ block: 'center' });
-  const input = document.querySelector('#ai-chat-input');
-  input.value = '解释单词 abandon';
-  document.querySelector('#ai-chat-send').click();
-  return 'sent';
-})()`);
+// ---------- 2. 发送并验证结构化回答卡 ----------
+await evalJs(`window.__type('#ai-chat-input', '解释单词 abandon')`);
+await sleep(300);
+const sendEnabled = await evalJs(`!document.querySelector('#ai-chat-send').disabled`);
+check('输入后发送键可用', sendEnabled === true, `可发送=${sendEnabled}`);
+await evalJs(`document.querySelector('#ai-chat-send').click()`);
 await sleep(2500);
 
-const PROBE = `
-(() => {
-  const msgs = document.querySelector('#ai-chat-msgs');
-  const user = document.querySelector('.ai-msg-user .ai-msg-bubble');
-  const ai = document.querySelector('.ai-msg-ai .ai-msg-bubble');
-  const cs = msgs ? getComputedStyle(msgs) : null;
-  const cu = user ? getComputedStyle(user) : null;
-  const ca = ai ? getComputedStyle(ai) : null;
+const card = await evalJs(`(() => {
+  var box = document.querySelector('#ai-chat-msgs');
+  var ai = document.querySelectorAll('#ai-chat-msgs .ai-msg-ai');
+  var last = ai[ai.length - 1];
+  var user = document.querySelector('#ai-chat-msgs .ai-msg-user .ai-msg-bubble');
+  var cu = user ? getComputedStyle(user) : null;
   return {
-    msgCount: document.querySelectorAll('#ai-chat-msgs .ai-msg').length,
-    userMsgs: document.querySelectorAll('#ai-chat-msgs .ai-msg-user').length,
-    botMsgs: document.querySelectorAll('#ai-chat-msgs .ai-msg-ai').length,
-    theme: document.documentElement.getAttribute('data-theme'),
-    msgs: cs ? { gap: cs.rowGap, overflowY: cs.overflowY, maxHeight: cs.maxHeight,
-                 clientH: msgs.clientHeight, scrollH: msgs.scrollHeight } : null,
-    userBubble: cu ? { bg: cu.backgroundColor, color: cu.color, padding: cu.padding,
-                       ratio: window.__ratio(cu.backgroundColor, cu.color) } : null,
-    aiBubble: ca ? { bg: ca.backgroundColor, color: ca.color, padding: ca.padding,
-                     ratio: window.__ratio(ca.backgroundColor, ca.color) } : null,
-    cardH: document.querySelector('.ai-chat-card') ? document.querySelector('.ai-chat-card').offsetHeight : null,
-    cardDisplay: document.querySelector('.ai-chat-card') ? getComputedStyle(document.querySelector('.ai-chat-card')).display : null,
-    pageActive: document.querySelector('.ai-chat-card') ? !!document.querySelector('.ai-chat-card').closest('.page.active') : null,
-    overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
+    msgCount: box.querySelectorAll('.ai-msg').length,
+    answerCards: document.querySelectorAll('#ai-chat-msgs .ai-answer').length,
+    lead: last && last.querySelector('.ai-answer-lead') ? last.querySelector('.ai-answer-lead').textContent.trim() : null,
+    exCards: document.querySelectorAll('#ai-chat-msgs .ai-ex-card').length,
+    exPlay: document.querySelectorAll('#ai-chat-msgs .ai-ex-card .play[data-speak]').length,
+    actions: document.querySelectorAll('#ai-chat-msgs .ai-act').length,
+    metaHasTime: !!document.querySelector('#ai-chat-msgs .ai-msg-meta'),
+    userRatio: cu ? window.__ratio(cu.backgroundColor, cu.color) : null,
   };
-})()`;
+})()`);
+check('回答渲染为结构化卡片', card.answerCards >= 1, `.ai-answer×${card.answerCards}`);
+check('结论行含单词', !!card.lead && /abandon/i.test(card.lead), card.lead);
+check('例句卡可单独朗读', card.exCards >= 1 && card.exPlay >= 1, `卡片×${card.exCards} 朗读×${card.exPlay}`);
+check('行动按钮已渲染', card.actions >= 1, `×${card.actions}`);
+check('消息带角色名与时间', card.metaHasTime === true, String(card.metaHasTime));
+check('浅色·用户气泡对比度 ≥4.5:1', card.userRatio >= 4.5, `${card.userRatio}:1`);
 
-// ============ 1. 浅色 · 桌面 1440 ============
-const light = await evalJs(PROBE);
-check('浅色·对话已渲染（用户+AI 各至少 1 条）', light.userMsgs >= 1 && light.botMsgs >= 1, `user=${light.userMsgs} bot=${light.botMsgs}`);
-check('浅色·AI 页已激活且卡片有实际高度', light.pageActive === true && light.cardH > 0, `active=${light.pageActive} cardH=${light.cardH}`);
-check('浅色·消息区有可视高度', light.msgs && light.msgs.clientH > 0, `clientH=${light.msgs?.clientH} maxH=${light.msgs?.maxHeight}`);
-check('浅色·用户气泡对比度 ≥4.5:1', light.userBubble && light.userBubble.ratio >= 4.5, `${light.userBubble?.ratio}:1  ${light.userBubble?.color} on ${light.userBubble?.bg}`);
-check('浅色·AI 气泡对比度 ≥4.5:1', light.aiBubble && light.aiBubble.ratio >= 4.5, `${light.aiBubble?.ratio}:1  ${light.aiBubble?.color} on ${light.aiBubble?.bg}`);
-check('浅色·AI 气泡文字色不是继承降级（应等于 --text #1A1A1A）',
-  light.aiBubble && light.aiBubble.color === 'rgb(26, 26, 26)', light.aiBubble?.color);
-check('浅色·消息区为滚动容器', light.msgs && light.msgs.overflowY === 'auto', light.msgs?.overflowY);
-check('浅色·消息间距 16px', light.msgs && light.msgs.gap === '16px', light.msgs?.gap);
-check('浅色·消息区高度不再写死 360px', light.msgs && light.msgs.maxHeight !== '360px', light.msgs?.maxHeight);
-check('浅色·气泡内边距 12px 16px', light.userBubble && light.userBubble.padding === '12px 16px', light.userBubble?.padding);
+// 真点一次例句朗读，确认链路不报错
+await evalJs(`(() => { var b = document.querySelector('#ai-chat-msgs .ai-ex-card .play'); if (b) b.click(); return !!b; })()`);
+await sleep(600);
 
-async function shot(name, w, h, mobileMode) {
+// ---------- 3. 输入区：自适应 / 字数 / 空态禁用 ----------
+const composer1 = await evalJs(`(() => {
+  var ta = document.querySelector('#ai-chat-input');
+  return { h1: Math.round(ta.getBoundingClientRect().height), maxLen: ta.getAttribute('maxlength') };
+})()`);
+await evalJs(`window.__type('#ai-chat-input', '第一行\\n第二行\\n第三行')`);
+await sleep(300);
+const composer2 = await evalJs(`(() => {
+  var ta = document.querySelector('#ai-chat-input');
+  return {
+    h2: Math.round(ta.getBoundingClientRect().height),
+    counter: (document.querySelector('#ai-counter') || {}).textContent || '',
+    sendDisabled: document.querySelector('#ai-chat-send').disabled,
+  };
+})()`);
+check('textarea 随内容增高', composer2.h2 > composer1.h1, `${composer1.h1}px → ${composer2.h2}px`);
+check('字数计数随输入更新', /\d+ \/ 1000/.test(composer2.counter), composer2.counter);
+check('maxlength 提到 1000', composer1.maxLen === '1000', composer1.maxLen);
+await evalJs(`window.__type('#ai-chat-input', '')`);
+await sleep(300);
+check('清空后发送键禁用', (await evalJs(`document.querySelector('#ai-chat-send').disabled`)) === true, '');
+
+// ---------- 4. 设置抽屉 ----------
+await evalJs(`document.querySelector('#ai-settings-toggle').click()`);
+await sleep(700);
+const drawer = await evalJs(`(() => {
+  var d = document.querySelector('#ai-settings-drawer');
+  return {
+    open: d.classList.contains('open'),
+    hidden: d.getAttribute('aria-hidden'),
+    x: Math.round(d.getBoundingClientRect().left),
+    switches: d.querySelectorAll('.ai-switch').length,
+    clearBtn: !!d.querySelector('.ai-clear-chat'),
+    scrim: document.querySelector('#ai-scrim').classList.contains('show'),
+  };
+})()`);
+check('抽屉可打开', drawer.open === true && drawer.hidden === 'false', `open=${drawer.open} aria-hidden=${drawer.hidden}`);
+check('抽屉滑入视口内', drawer.x < 1440 && drawer.x > 900, `left=${drawer.x}`);
+check('抽屉内 4 个开关', drawer.switches === 4, `×${drawer.switches}`);
+check('清空对话入口在抽屉内', drawer.clearBtn === true, String(drawer.clearBtn));
+check('遮罩已显示', drawer.scrim === true, String(drawer.scrim));
+await evalJs(`document.querySelector('#ai-sw-structured').click()`);
+await sleep(400);
+const swOff = await evalJs(`document.querySelector('#ai-sw-structured').getAttribute('aria-checked')`);
+check('开关可切换并写入 aria-checked', swOff === 'false', `aria-checked=${swOff}`);
+await evalJs(`document.querySelector('#ai-sw-structured').click()`);
+await sleep(300);
+await evalJs(`document.querySelector('#ai-drawer-close').click()`);
+await sleep(600);
+check('抽屉可关闭', (await evalJs(`document.querySelector('#ai-settings-drawer').classList.contains('open')`)) === false, '');
+
+// ---------- 5. 历史栏 ----------
+const hist1 = await evalJs(`document.querySelectorAll('#ai-hist-list .ai-hist-item').length`);
+await evalJs(`document.querySelector('#ai-new-chat').click()`);
+await sleep(900);
+const hist2 = await evalJs(`(() => ({
+  items: document.querySelectorAll('#ai-hist-list .ai-hist-item').length,
+  msgs: document.querySelectorAll('#ai-chat-msgs .ai-msg').length,
+}))()`);
+check('历史栏列出会话', hist1 >= 1, `×${hist1}`);
+check('新对话后历史条目增加', hist2.items >= hist1, `${hist1} → ${hist2.items}`);
+check('新对话后消息区回到欢迎语', hist2.msgs >= 1 && hist2.msgs <= 2, `×${hist2.msgs}`);
+await evalJs(`window.__type('#ai-hist-search', 'zzzz不存在')`);
+await sleep(400);
+check('搜索无匹配时列表清空', (await evalJs(`document.querySelectorAll('#ai-hist-list .ai-hist-item').length`)) === 0, '');
+await evalJs(`window.__type('#ai-hist-search', '')`);
+await sleep(400);
+
+// ---------- 6. 深色主题对比度 ----------
+// 先补一条消息：上一步「新对话」把消息区清了，否则量不到用户气泡
+await evalJs(`window.__type('#ai-chat-input', '我学得怎么样')`);
+await evalJs(`document.querySelector('#ai-chat-send').click()`);
+await sleep(2200);
+await evalJs(`document.documentElement.setAttribute('data-theme','dark')`);
+await sleep(800);
+const dark = await evalJs(`(() => {
+  var u = document.querySelector('#ai-chat-msgs .ai-msg-user .ai-msg-bubble');
+  var a = document.querySelector('#ai-chat-msgs .ai-msg-ai .ai-msg-bubble');
+  var cu = u ? getComputedStyle(u) : null;
+  var ca = a ? getComputedStyle(a) : null;
+  return {
+    user: cu ? { bg: cu.backgroundColor, color: cu.color, ratio: window.__ratio(cu.backgroundColor, cu.color) } : null,
+    ai: ca ? { ratio: window.__ratio(ca.backgroundColor, ca.color) } : null,
+  };
+})()`);
+check('深色·用户气泡对比度 ≥4.5:1', dark.user && dark.user.ratio >= 4.5, `${dark.user?.ratio}:1 ${dark.user?.color} on ${dark.user?.bg}`);
+check('深色·AI 气泡对比度 ≥4.5:1', dark.ai && dark.ai.ratio >= 4.5, `${dark.ai?.ratio}:1`);
+
+async function shot(name, w, h, mobileMode, theme) {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: !!mobileMode }, sessionId);
-  await sleep(600);
-  await evalJs(`(() => { const el = document.querySelector('.ai-chat-card'); if (el) el.scrollIntoView({ block: 'center' }); return 1; })()`);
-  await sleep(400);
+  await evalJs(`document.documentElement.setAttribute('data-theme','${theme || 'light'}')`);
+  await sleep(500);
+  await evalJs(`(() => { var el = document.querySelector('.ai-workspace'); if (el) el.scrollIntoView({ block: 'center' }); return 1; })()`);
+  await sleep(500);
   const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' }, sessionId);
   writeFileSync(join(root, 'test-screenshots', name), Buffer.from(data, 'base64'));
 }
-await shot('ai-chat-light-desktop.png', 1440, 900, false);
+await shot('ai-chat-v2-light-desktop.png', 1440, 900, false, 'light');
+await shot('ai-chat-v2-dark-desktop.png', 1440, 900, false, 'dark');
 
-// ============ 2. 深色 · 桌面 1440 ============
-await evalJs(`document.documentElement.setAttribute('data-theme','dark'); 'dark'`);
-await sleep(900);
-const dark = await evalJs(PROBE);
-check('深色·用户气泡对比度 ≥4.5:1', dark.userBubble && dark.userBubble.ratio >= 4.5, `${dark.userBubble?.ratio}:1  ${dark.userBubble?.color} on ${dark.userBubble?.bg}`);
-check('深色·AI 气泡对比度 ≥4.5:1', dark.aiBubble && dark.aiBubble.ratio >= 4.5, `${dark.aiBubble?.ratio}:1  ${dark.aiBubble?.color} on ${dark.aiBubble?.bg}`);
-check('深色·AI 气泡文字色为深色主题正文 #E8E8E8',
-  dark.aiBubble && dark.aiBubble.color === 'rgb(232, 232, 232)', dark.aiBubble?.color);
-await shot('ai-chat-dark-desktop.png', 1440, 900, false);
-await evalJs(`document.documentElement.setAttribute('data-theme','light'); 'light'`);
+// ---------- 7. 断点 ----------
+await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
+await sleep(700);
+const two = await evalJs(`(() => ({
+  cols: getComputedStyle(document.querySelector('.ai-workspace')).gridTemplateColumns.split(' ').length,
+  ctx: getComputedStyle(document.querySelector('#ai-context-rail')).display,
+}))()`);
+check('1100px 收为两栏且隐藏上下文栏', two.cols === 2 && two.ctx === 'none', `cols=${two.cols} ctx=${two.ctx}`);
 
-// ============ 3. 移动端 390 ============
 await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, sessionId);
-await sleep(1200);
-const mobile = await evalJs(PROBE);
-check('移动端·无横向滚动', mobile.overflowX === false, `scrollW>innerW = ${mobile.overflowX}`);
-check('移动端·消息间距收到 12px', mobile.msgs && mobile.msgs.gap === '12px', mobile.msgs?.gap);
-check('移动端·气泡内边距 10px 12px', mobile.userBubble && mobile.userBubble.padding === '10px 12px', mobile.userBubble?.padding);
-check('移动端·用户气泡对比度 ≥4.5:1', mobile.userBubble && mobile.userBubble.ratio >= 4.5, `${mobile.userBubble?.ratio}:1`);
-await shot('ai-chat-mobile.png', 390, 844, true);
+await sleep(900);
+const phone = await evalJs(`(() => {
+  var rail = document.querySelector('#ai-history-rail');
+  var cs = rail ? getComputedStyle(rail) : null;
+  return {
+    cols: getComputedStyle(document.querySelector('.ai-workspace')).gridTemplateColumns.split(' ').length,
+    railPosition: cs ? cs.position : null,
+    menuVisible: getComputedStyle(document.querySelector('#ai-hist-toggle')).display !== 'none',
+    overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
+  };
+})()`);
+check('390px 单栏', phone.cols === 1, `cols=${phone.cols}`);
+check('窄屏历史栏转为浮层抽屉', phone.railPosition === 'fixed', phone.railPosition);
+check('窄屏出现历史入口按钮', phone.menuVisible === true, String(phone.menuVisible));
+check('390px 无横向滚动', phone.overflowX === false, String(phone.overflowX));
+await evalJs(`document.querySelector('#ai-hist-toggle').click()`);
+await sleep(700);
+check('窄屏历史抽屉可打开', (await evalJs(`document.querySelector('#ai-history-rail').classList.contains('open')`)) === true, '');
+await shot('ai-chat-v2-mobile.png', 390, 844, true, 'light');
+await evalJs(`document.querySelector('#ai-scrim').click()`);
+await sleep(500);
 
-// ============ 输出 ============
-console.log('=== 浅色 1440 ==='); console.log(JSON.stringify(light, null, 2));
-console.log('=== 深色 1440 ==='); console.log(JSON.stringify(dark, null, 2));
-console.log('=== 移动端 390 ==='); console.log(JSON.stringify(mobile, null, 2));
+// ---------- 输出 ----------
+console.log('=== 骨架 ==='); console.log(JSON.stringify(shell, null, 2));
+console.log('=== 回答卡 ==='); console.log(JSON.stringify(card, null, 2));
+console.log('=== 输入区 ==='); console.log(JSON.stringify({ composer1, composer2 }, null, 2));
+console.log('=== 抽屉 ==='); console.log(JSON.stringify(drawer, null, 2));
+console.log('=== 深色 ==='); console.log(JSON.stringify(dark, null, 2));
+console.log('=== 断点 ==='); console.log(JSON.stringify({ two, phone }, null, 2));
 console.log('=== 断言 ===');
 let failed = 0;
 for (const r of results) {

@@ -38,9 +38,12 @@ describe('被审计的源文件确实是 UTF-8（前提校验）', () => {
 
   it('index.html 里的中文能按 UTF-8 正确还原（不被截断）', () => {
     const txt = readFileSync(join(root, 'index.html'), 'utf8');
-    // 完整短语；GB18030 误解码时末字会丢
-    expect(txt).toContain('按回车发送');
-    expect(txt).not.toContain('按回车发�');
+    // 完整短语；GB18030 误解码时末字会丢。
+    // 哨兵短语取自 AI 对话输入框的 placeholder（v2 改版后由「按回车发送」换成这句，
+    // 仍然是中文且以标点收尾，同样能抓住末字截断）。
+    expect(txt).toContain('问单词、要例句、分析错题…');
+    // 出现 U+FFFD 替换字符就说明被按错编码解过一次
+    expect(txt).not.toContain('�');
   });
 });
 
