@@ -59,6 +59,14 @@
   --text-sage:       var(--sage);
   --text-coral:      var(--coral);
 
+  /* ── AI 气泡（语义令牌） ──
+     用户气泡原先直接用 --sage 配白字，实测仅 4.05:1，低于 WCAG AA 正文 4.5:1；
+     改用深一档的 #4A6F93 后为 5.27:1。深色主题另给一套映射（见文件末尾 DARK THEME）。 */
+  --bubble-user-bg:     #4A6F93;
+  --bubble-user-text:   #FFFFFF;
+  --bubble-user-border: #4A6F93;
+  --bubble-ai-text:     var(--text);
+
   /* ── Background ── */
   --bg:              var(--ivory);
   --bg-warm:         var(--ivory-warm);
@@ -231,6 +239,13 @@
   --text-tertiary:   #707070;
   --text-ghost:      #505050;
   --text-inverse:    #1A1A1A;
+
+  /* ── AI 气泡（深色专项） ──
+     深色主题下 --sage 翻成 #7BA9CE，白字仅 2.50:1。改为浅蓝底配深色字（#0E141B）= 5.37:1。 */
+  --bubble-user-bg:     #5E8FB8;
+  --bubble-user-text:   #0E141B;
+  --bubble-user-border: #5E8FB8;
+  --bubble-ai-text:     var(--text);
 
   /* ── Background ── */
   --bg:              var(--ivory);

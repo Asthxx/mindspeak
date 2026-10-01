@@ -196,7 +196,7 @@
   display: flex;
   gap: 8px;
   font-size: var(--text-sm);
-  color: var(--text-base);
+  color: var(--text);
   line-height: 1.6;
 }
 .ai-tips li::before {
