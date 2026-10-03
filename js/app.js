@@ -7010,7 +7010,9 @@ App.prototype.resetData = function() {
       if (window.app.wordModule.wordProgress) window.app.wordModule.wordProgress = {};
     }
     window.__resettingData = true;
-    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
+    // 'items'/'item_buffs'/'voice_instant' 是已下线功能的键：功能不再读它们，
+    // 留在这里只为清掉旧用户 localStorage 里的残留（resetData 时统一 Storage.remove）。
+    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
     appKeys.forEach(function(k) { Storage.remove(k); });
     var _cats = DataStore.getDefaultWords().categories || [];
     for (var i = 0; i < _cats.length; i++) {

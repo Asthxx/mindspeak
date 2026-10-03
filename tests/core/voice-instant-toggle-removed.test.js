@@ -63,10 +63,24 @@ describe('手动覆盖的存储键已移除', () => {
     expect(fields[0], 'voiceInstant 不应再进备份').not.toContain("['voiceInstant'");
   });
 
-  it('resetData 的 appKeys 不再含 voice_instant', () => {
+  it('resetData 的 appKeys 保留 voice_instant 作旧数据清理', () => {
     const keys = app.match(/var appKeys = \[[\s\S]*?\];/);
     expect(keys, '未找到 appKeys').toBeTruthy();
-    expect(keys[0], 'voice_instant 不应再作为重置项').not.toContain("'voice_instant'");
+    // 功能已删除，但键要留在 appKeys 里 —— 与 eca274d 保留 'items'/'item_buffs'
+    // 的先例一致：旧用户 localStorage 中的残留键应由 resetData 清掉，
+    // 否则这些死键会长期留在一用户数据里。
+    expect(keys[0], 'voice_instant 应保留为旧数据清理项').toContain("'voice_instant'");
+  });
+
+  it('voice_instant 只出现在 appKeys 一处，不得有其它功能引用', () => {
+    // appKeys 是纯清理清单，读写都在 Storage.remove(appKeys) 里。
+    // 把它从 appKeys 之外抹掉，才能证明这个键确实只剩清理用途。
+    // 注释行要排除：说明性文字提到键名不算引用。
+    const code = app.split('\n')
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join('\n')
+      .replace(/var appKeys = \[[\s\S]*?\];/, 'var appKeys = [];');
+    expect(code, 'voice_instant 不应出现在 appKeys 之外的代码中').not.toContain('voice_instant');
   });
 });
 
