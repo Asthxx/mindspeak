@@ -824,6 +824,9 @@ var u;
         // 统一经 TTSManager.speak 朗读（内部 cancel + 100ms 后 speak，套用全局
         // 声音/语速/音调/音量）；重试换声时用 voice 覆盖。返回 null = 同步失败。
         u = TTSManager.speak(text, {
+          // 标记来源：SpeechUtil 已经按 instant 决策过声音，TTSManager 不得再把
+          // 决策委托回 SpeechUtil，否则 speak → _speakTTSOnline → speak 死循环。
+          fromSpeechUtil: true,
           voice: voice,
           rate: (opts && opts.rate) || settings.rate || TTSManager.rate,
           pitch: settings.pitch || TTSManager.pitch,

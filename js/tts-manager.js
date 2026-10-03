@@ -307,6 +307,21 @@ var TTSManager = (function() {
       // TTSManager.speak → 再次路由到同一个失败源的无限循环。
       var _vn = this._getVoiceName();
       var _hasRealVoice = !!(opts && opts.voice && typeof opts.voice === 'object' && opts.voice.name && typeof opts.voice.name === 'string');
+      // 系统默认（用户未在设置里选音色，voice_name 为空）时，下面的 voice_name 路由
+      // 整块被跳过，本方法直连 speechSynthesis 默认声；而其余功能走 SpeechUtil.speak，
+      // 会按 instant（= !(serverDown)）走 server SAPI / 在线引擎。两条独立路由因此
+      // 发出不同的声音，表现为"换了声音仍有页面不统一"（跟读 app.js:4855、字母朗读）。
+      // 在此把 instant 决策交回 SpeechUtil，收敛到单一事实来源。
+      //
+      // fromSpeechUtil 守卫（防无限循环）：SpeechUtil._speakTTSOnline（app.js:826）
+      // 会带着 onstart/onend/onerror 回调再次调用本方法；若此时再委托回 SpeechUtil，
+      // 就成了 speak → _speakTTSOnline → speak 的死循环。该来源一律直连
+      // speechSynthesis —— 那本就是 _speakTTSOnline 的最终兜底。
+      if (!_vn && !_hasRealVoice && !(opts && opts.fromSpeechUtil) && window.SpeechUtil) {
+        try { window.speechSynthesis.cancel(); } catch (_e) {}
+        try { window.SpeechUtil._stopLocalAudio(); } catch (_e) {}
+        return window.SpeechUtil.speak(text, lang, opts);
+      }
       if (_vn && !_hasRealVoice && window.SpeechUtil) {
         var _su = window.SpeechUtil;
         // 网页版/无后端（_serverDown=true）+ 用户选择了依赖 server 的男声
