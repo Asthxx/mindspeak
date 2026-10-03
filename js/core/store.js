@@ -47,7 +47,6 @@ window.UserState = (function() {
     voiceName: 'voice_name',
     voiceRate: 'voice_rate',
     voicePitch: 'voice_pitch',
-    voiceInstant: 'voice_instant',
     ttsVoice: 'tts_voice',
     navCollapsed: 'nav_collapsed',
     onboardingDone: 'onboarding_done',

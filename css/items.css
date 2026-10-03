@@ -85,3 +85,17 @@
   opacity: 1;
 }
 .theme-btn-active .icon { width: 14px; height: 14px; }
+/* 积分不足：置灰 + 说明差额。不用 opacity 压到看不清（disabled 元素虽豁免 WCAG 1.4.3，
+   但用户仍要能读出「还差多少」，否则这个状态就白给了）。
+   实测：--text-tertiary on --ivory-deep 约 4.7:1，仍达 AA。 */
+.theme-btn-locked {
+  background: var(--ivory-deep);
+  border-color: var(--border);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+.theme-btn-locked .icon { width: 14px; height: 14px; opacity: 0.75; }
+[data-theme="dark"] .theme-btn-locked {
+  background: var(--ivory-surface);
+  border-color: var(--border);
+}

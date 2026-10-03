@@ -154,7 +154,8 @@
 .ai-hist-del {
   flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px;
+  /* 原 28×28 低于 WCAG 2.5.8 的 24px 目标尺寸余量，触屏尤其难点中；提到 36（移动端 40） */
+  width: 36px; height: 36px;
   border: 0; background: none; border-radius: var(--radius-xs);
   color: var(--ai-text-3);
   opacity: 0;
@@ -556,6 +557,8 @@
   font-size: var(--ai-fs-chip); font-weight: var(--weight-medium);
 }
 .ai-set-link:hover { text-decoration: underline; }
+/* 深色下 --ai-brand-strong(=--sage-muted) 在卡片底仅 4.39:1，改用更亮的 --sage-deep（8.34:1） */
+[data-theme="dark"] .ai-set-link { color: var(--sage-deep); }
 
 /* ---------- 9. 兼容保留：legacy 回复与旧 DOM 仍在用的类 ---------- */
 /* 规则兜底 / LLM 纯文本回复走 legacy 分支时，行内按钮还是这两类 */

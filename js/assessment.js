@@ -377,10 +377,31 @@ var AssessmentModule = (function() {
     this._route('welcome');
   };
 
+  // 词库未就绪时的就地 loading：把"等待"这件事挂在用户刚点的那个按钮上，
+  // 比弹一条飘在右上角的提示更贴近操作点，也不会重复堆叠。
+  AssessmentModule.prototype._libraryBusy = function(on) {
+    var btn = document.getElementById('btn-assessment-start');
+    if (!btn) return;
+    if (on) {
+      if (btn.getAttribute('data-orig-html') === null) btn.setAttribute('data-orig-html', btn.innerHTML);
+      btn.disabled = true;
+      btn.classList.add('is-loading');
+      btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> 词库加载中…';
+    } else {
+      clearTimeout(this._libWaitTimer);
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      var orig = btn.getAttribute('data-orig-html');
+      if (orig !== null) { btn.innerHTML = orig; btn.removeAttribute('data-orig-html'); }
+    }
+  };
+
   AssessmentModule.prototype.close = function() {
     var modal = document.getElementById('assessment-modal');
     if (modal) modal.classList.add('hidden');
     this._open = false;
+    // 关闭时收掉等待态，否则按钮会一直停在"词库加载中…"且定时器还在跑
+    this._libraryBusy(false);
     this._stopListen();
     if (this._recognition) { try { this._recognition.abort(); } catch(e) {} this._recognition = null; }
   };
@@ -397,13 +418,17 @@ var AssessmentModule = (function() {
     this._finished = false;
     // 词库脚本（data/all-data.js 等）async 加载中（手机/慢网首开）：
     // DOMContentLoaded 不再被 9.8MB 数据阻塞、页面立即可用，但点「开始测评」时词库
-    // 可能尚未就绪 → 提示加载中并自动重试，而非直接报"词库数据为空"
+    // 可能尚未就绪 → 自动重试，而非直接报"词库数据为空"。
+    // 状态放在触发按钮上（就地 loading），不再每 0.8 秒弹一条 toast：
+    // 慢机首开要等 8 秒，旧写法会堆出约 10 条一模一样的提示把整屏糊住。
     if (typeof WORD_LIBRARY === 'undefined' || !WORD_LIBRARY.categories || WORD_LIBRARY.categories.length === 0) {
-      Toast.info('词库加载中，请稍候…');
       var self = this;
-      setTimeout(function() { self.start(); }, 800);
+      this._libraryBusy(true);
+      clearTimeout(this._libWaitTimer);
+      this._libWaitTimer = setTimeout(function() { self.start(); }, 800);
       return;
     }
+    this._libraryBusy(false);
     var includePron = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     var made = AssessmentEngine.createPaper({ includePron: includePron });
     if (!made.questions || !made.questions.length) {

@@ -87,17 +87,31 @@ describe('SpeechUtil.getSettings — Stale Cache Bug（核心Bug验证）', () =
     expect(s2.pitch).toBe(1.5);
   });
 
-  it('should_return_fresh_instant_after_localStorage_change', () => {
+  it('should_derive_instant_from_server_reachability_not_storage', () => {
     const su = globalThis.SpeechUtil;
-    // Set serverDown so instant defaults to false
-    su._serverDown = true;
-    ls.setItem('voice_instant', '1');
-    const s = su.getSettings();
-    expect(s.instant).toBe(true);
+    // 「本地即时语音」开关已下线（方案 A）：instant 不再有用户手动覆盖，
+    // 恒等于 !(serverDown) —— 探测到本机 server 就走零延迟本地朗读。
+    su._serverDown = false;
+    expect(su.getSettings().instant).toBe(true);
 
+    su._serverDown = true;
+    expect(su.getSettings().instant).toBe(false);
+
+    su._serverDown = false;
+    expect(su.getSettings().instant).toBe(true);
+  });
+
+  it('should_ignore_legacy_voice_instant_storage_key', () => {
+    const su = globalThis.SpeechUtil;
+    // 旧用户 localStorage 可能残留 voice_instant='0'；方案 A 不再读它，
+    // 否则会给看不见的开关留后门，导致新旧用户行为不一致且无法解释。
     ls.setItem('voice_instant', '0');
-    const s2 = su.getSettings();
-    expect(s2.instant).toBe(false);
+    su._serverDown = false;
+    expect(su.getSettings().instant).toBe(true);
+
+    ls.setItem('voice_instant', '1');
+    su._serverDown = true;
+    expect(su.getSettings().instant).toBe(false);
   });
 
   it('should_default_rate_to_0_9_when_missing', () => {

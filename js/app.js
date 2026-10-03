@@ -108,21 +108,53 @@ var Toast = {
     if (this.container) return;
     this.container = document.createElement('div');
     this.container.className = 'toast-container';
+    // 读屏可达：原先容器没有任何 live region 语义，读屏用户完全收不到操作结果反馈。
+    // polite 不打断当前朗读；error 级在下面单独标 role="alert" 立即播报。
+    this.container.setAttribute('role', 'status');
+    this.container.setAttribute('aria-live', 'polite');
     document.body.appendChild(this.container);
   },
   show: function(message, type, duration) {
     this.init();
     type = type || 'info';
     duration = duration || 3000;
+    // 同文案去重：轮询类提示（如"词库加载中…"每 0.8 秒重试一次）会在 8 秒内
+    // 堆出 10 条一模一样的 toast，把整个界面糊住。已存在的同文案提示改为
+    // 重置倒计时，而不是再叠一条。
+    var key = type + '|' + message;
+    if (!this._live) this._live = {};
+    var existing = this._live[key];
+    if (existing && existing.el && existing.el.isConnected) {
+      this._bump(existing, duration);
+      return;
+    }
     var toast = document.createElement('div');
     toast.className = 'toast toast-' + type;
+    if (type === 'error') toast.setAttribute('role', 'alert');
     toast.innerHTML = '<span class="toast-message">' + escapeHtml(message) + '</span>';
     this.container.appendChild(toast);
     requestAnimationFrame(function() { toast.classList.add('toast-show'); });
-    setTimeout(function() {
-      toast.classList.remove('toast-show');
-      toast.classList.add('toast-hide');
-      setTimeout(function() { toast.remove(); }, 300);
+    var rec = { el: toast, hideTimer: 0, removeTimer: 0 };
+    this._live[key] = rec;
+    this._bump(rec, duration);
+  },
+  // 重置（或首次设置）某条 toast 的隐藏倒计时
+  _bump: function(rec, duration) {
+    var self = this;
+    clearTimeout(rec.hideTimer);
+    clearTimeout(rec.removeTimer);
+    rec.el.classList.remove('toast-hide');
+    rec.hideTimer = setTimeout(function() {
+      rec.el.classList.remove('toast-show');
+      rec.el.classList.add('toast-hide');
+      rec.removeTimer = setTimeout(function() {
+        rec.el.remove();
+        if (self._live) {
+          Object.keys(self._live).forEach(function(k) {
+            if (self._live[k] === rec) delete self._live[k];
+          });
+        }
+      }, 300);
     }, duration);
   },
 success: function(msg) { this.show(msg, 'success'); },
@@ -146,6 +178,11 @@ var ConfirmBox = {
     var el = document.createElement('div');
     el.className = 'modal hidden';
     el.id = 'modal-confirm';
+    // 对话框语义：原本只是一个 div，读屏用户不知道弹出了对话框，
+    // 也无从得知标题；aria-labelledby 指向标题，配合 aria-modal 让读屏只播报弹窗内容。
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'confirm-title');
     el.innerHTML =
       '<div class="modal-content" style="width:400px">' +
         '<h3 id="confirm-title">请确认</h3>' +
@@ -159,6 +196,22 @@ var ConfirmBox = {
     el.addEventListener('click', function(e) { if (e.target === el) self.close(false); });
     document.getElementById('confirm-cancel').addEventListener('click', function() { self.close(false); });
     document.getElementById('confirm-ok').addEventListener('click', function() { self.close(true); });
+    // ESC 关闭 + 焦点圈定在弹窗内。
+    // 原来只有侧边抽屉做了这两件事，确认框既不能按 Esc 取消，Tab 也会跑到背后的页面上，
+    // 键盘用户在"清空错题本 / 重置所有数据"这类危险确认里很容易误触。
+    document.addEventListener('keydown', function(e) {
+      var box = document.getElementById('modal-confirm');
+      if (!box || box.classList.contains('hidden')) return;
+      if (e.key === 'Escape') { e.preventDefault(); self.close(false); return; }
+      if (e.key !== 'Tab') return;
+      var focusables = box.querySelectorAll('button:not(.hidden)');
+      if (!focusables.length) return;
+      var first = focusables[0];
+      var last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (document.activeElement !== first && document.activeElement !== last) { e.preventDefault(); first.focus(); }
+    });
   },
   confirm: function(message, onOk, opts) {
     this.init();
@@ -230,22 +283,18 @@ var SpeechUtil = {
       this._unlocked = true;
     } catch(e) {}
   },
-  // 朗读设置缓存：voice_name（预设声音名称）、voice_rate（语速）、voice_pitch（音调）、
+// 朗读设置缓存：voice_name（预设声音名称）、voice_rate（语速）、voice_pitch（音调）、
   // instant（是否本地即时语音：不依赖在线连接，用 server SAPI 合成，几乎零延迟）
-getSettings: function() {
+  getSettings: function() {
     // 每次从 localStorage 实时读取，避免缓存过期导致声音切换不生效。
     // getSettings() 调用频率低（仅朗读/设置页），无需缓存优化。
-    var hasInstant = false;
-    try { hasInstant = (window.localStorage.getItem('voice_instant') !== null); } catch(e) {}
-    var instant;
-    if (hasInstant) instant = Storage.get('voice_instant', '1') === '1';
-    else instant = !(this._serverDown === true);
+    // instant 不再由用户手动拨动，恒等于「本机 server 是否可达」：
+    // 探测到就零延迟本地朗读，探测不到就走在线引擎。
     var s = {
       voiceName: Storage.get('voice_name', ''),
       rate: parseFloat(Storage.get('voice_rate', '')) || 0.9,
       pitch: parseFloat(Storage.get('voice_pitch', '')) || 1,
-      instant: instant,
-      _defaultInstant: !hasInstant
+      instant: !(this._serverDown === true)
     };
     this._settings = s;
     return s;
@@ -313,15 +362,13 @@ getSettings: function() {
         .then(function() { done(); });
     } catch(e) { self._serverDown = true; done(); }
   },
-  // 探测结果落地：仅影响"用户没手动设过"的默认即时语音开关；降级时轻提示一次
+  // 探测结果落地：把 instant 同步为「server 是否可达」；降级时轻提示一次
   _syncInstantDefault: function() {
     var s = this._settings;
-    if (!s || !s._defaultInstant) return;
+    if (!s) return;
     var target = !(this._serverDown === true);
     if (s.instant === target) return;
     s.instant = target;
-    var el = document.getElementById('voice-instant');
-    if (el) el.checked = target;
     if (this._serverDown === true && !this._probeNotifyShown) {
       this._probeNotifyShown = true;
       var localBase = window.Env.getLocalBase();
@@ -606,7 +653,14 @@ _speakTTS: function(text, lang, opts) {
     // 点击即读；只有 server 不可用时才回退在线声，避免 file:// 没开 server 时完全静默。
     // 已探测到 server 不可达（_serverDown=true）→ 直接走在线音而不进 SAPI，
     // 避免每次点击都先把请求打到死端口上、等超时才降级。
-    if (settings.instant && !(this._serverDown === true)) {
+    // 本地即时语音（不再有手动开关，由 server 可达性自动决定）：不走在线引擎，
+    // 直接用 server SAPI（离线、缓存后几乎零延迟）。
+    // 点击即读；只有 server 不可用时才回退在线声，避免 file:// 没开 server 时完全静默。
+    // 已探测到 server 不可达（_serverDown=true）→ 直接走在线音而不进 SAPI，
+    // 避免每次点击都先把请求打到死端口上、等超时才降级。
+    // 选了具体音色（voiceName 非空）时以所选音色为准，不进本分支——
+    // 否则「在线语音切换」会失效：选了什么音色读出来都是本地声。
+    if (settings.instant && !(this._serverDown === true) && !settings.voiceName) {
       this._stopLocalAudio();
       var instOpts = {};
       if (opts) for (var k in opts) instOpts[k] = opts[k];
@@ -1486,8 +1540,8 @@ _markOnlineBroken: function() {
     }
   },
   // 本地即时语音的预合成：翻卡/列词表时后台让 server 把即将点击的词先合成好
-  // （HEAD 请求只触发 server 缓存，不下载音频、不出声）。勾选了「本地即时语音」
-  // 后调用，确保点击即出声。并发限制 2，避免一次起太多 PowerShell 合成进程。
+  // （HEAD 请求只触发 server 缓存，不下载音频、不出声）。处于本地即时语音
+  // （即 server 可达）时调用，确保点击即出声。并发限制 2，避免一次起太多 PowerShell 合成进程。
   prefetch: function(words) {
     var self = this;
     if (!this.getSettings().instant) return;
@@ -1748,6 +1802,21 @@ var Storage = {
 var DataStore = {
   getDefaultWords: function() {
     var lib = typeof WORD_LIBRARY !== 'undefined' && WORD_LIBRARY ? WORD_LIBRARY : {};
+    // 一次性清洗：部分词库条目的 chinese / example_cn / example 里残留字面 "\n"（反斜杠+n 两个字符，
+    // 数据源双转义所致），渲染时会原样显示成「v become dark\nv tarnish」。
+    // 中文释义的义项分隔替换为「；」，英文例句替换为 "; "。lib 是全局单例，清洗一次即可。
+    if (lib && typeof lib === 'object' && !lib._nsCleaned) {
+      (lib.categories || []).forEach(function(c) {
+        (c && c.words || []).forEach(function(w) {
+          ['chinese', 'example_cn', 'example'].forEach(function(k) {
+            if (typeof w[k] === 'string' && w[k].indexOf('\\n') !== -1) {
+              w[k] = w[k].replace(/\\n/g, k === 'example' ? '; ' : '；');
+            }
+          });
+        });
+      });
+      lib._nsCleaned = true;
+    }
     // 统一归一化：categories 缺失/非数组、单分类缺 words 时全部兜底，防各模块 init 崩溃
     var cats = Array.isArray(lib.categories) ? lib.categories : [];
     cats = cats.map(function(c) { return (c && typeof c === 'object') ? c : { name: '未知分类', words: [] }; });
@@ -2220,6 +2289,15 @@ function WordModule() {
     safeBind('word-category', 'change', function(e) { self.selectCategory(e.target.value); });
     safeBind('btn-add-word', 'click', function() { self.showAddModal(); });
     safeBind('btn-reset-card-pos', 'click', function() { self.resetCardPos(); });
+    // 移动端「更多工具」折叠：桌面端该按钮不显示、extra 用 display:contents 平铺，
+    // 因此这里只在按钮存在且可见时才有意义。
+    safeBind('btn-word-tools', 'click', function() {
+      var box = document.getElementById('word-tools-extra');
+      var btn = document.getElementById('btn-word-tools');
+      if (!box || !btn) return;
+      var open = box.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
     // 跳页输入：点“跳转”按钮或回车都直接跳到输入序号对应的卡片（1 基）
     safeBind('btn-jump-word', 'click', function() { self.jumpWord(); });
     var jumpInput = document.getElementById('word-jump-input');
@@ -5398,6 +5476,20 @@ var ChartModule = (function() {
 
 // ==================== 学习数据分析 ====================
 var AnalysisModule = (function() {
+  // 零值弱化（UI 审查 P0-5）：0 = 还没有数据。
+  // 原先 0 与真实数据共用同一套「2.2rem 渐变强调字 + 卡片顶部彩色条」，
+  // 新用户第一屏就是四个彩色条的 0，看起来信息很满，实际什么都没有，
+  // 而且红色/琥珀色的顶条还容易被读成"警告"。0 值改中性：字降为 tertiary，顶条改中性灰。
+  function setReportValue(id, val) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val;
+    var zero = Number(val) === 0;
+    el.classList.toggle('is-zero', zero);
+    var card = el.closest ? el.closest('.report-card, .stat-card') : null;
+    if (card) card.classList.toggle('is-zero', zero);
+  }
+
   function AnalysisModule() { this.render(); }
   AnalysisModule.prototype.render = function() {
     var checkins = DataStore.getProgress('checkins', {});
@@ -5408,11 +5500,11 @@ var AnalysisModule = (function() {
     var today = getLocalDateStr();
     var todayCount = checkins[today] || 0;
     var streak = calculateStreak(checkins);
-    document.getElementById('rpt-today').textContent = todayCount;
-    document.getElementById('rpt-streak').textContent = streak;
-    document.getElementById('rpt-total-words').textContent = totalWords;
+    setReportValue('rpt-today', todayCount);
+    setReportValue('rpt-streak', streak);
+    setReportValue('rpt-total-words', totalWords);
     var totalDays = Object.keys(checkins).filter(function(k) { return checkins[k] > 0; }).length;
-    document.getElementById('rpt-total-days').textContent = totalDays;
+    setReportValue('rpt-total-days', totalDays);
     this.renderAnalysis(checkins, totalWords, streak, learnedWords);
   };
   AnalysisModule.prototype.renderAnalysis = function(checkins, totalWords, streak, learnedWords) {
@@ -5686,9 +5778,21 @@ App.prototype._initAndroidBackHandler = function() {
       sidebar.classList.remove('open');
       return;
     }
-    var modal = document.querySelector('.modal-overlay.active');
+    // 原选择器 `.modal-overlay.active` 是死代码：这个类在全项目从未出现过，
+    // 真正的项目弹窗是 ConfirmBox 建的 `#modal-confirm.modal.hidden`。
+    // 后果是"清空错题本 / 重置所有数据"的确认框开着时按返回键，找不到弹窗 →
+    // 直接落到"再按一次退出"，App 被退掉而弹窗还悬着。
+    // 改成按真实形态查找，并优先走 ConfirmBox.close(false)（等价于点「取消」，
+    // 回调语义正确），其它可见 .modal 兜底隐藏。
+    var confirmEl = document.getElementById('modal-confirm');
+    if (confirmEl && !confirmEl.classList.contains('hidden')) {
+      if (typeof ConfirmBox !== 'undefined' && ConfirmBox) ConfirmBox.close(false);
+      else confirmEl.classList.add('hidden');
+      return;
+    }
+    var modal = document.querySelector('.modal:not(.hidden)');
     if (modal) {
-      modal.classList.remove('active');
+      modal.classList.add('hidden');
       return;
     }
     // 不能用 history.length 判断"还能不能退"：它只增不减，抽屉用过一次后
@@ -5713,6 +5817,18 @@ App.prototype._initAndroidBackHandler = function() {
 };
 App.prototype.showTab = function(tab) {
   this.currentTab = tab;
+  // 滚动复位：.content 是 20 个 .page 共用的唯一滚动容器，切页时不复位会导致
+  // 从滚到底部的长页（设置/错题本）切到别的页时，新页直接停在半空、标题与主操作
+  // 都在视口外，用户会误判成"页面没加载完"。
+  // 按 tab 记忆/还原滚动位置：从当前页离开时记住，回来时还原（长列表页体验更好）。
+  if (!this._scrollMemo) this._scrollMemo = {};
+  var _scroller = document.getElementById('main-content');
+  if (_scroller) {
+    if (this._lastTab && this._lastTab !== tab) this._scrollMemo[this._lastTab] = _scroller.scrollTop;
+    var _restore = (tab === this._lastTab) ? null : this._scrollMemo[tab];
+    _scroller.scrollTop = (typeof _restore === 'number' && _restore > 0) ? _restore : 0;
+  }
+  this._lastTab = tab;
   // 移动端：选中后自动收起抽屉导航，并回收 Android 返回键占用的 history 状态
   if (this._drawerEls && this._drawerEls.sidebar) {
     this._drawerEls.sidebar.classList.remove('open');
@@ -6018,12 +6134,6 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
   var voiceRateSelect = document.getElementById('voice-rate');
   if (voiceSelect) {
     var voiceSettings = SpeechUtil.getSettings();
-    // 存了具体声音 → 朗读必须用它：默认不进入「本地即时语音」（即时模式走 server SAPI，
-    // 不认所选声音，会让"在线语音切换"失效——选了什么音色读出来都是本地声）
-    if (voiceSettings.voiceName) {
-      voiceSettings.instant = false;
-      Storage.set('voice_instant', '0');
-    }
     var MALE_KEYS = ['david','mark','guy','james','george','daniel','alex','fred','peter','steffan','michael','samuel','ryan','thomas','aaron','oliver','toby','will','william','sebastian','simon','steven','victor','paul','roman','male'];
     var FEMALE_KEYS = ['zira','aria','jenny','samantha','susan','hazel','heera','neerja','female','laura','linda','lisa','michelle','natasha','nicole','rachel','rebecca','ruby','sally','victoria','hannah','emma','olivia','ava','sophia','mia','charlotte','amelia','jessica','amy','kate','karen','sarah','anna','megan','julia','lily','grace','lucy','joanna','kimberly','libby','lydia','mary','millie','molly','niamh','piper','serena','sonia','tessa','tina','wendy'];
     function guessVoiceGender(v) {
@@ -6124,8 +6234,8 @@ function fillVoiceOptions() {
       return map[v] || fallback || v;
     }
     fillVoiceOptions();
-    // 探测本地 server 是否可达：不可达时自动关闭「本地即时语音」默认值，
-    // 改用浏览器语音（修复 GitHub Pages/手机场景下朗读必弹"server 未运行"红错的根因）
+    // 探测本地 server 是否可达：不可达时自动改用浏览器语音
+    // （修复 GitHub Pages/手机场景下朗读必弹"server 未运行"红错的根因）
     SpeechUtil._probeServer();
     // Chrome/Firefox 的 voices 列表是异步加载的，加载完成后重新填充
     if ('speechSynthesis' in window) window.speechSynthesis.onvoiceschanged = fillVoiceOptions;
@@ -6136,12 +6246,10 @@ function fillVoiceOptions() {
       // 统一经 TTSManager 记录所选声音（localStorage tts_voice + 全局 voice），
       // 保证朗读/试听立即使用刚选的声音
       TTSManager.setVoice(name);
-      // 选了具体声音 → 退出「本地即时语音」，让所选声音真正生效（朗读与试听都用它）；
+      // 选了具体声音即视为用户明确指定音色，朗读路由会以它为准（见 speak() 的
+      // !settings.voiceName 守卫），这里无需再改 instant。
       // 清掉本会话"在线不可用"标记，给新选择一次尝试机会。
-if (name) {
-        voiceSettings.instant = false;
-        Storage.set('voice_instant', '0');
-        if (voiceInstant) voiceInstant.checked = false;
+      if (name) {
         SpeechUtil._onlineBroken = false;
         SpeechUtil._onlineBrokenAt = undefined;
         // 切换声音是明确的用户意图：清掉旧链路的"在线尝试挂起"标记，
@@ -6179,24 +6287,7 @@ if (name) {
       else Toast.success('已保存声音选择（当前设备暂无此声音，将自动选用可用语音）');
     });
   }
-  // 「本地即时语音」开关：勾选后朗读改走 server SAPI（离线、几乎零延迟）
-  var voiceInstant = document.getElementById('voice-instant');
-  if (voiceInstant) {
-    voiceInstant.checked = !!(voiceSettings && voiceSettings.instant);
-    voiceInstant.addEventListener('change', function() {
-      voiceSettings.instant = this.checked;
-      Storage.set('voice_instant', this.checked ? '1' : '0');
-      if (this.checked) {
-        // 回到本地即时语音：清掉具体声音选择（SAPI 朗读不认所选声音，留着会误导）
-        voiceSettings.voiceName = '';
-        Storage.set('voice_name', '');
-        TTSManager.setVoice('');
-        if (voiceSelect) voiceSelect.value = '';
-      }
-      SpeechUtil.updateSettings(voiceSettings);
-      Toast.success(this.checked ? '已切换为本地即时语音（零延迟，不依赖网络）' : '已切换为在线自然声（音色好，点击略有延迟）');
-    });
-  }
+  
   if (voiceRateSelect) {
     voiceRateSelect.value = String(parseFloat(Storage.get('voice_rate', '')) || 0.9);
     voiceRateSelect.addEventListener('change', function() {
@@ -6300,7 +6391,7 @@ if (name) {
     ['gamification','gamification',{},false], ['phoneticProgress','phonetic_progress',{},false],
     ['pkHistory','pk_history',[],false], ['wordCardPos','word_card_pos',{},false], ['checkins','checkins',{},false],
     ['voiceName','voice_name','',false], ['voiceRate','voice_rate','',false],
-    ['voicePitch','voice_pitch','',false], ['voiceInstant','voice_instant','1',false],
+    ['voicePitch','voice_pitch','',false],
     ['ownedThemes','owned_themes',{},false], ['appliedTheme','applied_theme','',false],
     ['dailyGoal','daily_goal',10,false], ['theme','theme','',false], ['themeColor','theme_color','',false],
     ['customThemeColor','custom_theme_color','',false], ['customBgOpacity','custom_bg_opacity',30,false],
@@ -6919,7 +7010,7 @@ App.prototype.resetData = function() {
       if (window.app.wordModule.wordProgress) window.app.wordModule.wordProgress = {};
     }
     window.__resettingData = true;
-    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
+    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
     appKeys.forEach(function(k) { Storage.remove(k); });
     var _cats = DataStore.getDefaultWords().categories || [];
     for (var i = 0; i < _cats.length; i++) {

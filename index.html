@@ -268,6 +268,11 @@
         <svg class="nav-chevron"" aria-hidden="true" focusable="false"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg>
       </button>
       <div class="nav-group-items" id="group-train-items" role="group" aria-labelledby="group-train-title">
+      <!-- 与移动端底部「练习」Tab 同源：两套导航指向同一聚合页，避免用户按不同入口得到不同结果 -->
+      <button type="button" class="nav-btn" data-tab="practice">
+        <svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg>
+        <span class="label">练习中心</span>
+      </button>
       <button type="button" class="nav-btn" data-tab="spelling">
         <svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-spellcheck" xlink:href="#i-spellcheck"/></svg>
         <span class="label">拼写测试</span>
@@ -394,7 +399,10 @@
             <div class="dp-progress" role="progressbar" aria-label="词库掌握进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="dp-bar-fill dash-master-bar" id="dash-master-bar"></div></div>
           </div>
           <div class="dash-actions">
-            <button type="button" class="btn btn-primary btn-sm" data-goto="word"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-translate" xlink:href="#i-translate"/></svg> 去背单词</button>
+            <!-- 首屏主操作唯一（P0-3）：原「去背单词」与右上「开始学习」都是 btn-primary 且
+                 都执行 showTab('word')，首屏出现两个蓝色主按钮让用户无谓取舍。
+                 这里降为默认 .btn，与同组的「开始复习」「词文串学」同级。 -->
+            <button type="button" class="btn btn-sm" data-goto="word"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-translate" xlink:href="#i-translate"/></svg> 去背单词</button>
             <button type="button" class="btn btn-sm" id="btn-dash-review"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 开始复习</button>
             <button type="button" class="btn btn-sm" data-goto="story"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-book" xlink:href="#i-book"/></svg> 词文串学</button>
           </div>
@@ -421,7 +429,8 @@
             <h3 class="dash-card-title" style="margin-bottom:var(--sp-2)"><svg class="icon icon-sm icon-sage" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 还不知道自己的水平？</h3>
             <p style="color:var(--text-secondary);font-size:var(--text-sm)">花 5-8 分钟做一次能力测评，了解词汇 / 语法 / 听力 / 发音 / 阅读水平，生成专属学习计划</p>
           </div>
-          <button type="button" class="btn btn-primary" data-ob-assess><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 立即测一测</button>
+          <!-- 次级即可：这张卡的标题 + 描述已承担召唤，首屏唯一的蓝色主按钮留给「开始学习」 -->
+          <button type="button" class="btn" data-ob-assess><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 立即测一测</button>
         </div>
       </div>
     </section>
@@ -612,8 +621,13 @@
           <button class="view-btn" id="btn-view-list" title="列表视图"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-list" xlink:href="#i-list"/></svg></button>
         </div>
         <button class="btn-sm learn-selected-toggle" id="btn-learn-selected" title="开启后卡片只学勾选过的词；勾选在列表视图中进行"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-check" xlink:href="#i-check"/></svg> 精选学习 <span id="learn-selected-count" class="learn-selected-count">0</span></button>
-        <button class="btn-sm" id="btn-add-word"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-add" xlink:href="#i-add"/></svg> 添加新词</button>
-        <button class="btn-sm" id="btn-reset-card-pos" title="把当前词库的翻页位置重置到第 1 张"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 重置翻页进度</button>
+        <!-- 低频工具：桌面端 display:contents 与改动前布局完全一致；
+             移动端（≤768px）收进折叠区，避免 5 组控件占满首屏把单词卡挤出去。 -->
+        <button class="btn-sm word-tools-toggle" id="btn-word-tools" type="button" aria-expanded="false" aria-controls="word-tools-extra"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-settings" xlink:href="#i-settings"/></svg> 更多工具</button>
+        <div class="word-tools-extra" id="word-tools-extra">
+          <button class="btn-sm" id="btn-add-word"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-add" xlink:href="#i-add"/></svg> 添加新词</button>
+          <button class="btn-sm" id="btn-reset-card-pos" title="把当前词库的翻页位置重置到第 1 张"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-refresh" xlink:href="#i-refresh"/></svg> 重置翻页进度</button>
+        </div>
       </div>
 
       <div class="card-area">
@@ -1502,10 +1516,6 @@
             <option value="">系统默认</option>
           </select>
         </label>
-        <label>
-          <input type="checkbox" id="voice-instant">
-          <span>本地即时语音（零延迟，点击立即出声）</span>
-        </label>
         <label class="voice-field">
           朗读语速：
           <select id="voice-rate">
@@ -1523,7 +1533,7 @@
           </select>
         </label>
         <button class="btn btn-sm btn-primary" id="btn-voice-test"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-volume" xlink:href="#i-volume"/></svg> 试听声音</button>
-        <p style="margin:var(--sp-3) 0 0;font-size:0.78rem;color:var(--text-tertiary);line-height:1.6">可选<b>在线音色</b>（百度/有道/谷歌，需联网，听觉一致、手机/网页同样生效）：百度·美音国内直连最快；有道美音/英音国内直连；谷歌音色多（美/英/澳）但国内手机可能连不上。也可选<b>系统声音</b>：取决于你的设备（Windows 通常有 David 男声 / Zira、Aria 女声，Chrome 有 Google 合成音）。切换后对背单词、随声听、听力等所有朗读生效。<br>在线自然声音色好，但每次点击需连服务器（约 0.5~1 秒）；勾选「本地即时语音」则用系统自带语音，几乎零延迟、不依赖网络。</p>
+        <p style="margin:var(--sp-3) 0 0;font-size:0.78rem;color:var(--text-tertiary);line-height:1.6">可选<b>在线音色</b>（百度/有道/谷歌，需联网，听觉一致、手机/网页同样生效）：百度·美音国内直连最快；有道美音/英音国内直连；谷歌音色多（美/英/澳）但国内手机可能连不上。也可选<b>系统声音</b>：取决于你的设备（Windows 通常有 David 男声 / Zira、Aria 女声，Chrome 有 Google 合成音）。切换后对背单词、随声听、听力等所有朗读生效。<br>在线自然声音色好，但每次点击需连服务器（约 0.5~1 秒）；若本机部署了本地服务，则自动改用系统自带语音，几乎零延迟、不依赖网络，无需手动开关。</p>
       </div>
 
       <div class="settings-group">
@@ -1717,13 +1727,67 @@
       <div class="search-hint" id="search-hint">输入关键词开始查询，支持英文和中文模糊搜索</div>
       <div class="search-results hidden" id="search-results"></div>
     </section>
+
+    <!-- 练习中心：移动端底部「练习」Tab 的落点。
+         原来该 Tab 直接打开「语法练习」，用户会形成「练习=语法」的错误心智模型，
+         找不到拼写/听力/阅读/PK。改为聚合页后，8 个训练入口一次可见。
+         按钮复用 data-goto，由 dashboard.js 的文档级委托统一处理跳转。 -->
+    <section id="page-practice" class="page" aria-labelledby="practice-title">
+      <h2 id="practice-title"><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 练习中心</h2>
+      <p class="practice-sub">选一种方式开始练习，题目全部来自你的词库与错题本</p>
+      <div class="practice-grid">
+        <button type="button" class="practice-btn" data-goto="spelling">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-spellcheck"/></svg></span>
+          <span class="practice-name">拼写测试</span>
+          <span class="practice-desc">看中文写英文、听音写词</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="listening">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-headphones"/></svg></span>
+          <span class="practice-name">听力训练</span>
+          <span class="practice-desc">听单词拼写、听句填空</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="reading">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-article"/></svg></span>
+          <span class="practice-name">阅读训练</span>
+          <span class="practice-desc">分级文章 + 理解题</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="grammar">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-edit"/></svg></span>
+          <span class="practice-name">语法练习</span>
+          <span class="practice-desc">选择、填空、句型变换</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="context">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-text"/></svg></span>
+          <span class="practice-name">语境填空</span>
+          <span class="practice-desc">在句子里选对单词</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="pk">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trophy"/></svg></span>
+          <span class="practice-name">单词 PK</span>
+          <span class="practice-desc">限时抢答，练反应速度</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="speak">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-mic"/></svg></span>
+          <span class="practice-name">跟读练习</span>
+          <span class="practice-desc">朗读并对比发音</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="mistake-train">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></span>
+          <span class="practice-name">错词强化</span>
+          <span class="practice-desc">只练你错过的词</span>
+        </button>
+      </div>
+    </section>
   </main>
 
   <!-- 移动端底部导航（App 级，仅 ≤768px 显示，桌面端隐藏） -->
   <nav class="bottom-nav" id="bottom-nav" aria-label="底部导航">
+    <!-- 底部导航：标签必须与打开的页面一致。原「学习」直达背单词、「练习」直达语法练习，
+         用户会误以为「练习」就是语法，找不到拼写/听力/阅读/PK 等其它训练入口。
+         「背单词」保留直达（最高频），「练习」指向新增的练习中心聚合页。 -->
     <button type="button" class="bottom-nav-btn active" data-tab="home" aria-current="page"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-chart" xlink:href="#i-chart"/></svg><span>首页</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="word"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-book" xlink:href="#i-book"/></svg><span>学习</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="grammar"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-edit" xlink:href="#i-edit"/></svg><span>练习</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="word"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-book" xlink:href="#i-book"/></svg><span>背单词</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="practice"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg><span>练习</span></button>
     <button type="button" class="bottom-nav-btn" data-tab="settings"><svg class="icon"" aria-hidden="true" focusable="false"><use href="#i-user" xlink:href="#i-user"/></svg><span>我的</span></button>
   </nav>
 

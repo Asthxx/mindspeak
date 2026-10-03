@@ -334,6 +334,12 @@ var DashboardModule = (function () {
     if (!el) return;
     var text = String(val);
     if (el.textContent !== text) el.textContent = text;
+    // 零值弱化（UI 审查 P0-5）：0 表示"还没有数据"，不该和有值数据一样顶着
+    // 24px 粗体去争夺注意力 —— 色彩与字重只在"有值"时才承担强调语义。
+    // 只作用于统计数字，避免误伤日期、说明文案等同样走 _setText 的元素。
+    if (el.classList && el.classList.contains('dash-stat-num')) {
+      el.classList.toggle('is-zero', Number(val) === 0);
+    }
   };
 
   // 进度条：视觉宽度 + 无障碍数值同步更新（role=progressbar 由 HTML 声明）

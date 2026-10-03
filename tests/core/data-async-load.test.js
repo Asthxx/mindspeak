@@ -79,7 +79,7 @@ describe('AssessmentModule.start — 词库未就绪（async 数据未到）守�
     return globalThis.AssessmentModule;
   }
 
-  it('词库未就绪时 start 不报"词库数据为空"，提示加载中并安排重试', async () => {
+  it('词库未就绪时 start 不报"词库数据为空"，改为就地 loading + 静默重试（不再逐条弹 toast）', async () => {
     const AssessmentModule = await loadModule();
     const mod = new AssessmentModule();
     mod.start = mod.start.bind(mod);
@@ -95,15 +95,29 @@ describe('AssessmentModule.start — 词库未就绪（async 数据未到）守�
       }
       return orig.call(this);
     };
+    // 注入「开始测评」按钮，验证等待态挂在这个按钮上
+    const btn = document.createElement('button');
+    btn.id = 'btn-assessment-start';
+    btn.textContent = '开始测评';
+    document.body.appendChild(btn);
+
     const inst = new AssessmentModule();
     inst.start();
-    expect(globalThis.Toast.info).toHaveBeenCalledWith(expect.stringContaining('加载中'));
+    // 不再弹 toast：旧实现每 0.8 秒一条，慢机首开（词库约 9.8MB，常要 8 秒）
+    // 会堆出约 10 条一模一样的提示把整屏糊住
+    expect(globalThis.Toast.info).not.toHaveBeenCalled();
     expect(globalThis.Toast.error).not.toHaveBeenCalled();
+    // 等待态就地落在按钮上：禁用 + 文案提示，而不是飘在右上角的 toast
+    expect(btn.disabled).toBe(true);
+    expect(btn.innerHTML).toContain('加载中');
     // 还有挂起的重试定时器
     expect(vi.getTimerCount()).toBeGreaterThan(0);
-    // 第二次触发时词库已就绪 → 不应再提示加载中（不再无谓重试）
+    // 第二次触发时词库已就绪 → 走正常流程，按钮恢复可用
     globalThis.WORD_LIBRARY = { categories: [{ stage: 1, name: 'x', words: [] }] };
     await vi.advanceTimersByTimeAsync(900);
     expect(calls).toBeGreaterThan(1);
+    expect(btn.disabled).toBe(false);
+    expect(btn.innerHTML).not.toContain('加载中');
+    btn.remove();
   });
 });

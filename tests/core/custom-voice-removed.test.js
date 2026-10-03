@@ -150,7 +150,9 @@ describe('其余发音设置未被误伤', () => {
     // 这些是 select 的 id（连字符形式），不是 localStorage 键（下划线形式）
     expect(html).toMatch(/id="voice-rate"/);
     expect(html).toMatch(/id="voice-pitch"/);
-    expect(html).toMatch(/id="voice-instant"/);
+    // 注：voice-instant 曾在此被断言「必须存在」，那是错误的设计锁定——
+    // 「本地即时语音」开关已于方案 A 下线，其守护测试见
+    // tests/core/voice-instant-toggle-removed.test.js（同时守住本机零延迟能力不被连坐删除）
   });
 
   it('SpeechUtil 仍导出', () => {

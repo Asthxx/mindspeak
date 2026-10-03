@@ -27,6 +27,11 @@
   --sage-light:      #E3ECF4;
   --sage-surface:    #EEF4F9;
   --sage-hover:      #4A6F93;
+  /* ── 品牌「墨色」：专供「浅底上的品牌文字/图标」──
+     与 --sage-deep 的区别：--sage-deep 在深色主题下会翻亮成 #9FC5E4（浅蓝），
+     拿它当浅底上的前景色会直接失效。--brand-ink 恒定不翻转，白底实测 8.03:1。
+     典型用法：深色渐变 hero 上的实心白按钮（见 nav.css 的 .ai-hero .btn-primary）。 */
+  --brand-ink:       #33536F;
 
   /* ── 10% Accent: Warm Coral Orange ── */
   --coral:           #FF8A65;
@@ -42,10 +47,20 @@
 
   --danger:          #EF5350;
   --danger-light:    #FFEBEE;
-  --danger-dark:     #D32F2F;
+  /* 原 #D32F2F 在 --danger-light 底上仅 4.36:1，压深一档到 4.92:1 */
+  --danger-dark:     #C62828;
 
   --warning:         #FFA726;
   --warning-light:   #FFF3E0;
+  /* --amber 是历史遗留名，全项目 4 处引用却从未定义（background/color/border 静默失效）。
+     此处统一别名到 --warning，修复 .ai-tip-prevent 徽章无底色、发音中等分无配色等问题。 */
+  --amber:           var(--warning);
+  --amber-light:     var(--warning-light);
+  /* ── 强调色的「文字态」──
+     --coral / --warning / --sage 都是为「大面积填充 + 白字」设计的饱和度，直接当小字前景色时
+     对比度远低于 AA（实测 coral on ivory 仅 2.14:1）。这三个令牌专供文字场景使用。 */
+  --coral-text:      #B04A28;   /* 白底 5.45:1 / ivory 底 5.03:1 / sage-surface 底 4.91:1 */
+  --warning-text:    #8A5300;   /* warning-light 底 ≈5.5:1 */
 
   --info:            #42A5F5;
   --info-light:      #E3F2FD;
@@ -53,7 +68,11 @@
   /* ── Text Colors ── */
   --text:            #1A1A1A;
   --text-secondary:  #5A5A5A;
-  --text-tertiary:   #8A8A8A;
+  /* 原 #8A8A8A 实测仅 3.45:1（白底）/ 3.19:1（ivory 底），低于 WCAG AA 正文 4.5:1。
+     改 #616B76：白底 5.42:1、ivory 底 5.00:1、sage-surface 底 4.89:1，全部达标，
+     且仍弱于 --text-secondary（6.90:1），保留三级文本层次。 */
+  --text-tertiary:   #616B76;
+  /* ghost 仅用于占位符等装饰性文字，保持轻量；不得承载正文语义 */
   --text-ghost:      #B0B0B0;
   --text-inverse:    #FFFFFF;
   --text-sage:       var(--sage);
@@ -229,6 +248,9 @@
 
   --warning:         #FFB74D;
   --warning-light:   #2E2518;
+  /* 深色下饱和暖色本身就很亮，直接当文字色对比度充足，无需再压暗 */
+  --coral-text:      var(--coral);   /* #FF9A76 on 卡片 #252629 = 7.30:1 */
+  --warning-text:    var(--warning);
 
   --info:            #64B5F6;
   --info-light:      #1A2233;
@@ -236,7 +258,10 @@
   /* ── Text Colors ── */
   --text:            #E8E8E8;
   --text-secondary:  #A0A0A0;
-  --text-tertiary:   #707070;
+  /* 原 #707070 实测仅 3.06:1（卡片 #252629 底），低于 AA 4.5:1。
+     改 #8A97A4：卡片底 5.07:1、画布底 5.78:1、surface 底 4.61:1，全部达标，
+     且仍弱于 --text-secondary（5.80:1），层次不倒置。 */
+  --text-tertiary:   #8A97A4;
   --text-ghost:      #505050;
   --text-inverse:    #1A1A1A;
 
@@ -445,6 +470,52 @@ body {
   color: var(--text-tertiary);
 }
 
+/* ── 按钮加载态（加载状态体系的基础件）──
+   此前全项目没有任何 loading 表达：异步操作要么静默，要么事后弹一句 toast。
+   这个组合（.is-loading + .btn-spinner）让"点了之后要等"这件事就地可见：
+   按钮禁用 + 文案替换为「…中」+ 转圈，用户不必猜是否已经生效。
+   用法：btn.classList.add('is-loading'); btn.innerHTML = '<span class="btn-spinner"></span> 正在…';
+   注意保存并还原 innerHTML（按钮上带 data-orig-html）。 */
+.btn.is-loading {
+  pointer-events: none;
+  opacity: 0.92;
+}
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ms-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes ms-spin { to { transform: rotate(360deg); } }
+/* 尊重降低动效偏好，但不完全停转——静止的圈会被读成"卡住了"，只放慢 */
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner { animation-duration: 1.8s; }
+}
+
+/* ── 复选框统一尺寸与品牌色 ──
+   此前设置页的 checkbox 走浏览器默认 13×13（阅读页/自动保存行写了 16px），
+   在移动端既难看清也难点中。统一抬到 20px（移动端 24px）并用品牌色渲染勾选态；
+   命中区由外层 <label> 整行承担，移动端另加 44px 行高（见 mobile.css）。 */
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--sage);
+  cursor: pointer;
+}
+/* 文本输入框：默认高度过低（实测 21–28px），统一最小 36px，移动端 44px */
+input[type="text"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+select {
+  min-height: 36px;
+}
+
 /* ── Badges ── */
 .badge {
   display: inline-flex;
@@ -517,7 +588,8 @@ body {
 }
 
 .stat-card-value.sage { color: var(--sage); }
-.stat-card-value.coral { color: var(--coral); }
+/* 统计数值虽是大字（30px/700），但 --coral on 白仅 2.31:1，连大文本 3:1 都不到，改用文字态令牌 */
+.stat-card-value.coral { color: var(--coral-text); }
 
 /* ============================================================
    NAVIGATION
@@ -602,7 +674,7 @@ body {
 .w-full { width: 100%; }
 .text-center { text-align: center; }
 .text-sage { color: var(--sage); }
-.text-coral { color: var(--coral); }
+.text-coral { color: var(--coral-text); }
 .text-muted { color: var(--text-tertiary); }
 .font-medium { font-weight: var(--weight-medium); }
 .font-semibold { font-weight: var(--weight-semibold); }

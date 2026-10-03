@@ -77,7 +77,9 @@
   gap: 14px;
   padding: 18px 22px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--sage-deep), var(--sage-muted));
+  /* 渐变终点原为 --sage-muted #7FB6D9（偏亮），白字标题仅 2.19:1、副标题（85% 白）更低。
+     终点改 --sage-hover #4A6F93（白字 5.27:1），起点 --sage-deep 6.67:1，整条渐变均达 AA。 */
+  background: linear-gradient(135deg, var(--sage-deep), var(--sage-hover));
   color: #fff;
   box-shadow: var(--shadow-md);
   margin-bottom: 16px;
@@ -104,6 +106,52 @@
 }
 .ai-hero-icon svg { width: 24px; height: 24px; }
 #page-ai .ai-hero .btn { margin-left: auto; flex-shrink: 0; }
+
+/* hero 内的主按钮：不能再沿用全局 .btn-primary 的渐变。
+   --btn-primary 是 linear-gradient(135deg, sage-hover, sage-deep)，
+   hero 恰好是 linear-gradient(135deg, sage-deep, sage-hover) —— 两者完全反相，
+   在同一位置互相抵消，实测按钮填充与底色只有 1.03:1，按钮边界几乎不可见，
+   只剩一条 1px 描边，读起来像悬空的幽灵标签而不是 CTA。
+   改「实心白底 + 品牌墨色字」：按钮面 vs hero 底 5.27:1，文字 vs 白底 8.03:1，
+   且这套配色不随主题翻转（--brand-ink 恒定），深浅两主题都成立。
+   规则：按钮不使用与所在容器同族的渐变。 */
+#page-ai .ai-hero .btn-primary {
+  background: #FFFFFF;
+  color: var(--brand-ink);
+  border-color: transparent;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+#page-ai .ai-hero .btn-primary:hover {
+  background: var(--sage-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+/* 深色：hero 翻成深蓝表面（sage-surface → sage-light），白底按钮对比反而更高（14:1），
+   但 hover 底必须换成浅色档，否则 --sage-light 在深色下是 #1C2B3D，深底配深字会失效。 */
+[data-theme="dark"] #page-ai .ai-hero .btn-primary {
+  background: #FFFFFF;
+  color: var(--brand-ink);
+}
+[data-theme="dark"] #page-ai .ai-hero .btn-primary:hover {
+  background: #DCE7F1;
+}
+
+/* 深色主题：原渐变两端（--sage-deep #9FC5E4 / --sage-muted #5E8FB8）在深色画布上
+   是一整块亮蓝色，与周围深表面割裂。改为深色表面渐变 + 浅色文字，随主题一体化。 */
+[data-theme="dark"] #page-ai .ai-hero {
+  background: linear-gradient(135deg, var(--sage-surface), var(--sage-light));
+  color: var(--text);
+  box-shadow: none;
+  border: 1px solid var(--border);
+}
+[data-theme="dark"] #page-ai .ai-hero h2 { color: var(--text); }
+[data-theme="dark"] #page-ai .ai-hero p { color: var(--text-secondary); }
+
+/* 窄屏防孤字：标题被右侧按钮挤压时会断成「AI 英语教 / 练」 */
+@media (max-width:768px) {
+  #page-ai .ai-hero { flex-wrap: wrap; gap: 12px; padding: 16px; }
+  #page-ai .ai-hero h2 { white-space: nowrap; font-size: 1.15rem; }
+}
 
 .ai-grid {
   display: grid;
@@ -261,7 +309,7 @@
   color: var(--text-secondary);
 }
 .ai-up { color: var(--success); font-weight: var(--weight-semibold); }
-.ai-down { color: var(--coral); font-weight: var(--weight-semibold); }
+.ai-down { color: var(--coral-text); font-weight: var(--weight-semibold); }
 
 /* 三级建议徽章 */
 .ai-tips li.ai-tip::before { content: none; }
@@ -274,9 +322,17 @@
   font-weight: var(--weight-semibold);
   line-height: 1.5;
 }
-.ai-tip-urgent .ai-tip-badge { background: var(--coral); color: #fff; }
-.ai-tip-prevent .ai-tip-badge { background: var(--amber); color: #fff; }
-.ai-tip-encourage .ai-tip-badge { background: var(--sage); color: #fff; }
+/* 徽章配色：原三档都是「饱和填充 + 白字」，实测对比度均不达标——
+   深色下 urgent 白字 on coral 仅 2.07:1（全站最低），prevent 的 --amber 更是从未定义（底色透明）。
+   改为：填充色降饱和或改用浅底深字，保证 12px/600 字重下 ≥4.5:1。 */
+.ai-tip-urgent .ai-tip-badge { background: var(--coral-text); color: #fff; }      /* #B04A28 白字 5.45:1 */
+.ai-tip-prevent .ai-tip-badge { background: var(--warning-light); color: var(--warning-text); }
+.ai-tip-encourage .ai-tip-badge { background: var(--sage-hover); color: #fff; }   /* #4A6F93 白字 5.27:1 */
+/* 深色主题：暖色本身很亮，改为浅底深字反而更差，统一走「深底 + 亮字」 */
+[data-theme="dark"] .ai-tip-urgent .ai-tip-badge { background: var(--coral-light); color: var(--coral); }    /* 7.66:1 */
+[data-theme="dark"] .ai-tip-prevent .ai-tip-badge { background: var(--warning-light); color: var(--warning); }
+/* normal 档：--text-secondary on --border 在深色下仅 4.28:1，改用正文色（9.13:1） */
+[data-theme="dark"] .ai-tip-normal .ai-tip-badge { color: var(--text); }
 .ai-tip-normal .ai-tip-badge { background: var(--border); color: var(--text-secondary); }
 
 /* 每周学习报告 */
@@ -302,12 +358,18 @@
   color: var(--sage-deep);
   font-weight: var(--weight-bold);
 }
+/* 零值弱化（UI 审查 P0-5）：0 = 还没有数据，与首页/设置页同一处理，
+   否则六个 0 会各自顶着强调色把空状态装成"信息很满"。 */
+.ai-report-item b.is-zero,
+.ai-ov-num.is-zero {
+  color: var(--text-tertiary);
+}
 .ai-report-item span {
   font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 .ai-report-up b { color: var(--success); }
-.ai-report-down b { color: var(--coral); }
+.ai-report-down b { color: var(--coral-text); }
 .ai-report-summary {
   margin-top: 10px;
   padding: 8px 12px;
@@ -340,6 +402,19 @@
 .ai-radar-label {
   fill: var(--text-secondary);
   font-size: 12px;
+  font-family: var(--font);
+}
+/* 雷达空状态：无数据时不画数据面，只在网格中心给出一句引导。
+   此前新用户会看到一个几乎填满的绿色多边形（没错题被折算成满分），
+   读起来像"各项能力都很强"，与实际完全相反。 */
+.ai-radar-empty {
+  fill: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font);
+}
+.ai-radar-empty-sub {
+  fill: var(--text-tertiary);
+  font-size: 11px;
   font-family: var(--font);
 }
 

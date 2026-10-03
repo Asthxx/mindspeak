@@ -283,12 +283,16 @@ var AiCoachModule = (function() {
     else if (delta < 0) summary = '本周投入较上周下降，别担心，安排一次 10 分钟复习就能找回状态。';
     else if (due > 5) summary = '积累了不少待复习词，本周优先清空复习队列。';
     else summary = '稳步前进，规律比冲量更重要。';
+    // 0 值弱化：周报六个格子里全是 0 时，六块强调字会让空数据看起来"很满"
+    var num = function(n) { return '<b' + (Number(n) === 0 ? ' class="is-zero"' : '') + '>' + n + '</b>'; };
     body.innerHTML = '<div class="ai-report-grid">'
-      + '<div class="ai-report-item"><b>' + trend.total + '</b><span>本周学习（词）</span></div>'
-      + '<div class="ai-report-item ' + (delta >= 0 ? 'ai-report-up' : 'ai-report-down') + '"><b>' + (delta >= 0 ? '▲ +' : '▼ ') + Math.abs(delta) + '</b><span>较上周</span></div>'
-      + '<div class="ai-report-item"><b>' + mastered + '</b><span>已掌握</span></div>'
-      + '<div class="ai-report-item"><b>' + due + '</b><span>待复习</span></div>'
-      + '<div class="ai-report-item"><b>' + mistakes.length + '</b><span>错题</span></div>'
+      + '<div class="ai-report-item">' + num(trend.total) + '<span>本周学习（词）</span></div>'
+      // 「+0 较上周」原本沿用 delta >= 0 判成"上升"，配绿色 ▲。
+      // 持平不是变好——绿色只该表示真的进步。0 变化改中性灰、不带箭头。
+      + '<div class="ai-report-item ' + (delta > 0 ? 'ai-report-up' : (delta < 0 ? 'ai-report-down' : '')) + '"><b>' + (delta > 0 ? '▲ +' : (delta < 0 ? '▼ ' : '')) + Math.abs(delta) + '</b><span>较上周</span></div>'
+      + '<div class="ai-report-item">' + num(mastered) + '<span>已掌握</span></div>'
+      + '<div class="ai-report-item">' + num(due) + '<span>待复习</span></div>'
+      + '<div class="ai-report-item">' + num(mistakes.length) + '<span>错题</span></div>'
       + '<div class="ai-report-item"><b>' + escapeHtml(weakName) + '</b><span>薄弱方向</span></div>'
       + '</div>'
       + '<div class="ai-report-summary">' + summary + '</div>';
@@ -317,17 +321,27 @@ var AiCoachModule = (function() {
     var err = { spelling: 0, grammar: 0, listening: 0, listen: 0, speak: 0, reading: 0, word: 0, context: 0, pk: 0 };
     mistakes.forEach(function(m) { if (m && m.source && err[m.source] !== undefined) err[m.source]++; });
     var clamp = function(v) { return Math.max(0, Math.min(10, Math.round(v * 10) / 10)); };
-    return [
-      { label: '词汇', score: clamp(mastered / 5) },
-      { label: '复习', score: clamp(10 - due * 1.5) },
-      { label: '拼写', score: clamp(10 - err.spelling * 3) },
-      { label: '语法', score: clamp(10 - err.grammar * 3) },
-      { label: '听力', score: clamp(10 - (err.listening + err.listen) * 3) },
-      { label: '口语', score: clamp(10 - err.speak * 3) }
-    ];
+    // 除「词汇」外其余五维都是**反向计分**（没错题 = 10 分）。
+    // 新用户没有任何错题，五维全是 10，多边形几乎填满 → 视觉上像"我拼写语法听力口语
+    // 全是满分"，而实际是"完全没有数据"。这是仪表盘里最严重的视觉谎言。
+    // 判据：既没有学习进度也没有错题时，整个雷达视为无数据，只画网格不给分数。
+    var hasData = Object.keys(progress).length > 0 || mistakes.length > 0;
+    return {
+      hasData: hasData,
+      items: [
+        { label: '词汇', score: clamp(mastered / 5) },
+        { label: '复习', score: hasData ? clamp(10 - due * 1.5) : 0 },
+        { label: '拼写', score: hasData ? clamp(10 - err.spelling * 3) : 0 },
+        { label: '语法', score: hasData ? clamp(10 - err.grammar * 3) : 0 },
+        { label: '听力', score: hasData ? clamp(10 - (err.listening + err.listen) * 3) : 0 },
+        { label: '口语', score: hasData ? clamp(10 - err.speak * 3) : 0 }
+      ]
+    };
   };
 
-  AiCoachModule.prototype._radarSvg = function(scores) {
+  AiCoachModule.prototype._radarSvg = function(raw) {
+    var hasData = !raw || raw.hasData !== false;
+    var scores = (raw && raw.items) ? raw.items : [];
     var cx = 200, cy = 110, R = 80;
     var n = scores.length;
     function pt(i, r) {
@@ -341,22 +355,39 @@ var AiCoachModule = (function() {
       for (var i = 0; i < n; i++) pts.push(pt(i, r));
       rings.push('<polygon points="' + pts.join(' ') + '" class="ai-radar-ring" />');
     }
-    var data = scores.map(function(s, i) { return pt(i, R * s.score / 10); }).join(' ');
+    // 轴标签：无数据时显示「—」而不是具体数字。
+    // 原写法会打出「拼写 10 / 语法 10 / 听力 10 / 口语 10」，而这 10 是"没错题"折算出来的，
+    // 不是真实能力值——用户读到的和实际情况正好相反。
     var labels = scores.map(function(s, i) {
       var ang = -Math.PI / 2 + i * 2 * Math.PI / n;
       var lx = cx + (R + 26) * Math.cos(ang);
       var ly = cy + (R + 26) * Math.sin(ang) + 4;
       var anchor = Math.abs(Math.cos(ang)) < 0.3 ? 'middle' : (Math.cos(ang) > 0 ? 'start' : 'end');
       return '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="' + anchor + '" class="ai-radar-label">'
-        + escapeHtml(s.label) + ' ' + s.score + '</text>';
+        + escapeHtml(s.label) + ' ' + (hasData ? s.score : '—') + '</text>';
     });
-    return '<svg viewBox="0 0 400 230" class="ai-radar-svg" role="img" aria-label="能力雷达图">'
-      + rings.join('') + '<polygon points="' + data + '" class="ai-radar-data" />' + labels.join('') + '</svg>';
+    var svg = '<svg viewBox="0 0 400 230" class="ai-radar-svg" role="img" aria-label="'
+      + (hasData ? '能力雷达图' : '能力雷达图，暂无数据') + '">' + rings.join('');
+    if (hasData) {
+      svg += '<polygon points="' + scores.map(function(s, i) { return pt(i, R * s.score / 10); }).join(' ') + '" class="ai-radar-data" />';
+    } else {
+      // 空状态：只留网格骨架 + 中心一句引导，不画任何数据面
+      svg += '<text x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" class="ai-radar-empty">暂无数据</text>'
+           + '<text x="' + cx + '" y="' + (cy + 24) + '" text-anchor="middle" class="ai-radar-empty-sub">学几个词或做一次测评后生成</text>';
+    }
+    return svg + labels.join('') + '</svg>';
   };
 
   AiCoachModule.prototype._set = function(id, val) {
     var el = this._el(id);
-    if (el) el.textContent = val;
+    if (!el) return;
+    el.textContent = val;
+    // 零值弱化（与首页 _setText 同构，见 UI 审查 P0-5）：
+    // 0 表示"还没有数据"，不该用 --sage-deep 强调色当主角。
+    // 「Lv.1」这类标识 Number() 得 NaN，不会命中，天然排除。
+    if (el.classList && el.classList.contains('ai-ov-num')) {
+      el.classList.toggle('is-zero', Number(val) === 0);
+    }
   };
 
   return AiCoachModule;

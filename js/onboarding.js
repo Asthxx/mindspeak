@@ -213,6 +213,11 @@ var OnboardingModule = (function() {
       if (desc) desc.textContent = '花 5-8 分钟做一次能力测评，了解词汇 / 语法 / 听力 / 发音 / 阅读水平，生成专属学习计划';
       if (btn) btn.innerHTML = '<svg class="icon"><use href="#i-target"/></svg> 立即测一测';
     }
+    // 主操作唯一（P0-3）由静态样式承担：「开始学习」恒为 primary，CTA 恒为次级。
+    // 这里不再做按状态的动态互换——曾试过"未测评时把主角让给「立即测一测」"，
+    // 但 CTA 卡在移动端首屏之外（要滚动才可见），互换之后首屏变成清一色白按钮，
+    // 完全没有视觉落点。CTA 卡自身的标题「还不知道自己的水平？」+ 描述已承担召唤，
+    // 按钮用次级即可，首屏始终保留「开始学习」这一个蓝色主按钮。
     el.classList.remove('hidden');
   };
 

@@ -190,6 +190,12 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 
   /* ================= 工具条 / 筛选 ================= */
   .section-header{flex-direction:column;gap:var(--sp-3);padding:var(--sp-4);align-items:stretch}
+
+  /* 背单词工具栏：低频工具（添加新词/重置进度）折叠，首屏让给单词卡与三键操作 */
+  .word-tools-toggle{display:inline-flex;align-items:center;justify-content:center}
+  .word-tools-extra{display:none;flex-direction:column;gap:var(--sp-2)}
+  .word-tools-extra.open{display:flex}
+  .word-tools-extra .btn-sm{justify-content:flex-start;min-height:44px}
   .section-header select,.section-header input{width:100%;padding:10px 12px;font-size:0.95rem}
   .word-list-toolbar{padding:var(--sp-3)}
   .word-search{min-width:0;width:100%;padding:12px 14px;font-size:1rem}
@@ -412,7 +418,9 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .dash-stat-card{flex-direction:column;align-items:flex-start;gap:6px;padding:12px}
   .dag-card{min-width:0}
   .ob-goal-options{grid-template-columns:1fr}
-  .story-toolbar .btn{flex:1;padding:10px 8px;font-size:0.82rem}
+  /* 原 flex:1（basis=0）让三按钮永远挤同一行、文字被压缩截断（「生成短…」）。
+     改 basis=auto：内容总宽超行时整行换行，文字始终完整；顺带补足 44px 触控高。 */
+  .story-toolbar .btn{flex:1 1 auto;padding:10px 10px;font-size:0.82rem;min-height:44px}
   .spelling-prompt .prompt-word{font-size:1.7rem}
 
   /* 背单词：核心按钮换行排布，保证拇指点击区域 */
@@ -616,3 +624,83 @@ html.platform-android{
 
 .safe-area-top { padding-top: env(safe-area-inset-top, 24px); }
 .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* ============================================================
+   触控目标合规（WCAG 2.5.8 / 2.5.5）
+   审计实测：设置页 5 个复选框仅 13×13、阅读页 16×16、每日目标/自动保存间隔
+   输入框高 21–34px、AI 历史项删除键 28×28。触屏下统一抬到 44px 命中区。
+   ============================================================ */
+@media (max-width:768px){
+  /* 复选框视觉放大到 24px（桌面 20px），外层 label 整行作为命中区 */
+  input[type="checkbox"]{ width:24px; height:24px; }
+
+  /* 设置页勾选行：整行 ≥44px 高，点击文字任意处即可切换 */
+  .settings-group label,
+  .r-toggle label,
+  .story-toggle,
+  .auto-save-toggle{
+    min-height:44px;
+    display:flex;
+    align-items:center;
+    gap:var(--sp-2);
+  }
+
+  /* 小输入框最小 44px（此前 21–34px） */
+  input[type="text"],
+  input[type="number"],
+  input[type="search"],
+  input[type="email"],
+  select{ min-height:44px; }
+
+  /* 词卡跳转框内联样式给了固定 padding，这里补高度 */
+  #word-jump-input{ min-height:44px; }
+
+  /* AI 历史项删除键：桌面靠 hover 浮出，触屏没有 hover，必须常驻 */
+  .ai-hist-del{ opacity:1; width:44px; height:44px; }
+
+  /* 图标按钮与色块：桌面 40px 够用，触屏统一抬到 44px（iOS HIG / WCAG 2.5.5） */
+  .ai-icon-btn, .color-btn{ width:44px; height:44px; }
+
+  /* AI 工作区里的 pill 行动按钮与历史项：实测 33–41px，触屏抬到 44px */
+  .ai-act, .ai-hist-main, .ai-action-btn{ min-height:44px; }
+
+  /* 消息级操作（复制/朗读/重新生成）实测 32px 高 */
+  .ai-msg-actions button{ min-height:44px; padding:8px 12px; }
+
+  /* 抽屉里的开关：默认 42×24 视觉偏小，触屏放大到 48×28（滑块尺寸同步） */
+  .ai-switch{ width:48px; height:28px; }
+  .ai-switch::after{ width:22px; height:22px; top:3px; left:3px; }
+  .ai-switch[aria-checked="true"]::after{ transform:translateX(20px); }
+  .ai-set-row{ min-height:44px; }
+
+  /* 邮箱是 inline-block 链接，实测 33px 高，补纵向 padding */
+  .support-mail{ padding:8px 0; }
+}
+
+/* 触屏设备（不论宽度）：凡靠 hover 才显形的图标按钮一律常驻 */
+@media (hover:none){
+  .ai-hist-del{ opacity:1; }
+}
+
+/* ---- Toast 移动端重定位 -------------------------------------------
+   桌面坐标是 top:80px;right:20px，搬到 390px 屏上正好压住页面标题和主题切换按钮。
+   移动端改到底部导航之上：下沿 = 底栏 64px + 外边距 10px + 手势条安全区，
+   左右各留 16px，与悬浮药丸底栏同宽，视觉上也更贴近拇指区。 */
+@media (max-width:768px){
+  .toast-container,
+  html.platform-ios .toast-container,
+  html.platform-android .toast-container{
+    top:auto;
+    bottom:calc(88px + env(safe-area-inset-bottom,0px));
+    left:16px;right:16px;
+    max-height:40vh;
+    align-items:stretch;
+  }
+}
+/* 宽视口异常的 WebView 里媒体查询可能失效，forced-mobile 是同一套兜底 */
+html.forced-mobile .toast-container{
+  top:auto;
+  bottom:calc(88px + env(safe-area-inset-bottom,0px));
+  left:16px;right:16px;
+  max-height:40vh;
+  align-items:stretch;
+}

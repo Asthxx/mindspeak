@@ -131,7 +131,16 @@ describe('调用方余额守卫是真实的（不是形同虚设）', () => {
   });
 
   it('主题商店仍有独立的 points 不足 pre-check', () => {
-    expect(itemsSrc, '主题商店需保留 pre-check').toMatch(/gami\.points\s*<\s*t\.price/);
+    expect(itemsSrc, '主题商店需保留 pre-check').toMatch(/points\s*<\s*t\.price/);
+  });
+
+  // pre-check 必须读真实余额来源（getStats().points），不能读 GamificationSystem
+  // 实例上的 points —— 后者根本不存在，恒为 undefined，守卫永远不触发
+  // （补签就是这么栽的，见下面两条）。主题商店统一走 _points() 取数，
+  // 与渲染侧的按钮置灰判定共用同一入口，避免两处算法漂移。
+  it('主题商店的 pre-check 读真实余额来源（getStats），而非实例上的 undefined', () => {
+    expect(itemsSrc, '需经 getStats 取真实余额').toMatch(/getStats\(\)/);
+    expect(itemsSrc, '不得直接读 gamification 实例上的 points').not.toMatch(/gamification\.points/);
   });
 
   it('补签仍校验 30 积分门槛', () => {

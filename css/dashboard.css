@@ -95,6 +95,9 @@
   font-size: var(--text-xs);
   color: var(--text-secondary);
 }
+/* 零值弱化（UI 审查 P0-5）：0 = 还没有数据，降为 tertiary 让位给有值的卡片。
+   卡片左上角的彩色图标块是"类别标识"（火=打卡、勾=掌握…），不是数值语义，保留原色。 */
+.dash-stat-num.is-zero { color: var(--text-tertiary); }
 
 /* ---------- 卡片通用 ---------- */
 .dash-grid {
@@ -245,8 +248,91 @@
   .dash-stat-card,
   .dash-card,
   .dp-bar-fill,
-  .dash-quick-btn {
+  .dash-quick-btn,
+  .practice-btn {
     transition: none;
   }
   .dash-stat-card:hover { transform: none; }
+  .practice-btn:hover { transform: none; }
+}
+
+/* ============================================================
+   练习中心（page-practice）
+   ------------------------------------------------------------
+   视觉语言刻意复用首页快捷入口的卡片/按钮体系（同族圆角、同族间距、
+   同族 hover 反馈），避免为一个聚合页引入新的样式分支。
+   字号一律走 --text-* 令牌，不新增硬编码值。
+   ============================================================ */
+.practice-sub {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin: calc(var(--sp-2) * -1) 0 var(--sp-5);
+  line-height: 1.6;
+}
+.practice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(224px, 1fr));
+  gap: var(--sp-4);
+}
+.practice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-height: 96px;
+  padding: var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--duration-normal) var(--ease),
+              border-color var(--duration-normal) var(--ease),
+              box-shadow var(--duration-normal) var(--ease);
+}
+.practice-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--sage-light);
+  box-shadow: var(--shadow-md);
+}
+.practice-btn:active { transform: translateY(0); }
+.practice-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+.practice-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--sage-surface);
+  color: var(--sage-deep);
+  flex-shrink: 0;
+}
+.practice-icon .icon { width: 22px; height: 22px; }
+.practice-name {
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.4;
+}
+.practice-desc {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+/* 深色主题：图标底与 hover 阴影随主题翻转（令牌已映射，此处仅补阴影） */
+[data-theme="dark"] .practice-btn:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+
+@media (max-width: 600px) {
+  .practice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+  .practice-btn { min-height: 44px; padding: var(--sp-3); }
+  /* 两列排布下说明文字容易挤成三行，窄屏只留名称，说明靠图标+名称已足够传达 */
+  .practice-desc { display: none; }
+}
+@media (max-width: 380px) {
+  .practice-grid { grid-template-columns: minmax(0, 1fr); }
 }
