@@ -114,10 +114,17 @@ var Toast = {
     this.container.setAttribute('aria-live', 'polite');
     document.body.appendChild(this.container);
   },
+  // P2-9：停留时长按字数自适应。原来固定 3 秒——一条 40 字的错误提示按正常
+  // 阅读速度根本读不完就被撤掉了。1600ms 起步 + 每字 80ms，上限 8 秒
+  // （再长就成了需要用户处理的"通知"，不该用 toast 承载）。
+  _durationFor: function(message) {
+    var n = String(message == null ? '' : message).length;
+    return Math.max(1600, Math.min(8000, 1600 + n * 80));
+  },
   show: function(message, type, duration) {
     this.init();
     type = type || 'info';
-    duration = duration || 3000;
+    if (duration == null) duration = this._durationFor(message);
     // 同文案去重：轮询类提示（如"词库加载中…"每 0.8 秒重试一次）会在 8 秒内
     // 堆出 10 条一模一样的 toast，把整个界面糊住。已存在的同文案提示改为
     // 重置倒计时，而不是再叠一条。
@@ -131,12 +138,40 @@ var Toast = {
     var toast = document.createElement('div');
     toast.className = 'toast toast-' + type;
     if (type === 'error') toast.setAttribute('role', 'alert');
-    toast.innerHTML = '<span class="toast-message">' + escapeHtml(message) + '</span>';
+    // 关闭按钮（P2-9）：容器是 pointer-events:none，靠单条 toast 放开点击。
+    // 识字快的用户不该被强制看完 8 秒。
+    toast.innerHTML =
+      '<span class="toast-message">' + escapeHtml(message) + '</span>' +
+      '<button type="button" class="toast-close" data-toast-close aria-label="关闭提示">' +
+      '<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close" xlink:href="#i-close"/></svg>' +
+      '</button>';
     this.container.appendChild(toast);
     requestAnimationFrame(function() { toast.classList.add('toast-show'); });
     var rec = { el: toast, hideTimer: 0, removeTimer: 0 };
     this._live[key] = rec;
+    var self = this;
+    toast.querySelector('[data-toast-close]').addEventListener('click', function() {
+      self._dismiss(rec);
+    });
     this._bump(rec, duration);
+  },
+  // 立即收掉一条 toast（手动关闭用）：与 _bump 的到期路径共用同一套清理，
+  // 避免"点了关闭但定时器还在跑"导致后面误删别的 toast
+  _dismiss: function(rec) {
+    if (!rec || !rec.el) return;
+    var self = this;
+    clearTimeout(rec.hideTimer);
+    clearTimeout(rec.removeTimer);
+    rec.el.classList.remove('toast-show');
+    rec.el.classList.add('toast-hide');
+    rec.removeTimer = setTimeout(function() {
+      rec.el.remove();
+      if (self._live) {
+        Object.keys(self._live).forEach(function(k) {
+          if (self._live[k] === rec) delete self._live[k];
+        });
+      }
+    }, 300);
   },
   // 重置（或首次设置）某条 toast 的隐藏倒计时
   _bump: function(rec, duration) {
@@ -162,6 +197,9 @@ success: function(msg) { this.show(msg, 'success'); },
   warning: function(msg) { this.show(msg, 'warning'); },
   info: function(msg) { this.show(msg, 'info'); }
 };
+// 浏览器里 `var Toast` 本来就在 window 上（app.js 是普通 script）；
+// 但测试用 ESM import 加载模块，顶层 var 不会挂到全局，行为级测试就驱动不了真实实现。
+if (typeof window !== 'undefined') window.Toast = Toast;
 
 // ==================== 通用确认弹窗（替代 confirm/alert） ====================
 // 微信 webview 等环境的原生 confirm()/alert() 行为不稳定（可能直接返回或无回调），
@@ -1889,25 +1927,66 @@ if (typeof window !== 'undefined') {
 }
 
 // ==================== 主题切换 ====================
+// 三态：'light' | 'dark' | 'system'（默认跟随系统）。
+// P3-2：原来默认写死 'light'，且 css/mobile.css 里主动移除了 prefers-color-scheme ——
+// 系统深色的用户第一次打开永远拿到亮白页面，只能自己去找开关。
+// 改成第三态「跟随系统」：没有手动选择时跟随系统；手动选过就以手动为准，不再被系统覆盖。
 var ThemeToggle = {
+  _mode: 'system',
+  _mq: null,
   init: function() {
-    var saved = Storage.get('theme', 'light');
+    var saved = Storage.get('theme', 'system');
+    this._watchSystem();
     this.apply(saved);
     var btn = document.getElementById('btn-theme-toggle');
     if (btn) btn.addEventListener('click', function() { ThemeToggle.toggle(); });
   },
+  // 用户的选择（三态），与"当前实际生效的主题"是两件事
+  mode: function() { return this._mode; },
+  resolve: function(mode) {
+    if (mode === 'light' || mode === 'dark') return mode;
+    try {
+      return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        ? 'dark' : 'light';
+    } catch (e) { return 'light'; }
+  },
   apply: function(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    Storage.set('theme', theme);
-    this._syncNativeBars(theme);
-    this._syncMetaThemeColor(theme);
+    this._mode = (theme === 'light' || theme === 'dark') ? theme : 'system';
+    var resolved = this.resolve(this._mode);
+    document.documentElement.setAttribute('data-theme', resolved);
+    Storage.set('theme', this._mode);
+    this._syncNativeBars(resolved);
+    this._syncMetaThemeColor(resolved);
+    this._syncButtonLabel();
+  },
+  // 跟随系统时，系统在设置里切主题要即时生效
+  _watchSystem: function() {
+    if (this._mq || !window.matchMedia) return;
+    var self = this;
+    try {
+      this._mq = window.matchMedia('(prefers-color-scheme: dark)');
+      var onChange = function() { if (self._mode === 'system') self.apply('system'); };
+      if (this._mq.addEventListener) this._mq.addEventListener('change', onChange);
+      else if (this._mq.addListener) this._mq.addListener(onChange);
+    } catch (e) {}
   },
   toggle: function() {
-    var current = document.documentElement.getAttribute('data-theme');
-    var next = current === 'dark' ? 'light' : 'dark';
+    var order = ['light', 'dark', 'system'];
+    var next = order[(order.indexOf(this.mode()) + 1) % order.length];
     this.apply(next);
-    Toast.info(next === 'dark' ? '已切换到深色模式' : '已切换到浅色模式');
+    // P2-9：不弹 toast —— 整屏配色都变了，这就是反馈
     ThemeColor.reapply();
+  },
+  // 按钮的可访问名必须说清"现在是什么、点了会变成什么"，
+  // 否则三态循环对读屏用户就是一个盲盒（title 也一起同步，鼠标用户同理）
+  _syncButtonLabel: function() {
+    var btn = document.getElementById('btn-theme-toggle');
+    if (!btn) return;
+    var label = { light: '浅色模式', dark: '深色模式', system: '跟随系统' }[this.mode()];
+    var nextLabel = { light: '深色模式', dark: '跟随系统', system: '浅色模式' }[this.mode()];
+    var text = '当前主题：' + label + '，点击切换到' + nextLabel;
+    btn.setAttribute('title', text);
+    btn.setAttribute('aria-label', text);
   },
   _syncNativeBars: function(theme) {
     if (!window.Capacitor) return;
@@ -1932,6 +2011,9 @@ var ThemeToggle = {
     if (meta) meta.setAttribute('content', theme === 'dark' ? '#1A1B1E' : '#F4F6F8');
   }
 };
+// 与 Toast 同理：顶层 var 在 ESM 里不挂全局，行为级测试取不到。
+// 注意必须写在对象定义**之后** —— 写在前面会因为 var 提升拿到 undefined。
+if (typeof window !== 'undefined') window.ThemeToggle = ThemeToggle;
 
 // ==================== 主题颜色 ====================
 // 预设色包名 → 'sage' 用默认（不设 data-theme-color 属性），其余映射到 CSS 里的 [data-theme-color="..."]
@@ -2176,6 +2258,7 @@ var KeyboardShortcuts = {
   enabled: true,
   init: function() {
     this.enabled = DataStore.getProgress('shortcuts_enabled', true);
+    this.syncHint();
     document.addEventListener('keydown', function(e) {
       if (!KeyboardShortcuts.enabled) return;
       if (e.repeat) return; // 长按按键自动 repeat，拦截防止连评多卡
@@ -2193,6 +2276,15 @@ var KeyboardShortcuts = {
         case 'Digit3': case 'Numpad3': e.preventDefault(); wm.markWord('known'); break;
       }
     });
+  },
+  // P1-4：快捷键此前是隐藏功能（实现了但界面从不说明）。这里把提示条与
+  // 开关状态绑定：关掉快捷键时提示条也一起消失，避免界面教用户按一个没用的键。
+  // 显示与否最终由 CSS 的 @media (hover:hover) and (pointer:fine) 决定，
+  // 触屏上即使 is-on 也不会出现。
+  syncHint: function() {
+    var el = document.getElementById('word-keyhint');
+    if (!el) return;
+    el.classList.toggle('is-on', !!this.enabled);
   }
 };
 
@@ -2278,6 +2370,7 @@ function WordModule() {
     safeBind('btn-speak', 'click', function() { self.speakCurrent(); });
     safeBind('prev-word', 'click', function() { self.prevWord(); });
     safeBind('next-word', 'click', function() { self.nextWord(); });
+    this._bindCardGestures();   // P1-3：卡片左右滑切词 / 上滑翻转
     safeBind('btn-forgot', 'click', function() { self.markWord('forgot'); });
     safeBind('btn-hesitate', 'click', function() { self.markWord('hesitate'); });
     safeBind('btn-known', 'click', function() { self.markWord('known'); });
@@ -2466,20 +2559,34 @@ function WordModule() {
     this.categories = DataStore.getDefaultWords().categories;
     if (!this.categories || this.categories.length === 0) {
       // 词库脚本 async 加载中（手机/慢网首开）：页面已可用但词库未到，
-      // 不误报「加载失败」，等词库就绪后自动重新填充
-      if (typeof WORD_LIBRARY === 'undefined' || !WORD_LIBRARY || !WORD_LIBRARY.categories || WORD_LIBRARY.categories.length === 0) {
-        this._wordTries = (this._wordTries || 0) + 1;
-        if (this._wordTries <= 30) {
-          if (!this._wordWaitNotified) { this._wordWaitNotified = true; Toast.info('词库加载中，请稍候…'); }
-          setTimeout(function() { self.populateCategories(); }, 500);
-          return;
-        }
+      // 不误报「加载失败」，等词库就绪后自动重新填充。
+      //
+      // 等待态统一交给 js/core/loading.js（UI 审查 P1-1）。原来是自造 500ms
+      // 重试 + 弹一条 toast：toast 长在远离内容的右上角、会过期也会被忽略，
+      // 而 #current-word 里还硬编码着占位词 —— 词库没到就展示它，用户会把
+      // 占位词当成今天要背的词。现在改成长在内容本该出现的位置（卡区骨架）。
+      var L = window.Loading;
+      if (L && !L.libraryReady()) {
+        if (this._libWaitHandle) return;               // 已在等待，不重复挂
+        var cardHost = document.getElementById('word-card');
+        this._libWaitHandle = L.awaitLibrary({
+          host: cardHost,
+          skeleton: { variant: 'card', rows: 3 },
+          ready: function() {
+            self._libWaitHandle = null;
+            self.populateCategories();
+          },
+          onTimeout: function() {
+            self._libWaitHandle = null;
+            Toast.error('词库加载失败，请检查 data/ 文件是否齐全或刷新页面');
+            self.categories = [];
+          },
+        });
+        return;
       }
       Toast.error('词库加载失败，请检查 data/ 文件是否齐全或刷新页面');
       this.categories = [];
     }
-    this._wordTries = 0;
-    this._wordWaitNotified = false;
     this.categories.forEach(function(cat, i) {
       var custom = DataStore.getProgress('custom_words_' + i, null);
       if (custom && Array.isArray(custom) && custom.length > 0) {
@@ -2606,7 +2713,7 @@ cat.words = merged;
     this._refreshStats();
     this._syncLearnSwitchUI();
     this._syncSelectUI();
-    Toast.info(this.learnSelectedOnly ? '已开启精选学习：卡片只学勾选的词' : '已关闭精选学习：学习全部单词');
+    
     return this.learnSelectedOnly;
   };
   // 卡片流词池：开关开时仅返回当前分类中勾选过的词；零勾选返回空池（由调用方 Toast 提示）
@@ -2676,7 +2783,107 @@ cat.words = merged;
     });
   };
 
-  WordModule.prototype.showCurrentWord = function() {
+  // 切卡入场动画（P1-2）：dir = 'left' | 'right' | 'fade' | 不传（不播）。
+  // 不传就不播，避免初始化 / 切页 / 词库切换这些非"翻卡"场景也闪一下。
+  WordModule.prototype._playCardEnter = function(dir) {
+    if (!dir) return;
+    var card = document.getElementById('word-card');
+    if (!card) return;
+    var cls = dir === 'left' ? 'card-in-left' : (dir === 'right' ? 'card-in-right' : 'card-in-fade');
+    card.classList.remove('card-in-left', 'card-in-right', 'card-in-fade');
+    void card.offsetWidth;   // 强制重排，让同一动画能被连续触发（连按下一张）
+    card.classList.add(cls);
+    var self = this;
+    clearTimeout(this._cardAnimTimer);
+    this._cardAnimTimer = setTimeout(function() {
+      card.classList.remove('card-in-left', 'card-in-right', 'card-in-fade');
+    }, 280);
+  };
+
+  // 评价按钮按下态（P1-2）
+  WordModule.prototype._pressFeedback = function(action) {
+    var id = action === 'forgot' ? 'btn-forgot'
+           : action === 'hesitate' ? 'btn-hesitate' : 'btn-known';
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.add('is-pressed');
+    setTimeout(function() { btn.classList.remove('is-pressed'); }, 160);
+  };
+
+  // ── 卡片手势（P1-3）────────────────────────────────────────────────────
+  // 移动端背单词时，能点的只有两个 36px 的小箭头（#prev-word/#next-word），
+  // 拇指自然落点（卡片本体）此前完全没响应。这里补：
+  //   左右滑 = 上一个 / 下一个（阈值 60px，跟手位移 + 松手回弹）
+  //   上滑   = 翻转
+  // 三条硬约束：
+  //   1. passive:true —— 永不 preventDefault，纵向滚动照常（否则会锁住页面滚动）；
+  //   2. 首次位移超过 8px 时锁定轴向，之后不再改判 —— 否则斜向滑动会在
+  //      "横向跟手"与"纵向滚动"之间反复横跳；
+  //   3. 位移不足 8px 就抬手 = 点击，直接交还给 click（卡片本身可点）。
+  WordModule.prototype._bindCardGestures = function() {
+    var card = document.getElementById('word-card');
+    if (!card || card.__msGesturesBound) return;
+    card.__msGesturesBound = true;
+    var self = this;
+    var sx = 0, sy = 0, dx = 0, dy = 0;
+    var active = false, decided = false, horizontal = false;
+
+    function reset() {
+      active = false; decided = false; horizontal = false;
+      dx = dy = 0;
+      card.style.transition = '';
+      card.style.transform = '';
+      card.style.opacity = '';
+    }
+
+    card.addEventListener('touchstart', function(e) {
+      if (!e.touches || e.touches.length !== 1) return;
+      var t = e.touches[0];
+      sx = t.clientX; sy = t.clientY; dx = 0; dy = 0;
+      active = true; decided = false; horizontal = false;
+      // 跟手阶段不能有过渡，否则位移会拖尾
+      card.style.transition = 'none';
+    }, { passive: true });
+
+    card.addEventListener('touchmove', function(e) {
+      if (!active || !e.touches || e.touches.length !== 1) return;
+      var t = e.touches[0];
+      dx = t.clientX - sx;
+      dy = t.clientY - sy;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        decided = true;
+        horizontal = Math.abs(dx) > Math.abs(dy);
+      }
+      if (!horizontal) return;                       // 纵向手势交给页面滚动，不做任何处理
+      if (self._reducedMotion()) return;             // 降低动效偏好下不做跟手位移
+      card.style.transform = 'translateX(' + (dx * 0.55) + 'px)';
+      card.style.opacity = String(Math.max(0.45, 1 - Math.abs(dx) / 460));
+    }, { passive: true });
+
+    card.addEventListener('touchend', function() {
+      if (!active) return;
+      var h = horizontal, ddx = dx, ddy = dy, dec = decided;
+      reset();                                        // 先清干净，回弹过渡由 CSS 的 transition 负责
+      if (!dec) return;                               // 没形成手势 → 当作点击
+      if (h) {
+        if (ddx <= -60) self.nextWord('right');
+        else if (ddx >= 60) self.prevWord();
+      } else if (ddy <= -50) {
+        self.flipCard();
+      }
+    }, { passive: true });
+
+    card.addEventListener('touchcancel', reset, { passive: true });
+  };
+
+  WordModule.prototype._reducedMotion = function() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  };
+
+  WordModule.prototype.showCurrentWord = function(dir) {
     var words = this.getCardWords();
     if (!words.length) return;
     // 防御：currentIndex 越界（词库被外部缩短/边界场景）时归零，避免下面 words[currentIndex].word 抛错
@@ -2692,13 +2899,15 @@ cat.words = merged;
     var p = this.wordProgress[key];
     var reviewCount = (p && p.reviewCount) ? p.reviewCount : 0;
     var isMastered = p && p.status === 'mastered';
-    var stageText = '';
-    if (p) {
-      if (isMastered) stageText = ' | 已掌握';
-      else if (p.status === 'failed') stageText = ' | 不认识';
-      else if (reviewCount > 0) stageText = ' | 阶段' + reviewCount + '/8';
-    }
-    document.getElementById('word-progress').textContent = (this.currentIndex + 1) + '/' + words.length + stageText;
+    // P3-7：掌握状态不再拼进进度行。进度行只回答"我在第几张 / 共几张"，
+    // 掌握程度由下方的复习环（百分比 + 阶段说明）承担 —— 原来两者挤成一串
+    // （"3/10000 | 阶段3/8"），且与环里的百分比各说各话。
+    document.getElementById('word-progress').textContent = (this.currentIndex + 1) + '/' + words.length;
+    // P3-10：首/末位时把翻页按钮置灰。原来 prevWord/nextWord 只是直接 return，
+    // 按钮看起来仍可点，点了却没有任何反应——属于"静默无效"。
+    this._syncNavButtons(words.length);
+    // P3-6：一体化分页控件的总数位，随卡数同步（换分类 / 精选开关都会改变它）
+    this._syncJumpTotal(words.length);
     // 复习环显示当前阶段的记忆保持率，替代原先的阶段数/8
     var retention = DataStore.ebbinghausRetention;
     var pct = isMastered ? 100 : (reviewCount > 0 ? retention[Math.min(reviewCount - 1, retention.length - 1)] : 0);
@@ -2707,8 +2916,19 @@ cat.words = merged;
     var ringText = document.getElementById('ring-text');
     if (ringFill) ringFill.style.strokeDasharray = pct + ', 100';
     if (ringText) ringText.textContent = pct + '%';
+    // P3-7：环下说明行写清"这个百分比指的是哪个阶段"。
+    // 没有复习记录时写「新词」——比留空或写 "0/8" 更能说明"还没开始"。
+    var ringCaption = document.getElementById('ring-caption');
+    if (ringCaption) {
+      var cap = '新词';
+      if (isMastered) cap = '已掌握 · 阶段 8/8';
+      else if (p && p.status === 'failed') cap = '不认识 · 阶段 ' + Math.max(reviewCount, 0) + '/8';
+      else if (reviewCount > 0) cap = '阶段 ' + reviewCount + '/8';
+      ringCaption.textContent = cap;
+    }
     document.getElementById('word-front').classList.remove('hidden');
     document.getElementById('word-back').classList.add('hidden');
+    this._playCardEnter(dir);
     // 新词展示：主动回忆的"已答对放行"状态复位，下一次翻牌重新考
     this._recallPassed = false;
     // 收藏按钮状态同步：当前词是否已收藏 → 实心书签+填色 / 描边书签+描边
@@ -2782,8 +3002,38 @@ WordModule.prototype.speakCurrent = function() {
     }
     this._syncFavBtn();
   };
-  WordModule.prototype.prevWord = function() { if (this.currentIndex > 0) { this.currentIndex--; this.showCurrentWord(); this.saveCardPos(); } };
-  WordModule.prototype.nextWord = function() { var words = this.getCardWords(); if (this.currentIndex < words.length - 1) { this.currentIndex++; this.showCurrentWord(); this.saveCardPos(); } };
+  // 方向参数只影响入场动画（P1-2）：新卡从手势/评分的对应方向进来
+  WordModule.prototype.prevWord = function() { if (this.currentIndex > 0) { this.currentIndex--; this.showCurrentWord('left'); this.saveCardPos(); } };
+  WordModule.prototype.nextWord = function(dir) { var words = this.getCardWords(); if (this.currentIndex < words.length - 1) { this.currentIndex++; this.showCurrentWord(dir || 'right'); this.saveCardPos(); } };
+  // P3-6：一体化分页控件的总数位。输入上限也跟着走，
+  // 否则用户能输入一个超出总数的序号，点下去只能收到一句"超过总数"的提示。
+  WordModule.prototype._syncJumpTotal = function(total) {
+    var el = document.getElementById('word-jump-total');
+    if (el) el.textContent = String(total);
+    var input = document.getElementById('word-jump-input');
+    if (input) {
+      input.max = String(total);
+      if (input.placeholder === '跳转') input.placeholder = '';   // 旧文案兜底清理
+    }
+  };
+
+  // 翻页按钮的可用态：只有"确实能往那边翻"时才可点。
+  // disabled 之外还要写 aria-disabled —— 只靠 disabled 的按钮在读屏里会被跳过，
+  // 用户连"这里有个到头的边界"都无从得知。
+  WordModule.prototype._syncNavButtons = function(total) {
+    var prev = document.getElementById('prev-word');
+    var next = document.getElementById('next-word');
+    var n = (typeof total === 'number' ? total : this.getCardWords().length);
+    var atFirst = this.currentIndex <= 0;
+    var atLast = this.currentIndex >= n - 1;
+    [[prev, atFirst], [next, atLast]].forEach(function(pair) {
+      var el = pair[0], off = pair[1];
+      if (!el) return;
+      el.disabled = off;
+      if (off) el.setAttribute('aria-disabled', 'true');
+      else el.removeAttribute('aria-disabled');
+    });
+  };
   // 按输入序号跳转：1 起，边界内合法即跳，越界 toast 提示
   WordModule.prototype.jumpWord = function() {
     var input = document.getElementById('word-jump-input');
@@ -2839,6 +3089,9 @@ WordModule.prototype.saveCardPos = function() {
     this._evalLock = true;
     var self = this;
     setTimeout(function() { self._evalLock = false; }, 250);
+    // P1-2：按下态 —— 给"这一下已经被记下来了"一个可见的确认。
+    // 键盘 1/2/3 也走同一条路径，所以鼠标和键盘都能看到反馈。
+    this._pressFeedback(action);
     var words = this.getCardWords();
     if (!words.length) return;
     var w = words[this.currentIndex];
@@ -2937,7 +3190,9 @@ this.renderStats();
       window.EventBus.emit(EVT.WORD_REVIEWED, evtData);
       window.EventBus.emit(EVT.DAILY_PLAN_CHANGED, { today: today });
     }
-    this.nextWord();
+    // P1-2：新卡从对应方向进来——「不认识」从左侧、其余从右侧。
+    // 评价结果此前毫无感知（记完分直接换卡），方向 + 按钮按下态一起补上"已记录"的确认。
+    this.nextWord(action === 'forgot' ? 'left' : 'right');
   };
   WordModule.prototype.getToday = function() { return getLocalDateStr(); };
   WordModule.prototype.currentReviewCount = function() {
@@ -3091,7 +3346,7 @@ var GrammarModule = (function() {
     if (this.currentIndex >= this.exercises.length) { this.showScore(); return; }
     var ex = this.exercises[this.currentIndex];
     document.getElementById('grammar-progress-text').textContent = '第 ' + (this.currentIndex + 1) + '/' + this.exercises.length + ' 题';
-    document.getElementById('grammar-progress-fill').style.width = ((this.currentIndex + 1) / this.exercises.length * 100) + '%';
+    ProgressBar.set('grammar-progress-fill', (this.currentIndex + 1) / this.exercises.length * 100);
     document.getElementById('gq-text').textContent = ex.question;
     document.getElementById('gq-options').innerHTML = '';
     document.getElementById('gq-input').style.display = 'none';
@@ -3251,8 +3506,12 @@ var ReadingModule = (function() {
         document.getElementById('r-text').innerHTML = '';
         document.getElementById('r-vocab').classList.add('hidden');
         document.getElementById('r-questions').classList.add('hidden');
+        // 换难度等于回到空状态，三个开关重新置灰
+        self._syncReadingControls(false);
       });
     }
+    // 初始是空状态（还没有文章），开关先置灰
+    this._syncReadingControls(false);
     safeBind('show-cn', 'change', function() {
       document.querySelectorAll('.r-cn').forEach(function(el) { el.style.display = document.getElementById('show-cn').checked ? 'block' : 'none'; });
     });
@@ -3374,11 +3633,27 @@ pop.style.left = left + 'px';
     var pop = document.getElementById('r-trans-popup');
     if (pop) pop.classList.add('hidden');
   };
+  // 空状态下「显示中文 / 重点词汇 / 答案」三个开关是可点的，但没有文章可以作用——
+  // 勾了什么也不会发生（UI 审查 P3-9）。有文章时才放开。
+  ReadingModule.prototype._syncReadingControls = function(enabled) {
+    var ids = ['show-cn', 'show-vocab', 'show-answer'];
+    ids.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = !enabled;
+      if (enabled) el.removeAttribute('aria-disabled');
+      else el.setAttribute('aria-disabled', 'true');
+    });
+    var toggle = document.getElementById('r-toggle');
+    if (toggle) toggle.classList.toggle('is-disabled', !enabled);
+  };
+
   ReadingModule.prototype.loadArticle = function(idx) {
     this._hidePopup();
     this.currentArticle = this.filtered[idx];
     var a = this.currentArticle;
-    if (!a) return;
+    if (!a) { this._syncReadingControls(false); return; }
+    this._syncReadingControls(true);
     document.getElementById('r-title').textContent = a.title;
     var html = '';
     // 段落优先用 a.paragraphs（含 {en,cn} 的对象数组），否则用 a.text 按 \n\n 切段，
@@ -3531,7 +3806,7 @@ this.mode = document.getElementById('listening-mode').value;
     if (this.currentIndex >= this.words.length) { this.showScore(); return; }
     var w = this.words[this.currentIndex];
     document.getElementById('listening-progress-text').textContent = '第 ' + (this.currentIndex + 1) + '/' + this.words.length + ' 题';
-    document.getElementById('listening-progress-fill').style.width = ((this.currentIndex + 1) / this.words.length * 100) + '%';
+    ProgressBar.set('listening-progress-fill', (this.currentIndex + 1) / this.words.length * 100);
     if (this.mode === 'sentence' && w.example) {
       var safeWord = escapeReg(w.word || '');
       var hint = w.example.replace(new RegExp('\\b' + safeWord + '\\b', 'gi'), '______');
@@ -3636,7 +3911,7 @@ var SpellingModule = (function() {
     var w = this.words[this.currentIndex];
     var self = this;
     document.getElementById('spelling-progress-text').textContent = '第 ' + (this.currentIndex + 1) + '/' + this.words.length + ' 题';
-    document.getElementById('spelling-progress-fill').style.width = ((this.currentIndex + 1) / this.words.length * 100) + '%';
+    ProgressBar.set('spelling-progress-fill', (this.currentIndex + 1) / this.words.length * 100);
     if (this.mode === 'cn2en') {
       document.getElementById('spelling-prompt').textContent = w.chinese;
       document.getElementById('spelling-input-area').style.display = 'block';
@@ -3997,7 +4272,7 @@ PKModule.prototype.startTimer = function() {
   PKModule.prototype.showQuestion = function() {
     if (this.currentIndex >= this.words.length || !this.isRunning) { this.endGame(); return; }
     var w = this.words[this.currentIndex];
-    document.getElementById('pk-progress-fill').style.width = (this.currentIndex / this.words.length * 100) + '%';
+    ProgressBar.set('pk-progress-fill', this.currentIndex / this.words.length * 100);
     document.getElementById('pk-prompt').textContent = w.chinese || '';
     document.getElementById('pk-result').classList.add('hidden');
     document.getElementById('pk-actions').style.display = 'none';
@@ -4199,7 +4474,7 @@ ContextModule.prototype.start = function() {
     if (this.currentIndex >= this.exercises.length) { this.showScore(); return; }
     var ex = this.exercises[this.currentIndex];
     document.getElementById('context-progress-text').textContent = '第 ' + (this.currentIndex + 1) + '/' + this.exercises.length + ' 题';
-    document.getElementById('context-progress-fill').style.width = ((this.currentIndex + 1) / this.exercises.length * 100) + '%';
+    ProgressBar.set('context-progress-fill', (this.currentIndex + 1) / this.exercises.length * 100);
     document.getElementById('context-sentence').textContent = ex.sentence;
     document.getElementById('context-hint').textContent = '中文提示：' + ex.chinese;
     document.getElementById('context-translation').textContent = ex.translation;
@@ -4355,14 +4630,14 @@ PomodoroModule.prototype.start = function() {
     this.updateStats();
     var msgEl = document.getElementById('pomodoro-message');
     msgEl.classList.remove('hidden');
-    msgEl.innerHTML = '🎉 专注完成！休息一下吧！';
+    msgEl.innerHTML = '专注完成！休息一下吧！';
     document.getElementById('btn-pomodoro-start').innerHTML = '<svg class="icon"><use href="#i-play"/></svg> 开始专注';
     // 完成后回到当前选中时长 MM:00，方便立即开下一轮
     this.timeLeft = minutes * 60;
     this.updateDisplay();
     Toast.success('番茄钟完成！');
     // 到时间提醒：弹窗（跨页面可见，不受开关影响）+ 三连提示音/震动（可设置关闭）
-    ConfirmBox.alert('🎉 专注完成！休息一下吧。', { title: '番茄钟完成', okText: '知道了' });
+    ConfirmBox.alert('专注完成！休息一下吧。', { title: '番茄钟完成', okText: '知道了' });
     if (this.soundEnabled) {
       this._playAlertSound();
       this._vibrate();
@@ -4838,7 +5113,7 @@ var SpeakModule = (function() {
     if (this.currentIndex >= this.words.length) { this.showScore(); return; }
     var w = this.words[this.currentIndex];
     document.getElementById('speak-progress-text').textContent = '第 ' + (this.currentIndex + 1) + '/' + this.words.length + ' 题';
-    document.getElementById('speak-progress-fill').style.width = ((this.currentIndex + 1) / this.words.length * 100) + '%';
+    ProgressBar.set('speak-progress-fill', (this.currentIndex + 1) / this.words.length * 100);
     document.getElementById('speak-word').textContent = w.word;
     document.getElementById('speak-phonetic').textContent = w.phonetic || '';
     document.getElementById('speak-chinese').textContent = w.chinese || '';
@@ -5063,7 +5338,7 @@ var MistakeTrainModule = (function() {
     var promptText = fill ? (target === w.chinese ? w.word : w.chinese) : (w.chinese || '');
     this._mtTarget = target;
     document.getElementById('mt-progress-text').textContent = '第 ' + (this.currentIndex + 1) + '/' + this.words.length + ' 题';
-    document.getElementById('mt-progress-fill').style.width = ((this.currentIndex + 1) / this.words.length * 100) + '%';
+    ProgressBar.set('mt-progress-fill', (this.currentIndex + 1) / this.words.length * 100);
     document.getElementById('mt-chinese').textContent = promptText;
     document.getElementById('mt-example').textContent = w.example || '';
     document.getElementById('mt-example').classList.toggle('hidden', !w.example);
@@ -5176,7 +5451,7 @@ var GamificationSystem = (function() {
     var leveledUp = newLevel > oldLevel;
     if (leveledUp) {
       this.data.level = newLevel;
-      Toast.success('🎉 升级到 Lv.' + newLevel + '！');
+      Toast.success('升级到 Lv.' + newLevel + '！');
     }
     this.save();
     // 同步顶栏统计
@@ -5212,7 +5487,7 @@ var GamificationSystem = (function() {
     }
     // 仅在连续打卡跨越阈值时 Toast 一下
     if (this.data.streak === 7 || this.data.streak === 30) {
-      Toast.info('🎉 连续打卡 ' + this.data.streak + ' 天！');
+      Toast.info('连续打卡 ' + this.data.streak + ' 天！');
     }
     this.addPoints(type === 'word' ? 5 : 10);
     // P0-04 事件通知：连续打卡变化
@@ -5283,7 +5558,7 @@ var DailyChallenge = (function() {
     var completed = this.data.completed.length;
     var total = this.data.tasks.length;
     var pct = Math.round(completed / total * 100);
-    document.getElementById('dc-progress-fill').style.width = pct + '%';
+    ProgressBar.set('dc-progress-fill', pct);
     document.getElementById('dc-progress-text').textContent = completed + '/' + total + ' 已完成';
     var claimBtn = document.getElementById('btn-claim-dc');
     if (claimBtn) {
@@ -5337,7 +5612,7 @@ DailyChallenge.prototype.claimReward = function() {
     if (window.app && window.app.gamification) {
       window.app.gamification.addPoints(50);
     }
-    Toast.success('🎉 领取奖励：+50 积分！');
+    Toast.success('领取奖励：+50 积分！');
     this.render();
   };
   return DailyChallenge;
@@ -5443,7 +5718,20 @@ var ChartModule = (function() {
     }
     var total = days.reduce(function(s, x) { return s + x.count; }, 0);
     var totalEl = document.getElementById('chart-week-total');
-    if (totalEl) totalEl.textContent = '近 7 天共 ' + total + ' 词';
+    if (totalEl) totalEl.textContent = total > 0 ? '近 7 天共 ' + total + ' 词' : '暂无记录';
+
+    // 零数据空状态（UI 审查 P1-6）：7 条等长的空心胶囊在冷灰卡面上和"没加载完的
+    // 骨架屏"完全同形，用户会以为图表在加载。这里改成一行说明 + 一个行动入口。
+    if (total <= 0) {
+      listEl.innerHTML = '<div class="week-empty">'
+        + '<p class="week-empty-title">近 7 天还没有学习记录</p>'
+        + '<p class="week-empty-sub">今天先学 10 个词，这里就会出现第一条。</p>'
+        + '<button type="button" class="btn btn-sm" data-goto="word">去背单词</button>'
+        + '</div>';
+      var emptyStyle = listEl.ownerDocument.getElementById('week-days-list-theme');
+      if (emptyStyle) emptyStyle.textContent = '';
+      return;
+    }
 
     var cs = getComputedStyle(document.documentElement);
     function color(name, fallback) { var v = cs.getPropertyValue(name).trim(); return v || fallback; }
@@ -5461,7 +5749,9 @@ var ChartModule = (function() {
       html += '<div class="' + rowCls + '">'
         + '<div class="week-row-left"><span class="week-row-label">' + (d.isToday ? '今天' : d.label) + '</span>'
         + '<span class="week-row-date">' + d.date + '</span></div>'
-        + '<div class="week-row-bar"><div class="week-row-fill" style="width:' + pct + '%"></div></div>'
+        + '<div class="week-row-bar" role="progressbar" aria-label="' + (d.isToday ? '今天' : d.label) + '学习量"'
+        + ' aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '">'
+        + '<div class="week-row-fill" style="width:' + pct + '%"></div></div>'
         + '<span class="week-row-count' + (d.isToday ? ' week-row-count-today' : '') + '">' + escapeHtml(d.count) + ' 词</span>'
         + '</div>';
     });
@@ -5634,7 +5924,20 @@ function App() {
     this._initAndroidBackHandler();
   }
   this.initNav();
+  this._initHashRouting();
   this.currentTab = 'home';
+  // P1-7 深链：带 #/word 打开（分享链接 / 刷新）时直达该页。
+  // 放在模块初始化之后——目标页的 render 依赖已构造好的子模块。
+  var _deepTab = this._tabFromHash();
+  if (_deepTab) {
+    this.showTab(_deepTab);
+  } else {
+    // 无 hash 时也要把 #/home 落到地址栏：否则用户复制地址栏拿到的是不带
+    // 页面信息的裸链接，分享出去仍然只能到首页（本脚本实测首屏 hash 为空）。
+    // 这里只写 hash 不走 showTab——index.html 已经把 page-home 设为 active，
+    // 再走一次 showTab 会在启动时额外触发一轮各模块 render。
+    try { window.history.replaceState({ msTab: 'home' }, '', '#/home'); } catch (e) {}
+  }
   this.updateGlobalStats();
   this.bindSettings();
 }
@@ -5720,9 +6023,16 @@ App.prototype._initMobileDrawer = function() {
     try { window.history.pushState({ msDrawer: ++drawerSeq }, ''); } catch (e) {}
   };
   var popBack = function() {
-    if (!window.history || !window.history.back) return;
+    // 占位条目**不靠 history.back() 回收** —— 那次异步回退落地的瞬间会把 hash 拉回旧值，
+    // 又被路由监听读成"用户切页"（历史上"切了又被弹回去"的根源）。
+    // 改成同步把这条占位条目改写回当前页的条目：无竞态、不留悬空条目。
+    // 留着悬空条目是真实危害：首页按返回键时会被它静默吞掉一次（不弹"再按一次退出"）。
+    if (!window.history || !window.history.replaceState) return;
     try {
-      if (window.history.state && window.history.state.msDrawer) window.history.back();
+      var st = window.history.state;
+      if (st && st.msDrawer) {
+        window.history.replaceState({ msTab: (self && self.currentTab) || 'home' }, '');
+      }
     } catch (e) {}
   };
   var close = function(restore) {
@@ -5749,6 +6059,15 @@ App.prototype._initMobileDrawer = function() {
     var first = sidebar.querySelector('.nav-btn');
     if (first && document.activeElement === menuBtn) { try { first.focus(); } catch (e) {} }
   };
+  // 供返回键 / 切页复用：必须走正规关闭路径，不能在外面直接 remove('open')。
+  // 原因有两个，都踩过：
+  //   1. close() 负责清空 lastFocus；绕过它的话 open() 开头的
+  //      `if (lastFocus !== null) return;` 会让汉堡按钮**此后永远打不开抽屉**。
+  //   2. 占位条目要靠 popBack() 清掉，否则会吞掉一次返回键。
+  // consume=true 表示顺带回收占位（返回键关抽屉时用）；
+  // 切页时传 false —— 交由 _writeHash() 把占位**改写**成新页条目，避免多压一条历史。
+  self._closeDrawer = function(consume) { close(!!consume); };
+
   if (menuBtn) menuBtn.addEventListener('click', function() {
     if (sidebar.classList.contains('open')) close(true);
     else open();
@@ -5767,37 +6086,125 @@ App.prototype._initMobileDrawer = function() {
       else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
     }
   });
-  // Android 返回键：抽屉打开时优先关抽屉
+  // 浏览器返回（区别于 Android 硬件返回键）：抽屉开着就先关掉。
+  // 注意 close(false) 不回收占位 —— 这次导航已经把我们带到了另一条历史条目上，
+  // 占位条目自然随之消失；切页同步改写占位的工作由 _writeHash() 负责。
   window.addEventListener('popstate', function() {
     if (sidebar.classList.contains('open')) close(false);
   });
 };
+// P1-7 返回键优先级：抽屉 → 弹窗 → 非首页则回首页 → 双击退出。
+// 返回 true 表示已被接管（App 不退），false 表示该走"再按一次退出"。
+//
+// 从 Capacitor 监听器里抽成方法是为了可测：原来这段逻辑埋在回调里，
+// 20 个页面之间没有退路这件事根本没法写测试。
+//
+// 关于弹窗：原选择器 `.modal-overlay.active` 是死代码，这个类在全项目从未出现过，
+// 真正的确认框是 ConfirmBox 建的 `#modal-confirm.modal.hidden`。
+// 走 ConfirmBox.close(false) 等价于点「取消」，回调语义正确。
+App.prototype._onBackPressed = function() {
+  // ⚠️ 抽屉元素是 `.sidebar`（class），id 是 `sidebar-nav`。
+  // 原写法 getElementById('sidebar') 永远拿到 null —— 这条分支是**死代码**，
+  // 真机上抽屉打开时按返回键根本不关抽屉，而是落到下面"回首页"那一档。
+  // 顺带必须走 _closeDrawer()：直接 remove('open') 会把占位条目留在历史里，
+  // 之后在首页按返回键会被它静默吞掉一次。
+  var sidebar = (this._drawerEls && this._drawerEls.sidebar) || document.querySelector('.sidebar');
+  if (sidebar && sidebar.classList.contains('open')) {
+    // 传 true：这是"用户主动关抽屉"，占位条目必须当场回收，
+    // 否则它会留在历史里，之后在首页按返回键会被静默吞掉一次。
+    if (this._closeDrawer) this._closeDrawer(true);
+    else sidebar.classList.remove('open');
+    return true;
+  }
+  var confirmEl = document.getElementById('modal-confirm');
+  if (confirmEl && !confirmEl.classList.contains('hidden')) {
+    if (typeof ConfirmBox !== 'undefined' && ConfirmBox) ConfirmBox.close(false);
+    else confirmEl.classList.add('hidden');
+    return true;
+  }
+  var modal = document.querySelector('.modal:not(.hidden)');
+  if (modal) {
+    modal.classList.add('hidden');
+    return true;
+  }
+  // 非首页 → 回首页。首页是"根"，其余页面都从首页可达（首页有快捷入口），
+  // 所以退到首页是天然合理的落点，比"再按一次退出 App"符合直觉得多。
+  if (this.currentTab && this.currentTab !== 'home') {
+    this.showTab('home');
+    return true;
+  }
+  return false;
+};
+
+// P1-7 轻量路由：hash ↔ 页面双向同步
+//
+// _tabFromHash：只接受"确实存在这个页面"的 hash。
+// 任意 hash 都可能被用户/第三方拼出来，若不校验就把 #/xxx 当页面名，
+// 界面会被带到一个没有任何 .active 的空白区。
+// P1-7：把某个页写进历史（唯一的写入口，所有地方都走它）。
+//
+// 默认 **pushState**（不是 replaceState）：切页压一条历史，浏览器的前进/后退
+// 才能在应用内生效。早期版本一律 replaceState，于是浏览器后退会直接退出应用 ——
+// 那时候的顾虑是"切页压历史会和抽屉的占位打架"，如今抽屉改用「改写占位条目」
+// 的方式（见下），冲突的根源没了。
+//
+// 只有在**当前条目是抽屉占位**时才用 replaceState：把那条占位直接改写成本页的
+// 条目。这样既不留悬空条目，也不必再调用异步的 history.back() 去回收它 ——
+// 那个 back() 正是"切了又被弹回去"的根源（它落地时把 hash 拉回旧值，
+// 又被路由监听读成用户切页）。
+App.prototype._writeHash = function(tab) {
+  try {
+    var want = '#/' + tab;
+    var st = null;
+    try { st = window.history.state; } catch (e) {}
+    var replace = !!(st && st.msDrawer);
+    var entry = { msTab: tab };
+    if (window.location.hash !== want || replace) {
+      if (replace) window.history.replaceState(entry, '', want);
+      else window.history.pushState(entry, '', want);
+    }
+  } catch (e) {}
+};
+
+App.prototype._tabFromHash = function() {
+  var m = String((window.location && window.location.hash) || '').match(/^#\/([A-Za-z0-9-]+)$/);
+  if (!m) return null;
+  var name = m[1];
+  return document.getElementById('page-' + name) ? name : null;
+};
+
+App.prototype._initHashRouting = function() {
+  var self = this;
+  // popstate：浏览器前进/后退（以及任何历史遍历）都会触发，并且能拿到我们写进
+  // 条目的 state.msTab —— 比从 hash 反解更可靠（同一 hash 也可能有不同条目）。
+  // hashchange：补上"用户直接在地址栏改 hash"这条路径（那种改动不一定有 popstate）。
+  // 两个监听都指向同一个幂等处理器：已在目标页就直接返回，重复触发无害。
+  var onTraverse = function() {
+    var st = null;
+    try { st = window.history.state; } catch (e) {}
+    var tab = (st && st.msTab) ? st.msTab : self._tabFromHash();
+    if (!tab || tab === self.currentTab) return;   // 未知页名或已在当前页：不动
+    self._applyTabFromHistory(tab);
+  };
+  window.addEventListener('popstate', onTraverse);
+  window.addEventListener('hashchange', onTraverse);
+};
+
+// 从历史进入某页：切 DOM / 同步导航态，但**不再写历史** ——
+// 否则"后退 → 切页 → 又压一条"会形成回环，把前进方向冲掉。
+App.prototype._applyTabFromHistory = function(tab) {
+  if (!document.getElementById('page-' + tab)) return;   // 未知页名：不动
+  this.showTab(tab, { fromHistory: true });
+};
+
 App.prototype._initAndroidBackHandler = function() {
   if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
   var lastBackTime = 0;
+  var self = this;
   window.Capacitor.Plugins.App.addListener('backButton', function() {
-    var sidebar = document.getElementById('sidebar');
-    if (sidebar && sidebar.classList.contains('open')) {
-      sidebar.classList.remove('open');
-      return;
-    }
-    // 原选择器 `.modal-overlay.active` 是死代码：这个类在全项目从未出现过，
-    // 真正的项目弹窗是 ConfirmBox 建的 `#modal-confirm.modal.hidden`。
-    // 后果是"清空错题本 / 重置所有数据"的确认框开着时按返回键，找不到弹窗 →
-    // 直接落到"再按一次退出"，App 被退掉而弹窗还悬着。
-    // 改成按真实形态查找，并优先走 ConfirmBox.close(false)（等价于点「取消」，
-    // 回调语义正确），其它可见 .modal 兜底隐藏。
-    var confirmEl = document.getElementById('modal-confirm');
-    if (confirmEl && !confirmEl.classList.contains('hidden')) {
-      if (typeof ConfirmBox !== 'undefined' && ConfirmBox) ConfirmBox.close(false);
-      else confirmEl.classList.add('hidden');
-      return;
-    }
-    var modal = document.querySelector('.modal:not(.hidden)');
-    if (modal) {
-      modal.classList.add('hidden');
-      return;
-    }
+    // 抽屉 / 弹窗 / 非首页回首页 三类优先级统一在 _onBackPressed 里（P1-7）。
+    // 这里只保留"没人接管"时的 history 回收与双击退出。
+    if (self._onBackPressed()) return;
     // 不能用 history.length 判断"还能不能退"：它只增不减，抽屉用过一次后
     // 永远 >1，双击退出分支从此不可达（首页按返回变成静默无效操作）。
     // 改看当前历史条目的状态标记：只有我们自己压入的抽屉状态才需要 history.back()。
@@ -5818,7 +6225,7 @@ App.prototype._initAndroidBackHandler = function() {
     }
   });
 };
-App.prototype.showTab = function(tab) {
+App.prototype.showTab = function(tab, opts) {
   this.currentTab = tab;
   // 滚动复位：.content 是 20 个 .page 共用的唯一滚动容器，切页时不复位会导致
   // 从滚到底部的长页（设置/错题本）切到别的页时，新页直接停在半空、标题与主操作
@@ -5832,14 +6239,23 @@ App.prototype.showTab = function(tab) {
     _scroller.scrollTop = (typeof _restore === 'number' && _restore > 0) ? _restore : 0;
   }
   this._lastTab = tab;
-  // 移动端：选中后自动收起抽屉导航，并回收 Android 返回键占用的 history 状态
+  // 移动端：选中后自动收起抽屉导航。
+  // 抽屉占位不再靠 history.back() 回收 —— 那次异步回退会把 hash 拉回旧值，
+  // 又被路由监听读成"用户切页"，实测表现为"切过去 300ms 内被弹回来"。
+  // 改由下面的 _writeHash() 把这条占位条目直接改写成本页条目（同步、无竞态）。
   if (this._drawerEls && this._drawerEls.sidebar) {
-    this._drawerEls.sidebar.classList.remove('open');
-    if (this._drawerEls.scrim) this._drawerEls.scrim.classList.remove('show');
-    try {
-      if (window.history && window.history.state && window.history.state.msDrawer) window.history.back();
-    } catch (e) {}
+    // 必须走 _closeDrawer()，不能直接 remove('open')：
+    // close() 会清空 lastFocus，否则 open() 会以为"焦点还在别处"而拒绝再打开，
+    // 表现为"从抽屉里选过一次页面后，汉堡按钮就再也点不开了"。
+    if (this._closeDrawer) this._closeDrawer(false);
+    else {
+      this._drawerEls.sidebar.classList.remove('open');
+      if (this._drawerEls.scrim) this._drawerEls.scrim.classList.remove('show');
+    }
   }
+  // P1-7 轻量路由：把当前页写进历史。
+  // fromHistory = 这次切页是浏览器前进/后退带回来的，不能再写历史（否则回环）。
+  if (!opts || !opts.fromHistory) this._writeHash(tab);
   // 同步 aria-current：原来仅靠 .active 类名表达当前页，读屏用户无从知晓，
   // 键盘 / 读屏依赖 aria-current="page" 播报「当前页面」
   document.querySelectorAll('.nav-btn').forEach(function(b) {
@@ -5890,12 +6306,27 @@ App.prototype.showTab = function(tab) {
 App.prototype.updateGlobalStats = function() {
   if (!this.gamification) return;
   var gami = this.gamification.getStats();
-  document.getElementById('stat-level').textContent = 'Lv.' + gami.level;
-  document.getElementById('stat-points').textContent = gami.points;
-  document.getElementById('stat-streak').textContent = calculateStreak(DataStore.getProgress('checkins', {}));
-var progress = DataStore.getProgress('word_progress', {});
-  var mastered = Object.keys(progress).filter(function(k) { var p = progress[k]; return p && p.status === 'mastered'; }).length;
-  document.getElementById('stat-words').textContent = mastered;
+  // 顶栏只保留身份类信息（P3-11）：等级 / 积分。
+  // 原来的连续打卡与已掌握词数与首页统计卡重复，已从 DOM 删除 ——
+  // 这里必须补空值保护，否则一旦元素被移除就会在启动路径上抛错。
+  var levelEl = document.getElementById('stat-level');
+  if (levelEl) levelEl.textContent = 'Lv.' + gami.level;
+  var pointsEl = document.getElementById('stat-points');
+  if (pointsEl) pointsEl.textContent = gami.points;
+  this._syncHomeStatCards();
+};
+
+// 学习数据（连续打卡 / 已掌握词数）只写在首页统计卡上，不再重复写顶栏。
+App.prototype._syncHomeStatCards = function() {
+  var streakEl = document.getElementById('dash-streak');
+  if (streakEl) streakEl.textContent = calculateStreak(DataStore.getProgress('checkins', {}));
+  var progress = DataStore.getProgress('word_progress', {});
+  var mastered = Object.keys(progress).filter(function(k) {
+    var p = progress[k];
+    return p && p.status === 'mastered';
+  }).length;
+  var masteredEl = document.getElementById('dash-mastered');
+  if (masteredEl) masteredEl.textContent = mastered;
 };
 // ==================== 主动回忆 ====================
 App.prototype.triggerRecall = function(currentWord) {
@@ -6071,7 +6502,7 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
     recallToggle.checked = DataStore.getProgress('active_recall', false) === true;
     recallToggle.addEventListener('change', function() {
       DataStore.setProgress('active_recall', recallToggle.checked);
-      Toast.info(recallToggle.checked ? '已开启主动回忆模式' : '已关闭主动回忆模式');
+      
     });
   }
   // 自适应复习间隔开关：认识=按表推进；有点印象=间隔减半；不认识=次日重来（关闭恢复固定间隔）
@@ -6080,7 +6511,7 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
     adaptiveToggle.checked = DataStore.getProgress('adaptive_review', true) !== false;
     adaptiveToggle.addEventListener('change', function() {
       DataStore.setProgress('adaptive_review', adaptiveToggle.checked);
-      Toast.info(adaptiveToggle.checked ? '已开启自适应复习间隔' : '已关闭自适应复习间隔（恢复固定艾宾浩斯间隔）');
+      
     });
   }
   // 番茄钟完成提醒音开关：关掉后完成时仅弹窗，不播提示音/震动；即时同步到运行中的 PomodoroModule
@@ -6091,7 +6522,7 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
       var isOn = pomodoroSoundToggle.checked;
       DataStore.setProgress('pomodoro_sound_enabled', isOn);
       if (self.pomodoroModule) self.pomodoroModule.soundEnabled = isOn;
-      Toast.info(isOn ? '已开启番茄钟提醒音' : '已关闭番茄钟提醒音（弹窗仍会显示）');
+      
     });
   }
   // 自动保存开关：开启后按自定义间隔自动备份进度（默认 5 分钟，范围 1-1440）
@@ -6119,8 +6550,8 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
     autoSaveToggle.addEventListener('change', function() {
       var on = autoSaveToggle.checked;
       DataStore.setProgress('auto_save_enabled', on);
-      if (on) { startAutoSave(); Toast.success('自动保存已开启（每 ' + getAutoSaveMinutes() + ' 分钟）'); }
-      else { stopAutoSave(); Toast.info('自动保存已关闭'); }
+      // 开关状态自明（按钮本身已置位），不再弹 toast —— P2-9
+      if (on) startAutoSave(); else stopAutoSave();
     });
     if (autoSaveIntervalInput) {
       autoSaveIntervalInput.addEventListener('change', function() {
@@ -6318,14 +6749,35 @@ function fillVoiceOptions() {
     // 注意不能用含 "test" 的句子：有道 dictvoice 对含 test 的词组会拒绝（500）。
     SpeechUtil.speak('Hello, nice to meet you.', 'en-US');
   });
-  safeBind('btn-save-goal', 'click', function() {
-    var val = parseInt(document.getElementById('daily-goal').value);
-    if (isNaN(val) || val < 1 || val > 100) { Toast.warning('请输入1-100之间的数字'); return; }
+  // P1-5：每日目标改为「改完即生效」，删掉「保存设置」按钮。
+  // 原先同一屏里三种持久化模型混用（大部分开关 change 即存、这一项要手动保存、
+  // 自动保存间隔又是第三套），用户没法预判「我改完了没有」。
+  // input 走 700ms 防抖：数字框每次按键都会触发 input，直接写会把
+  // 「1」→「15」的中间态也落盘；change（失焦/回车）立刻提交，避免敲完就走丢。
+  var dailyGoalInput = document.getElementById('daily-goal');
+  var dailyGoalTimer = null;
+  function commitDailyGoal() {
+    if (dailyGoalTimer) { clearTimeout(dailyGoalTimer); dailyGoalTimer = null; }
+    if (!dailyGoalInput) return;
+    var val = parseInt(dailyGoalInput.value, 10);
+    if (isNaN(val) || val < 1 || val > 100) {
+      Toast.warning('请输入 1-100 之间的数字');
+      var cur = DataStore.getProgress('daily_goal', 10);
+      if (cur) dailyGoalInput.value = cur;   // 回滚，避免界面显示与已存数据不一致
+      return;
+    }
     DataStore.setProgress('daily_goal', val);
-    Toast.success('每日目标已保存！');
-  });
+    Toast.success('每日目标已设为 ' + val + ' 词');
+  }
+  if (dailyGoalInput) {
+    dailyGoalInput.addEventListener('input', function() {
+      if (dailyGoalTimer) clearTimeout(dailyGoalTimer);
+      dailyGoalTimer = setTimeout(commitDailyGoal, 700);
+    });
+    dailyGoalInput.addEventListener('change', commitDailyGoal);
+  }
   var dailyGoal = DataStore.getProgress('daily_goal', 10);
-  if (dailyGoal) document.getElementById('daily-goal').value = dailyGoal;
+  if (dailyGoal && dailyGoalInput) dailyGoalInput.value = dailyGoal;
 
   // 主动回忆弹窗内的按钮
   safeBind('btn-recall-show', 'click', function() { self.showRecallAnswer(); });

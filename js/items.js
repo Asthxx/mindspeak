@@ -258,7 +258,8 @@ var ThemeShop = (function() {
     this.applied = id;
     DataStore.setProgress('applied_theme', id);
     this.applyCss(id);
-    if (!silent) Toast.success('已启用「' + t.name + '」主题');
+    // P2-9：切换主题不弹 toast —— 整屏配色都变了，这就是最直白的反馈，
+    // 再弹一条"已启用 X 主题"是纯粹的多余确认（兑换成功那条保留：那是交易结果）。
     this.render();
   };
   // 恢复默认主题

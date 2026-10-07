@@ -219,8 +219,17 @@ async function main() {
   const cdp = new Cdp(dbg.webSocketDebuggerUrl);
   await cdp.open();
   await cdp.send('Target.setDiscoverTargets', { discover: true });
-  const { targetInfos } = await cdp.send('Target.getTargets');
-  const page = targetInfos.find(t => t.type === 'page');
+  // page target 不是同步就绪的：--headless=new 偶尔在 /json/version 已经可访问、
+  // 但 page target 还没注册时被查询到，直接 .find() 会拿到 undefined 并抛
+  // "Cannot read properties of undefined (reading 'targetId')"（偶发，非确定性）。
+  // 重试到最多 5 秒，或在真的没有 page 时显式报错，避免误判成审计结果有问题。
+  let page = null;
+  for (let i = 0; i < 25 && !page; i++) {
+    const { targetInfos } = await cdp.send('Target.getTargets');
+    page = targetInfos.find(t => t.type === 'page');
+    if (!page) await sleep(200);
+  }
+  if (!page) throw new Error('Chromium 未提供 page target（5 秒内未就绪）');
   const { sessionId: S } = await cdp.send('Target.attachToTarget', { targetId: page.targetId, flatten: true });
 
   const errors = [];

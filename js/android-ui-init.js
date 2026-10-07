@@ -193,9 +193,11 @@
       var menu = document.createElement('div');
       menu.className = 'long-press-menu';
       menu.innerHTML =
-        '<div class="long-press-menu-item" data-action="favorite"><span class="icon">⭐</span><span>收藏</span></div>' +
-        '<div class="long-press-menu-item" data-action="mistake"><span class="icon">❌</span><span>加入错词本</span></div>' +
-        '<div class="long-press-menu-item" data-action="share"><span class="icon">📤</span><span>分享</span></div>';
+        // P2-6：原来用 ⭐ / ❌ / 📤 当图标。emoji 在不同系统渲染成完全不同的
+        // 形状与色彩（Windows 彩色、部分环境单色），还和 sprite 的线宽对不齐。
+        '<div class="long-press-menu-item" data-action="favorite"><span class="icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-star" xlink:href="#i-star"/></svg></span><span>收藏</span></div>' +
+        '<div class="long-press-menu-item" data-action="mistake"><span class="icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-error" xlink:href="#i-error"/></svg></span><span>加入错词本</span></div>' +
+        '<div class="long-press-menu-item" data-action="share"><span class="icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-share" xlink:href="#i-share"/></svg></span><span>分享</span></div>';
 
       // 忽略长按抬起瞬间产生的点击，防止误触第一项
       var shownAt = Date.now();
@@ -315,7 +317,7 @@
       var hasScore = data && typeof data.score !== 'undefined' && data.score !== null;
       var level = this._escapeHtml(data && data.level ? data.level : '');
       var html =
-        '<div class="bottom-sheet-title">练习完成 🎉</div>' +
+        '<div class="bottom-sheet-title">练习完成</div>' +
         (hasScore ? '<div class="bottom-sheet-score">' + this._escapeHtml(data.score) + '</div>' : '') +
         '<div class="bottom-sheet-level">' + (level ? '等级：' + level : '继续加油！') + '</div>' +
         '<button type="button" class="bottom-sheet-btn" data-action="close">好的</button>';

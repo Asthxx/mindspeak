@@ -304,7 +304,7 @@ var DashboardModule = (function () {
     this._setText(this.dom.goal, stats.goal);
     this._setText(this.dom.dueAnalysis, stats.dueCount);
     this._setText(this.dom.doneAnalysis, stats.doneCount);
-    this._setText(this.dom.total, stats.total);
+    this._setLibraryTotal(stats.total);
     this._setText(this.dom.totalMastered, stats.mastered);
 
     // 今日新学进度
@@ -330,6 +330,38 @@ var DashboardModule = (function () {
 
   // ==================== DOM 写入工具（值未变则不写，减少无谓重排） ====================
 
+  // 「词库总量」必须区分「真的没有」和「还没到」（UI 审查 P1-1）。
+  //
+  // data/all-data.js 约 9.9MB 是 async 加载的；在它落地前 getLibraryTotal()
+  // 只能读到内置小词库，算出来的 total 是 0。直接写进去，用户首屏看到的就是
+  // 「词库总量 0 词」——一个把"加载中"误读成"这个 App 里没有词"的显示。
+  DashboardModule.prototype._setLibraryTotal = function (total) {
+    var el = this.dom.total;
+    if (!el) return;
+    var L = window.Loading;
+    if (!L) { this._setText(el, total); return; }
+
+    if (!L.libraryReady()) {
+      // swap:true —— #dash-total 是 <b>0</b>，内容就是文本节点，
+      // 不 swap 的话 CSS 隐藏对文本节点无效，会"0"和骨架并排显示
+      L.skeleton(el, { variant: 'inline', rows: 1, swap: true });
+      if (!this._libWaitHandle) {
+        var self = this;
+        this._libWaitHandle = L.awaitLibrary({
+          ready: function () { self._libWaitHandle = null; self.render(); },
+          onTimeout: function () {
+            self._libWaitHandle = null;
+            L.skeletonClear(el);
+            self._setText(el, total);   // 超时就按真实值显示，不再假装还在加载
+          },
+        });
+      }
+      return;
+    }
+    L.skeletonClear(el);
+    this._setText(el, total);
+  };
+
   DashboardModule.prototype._setText = function (el, val) {
     if (!el) return;
     var text = String(val);
@@ -342,16 +374,12 @@ var DashboardModule = (function () {
     }
   };
 
-  // 进度条：视觉宽度 + 无障碍数值同步更新（role=progressbar 由 HTML 声明）
+  // 进度条：视觉宽度 + 无障碍数值同步更新（role=progressbar 由 HTML 声明）。
+  // 逻辑统一在 js/core/progress.js，这里只是保留旧调用点，避免两处实现漂移。
   DashboardModule.prototype._setBar = function (fillEl, pct) {
     if (!fillEl) return;
-    var width = pct + '%';
-    if (fillEl.style.width !== width) fillEl.style.width = width;
-    var track = fillEl.parentNode;
-    if (track && track.getAttribute('role') === 'progressbar') {
-      track.setAttribute('aria-valuenow', String(pct));
-      track.setAttribute('aria-valuetext', pct + '%');
-    }
+    if (window.ProgressBar) return ProgressBar.set(fillEl, pct);
+    fillEl.style.width = pct + '%';
   };
 
   return DashboardModule;

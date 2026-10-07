@@ -2,7 +2,15 @@
    DESIGN SYSTEM — AI English Growth Companion
    ============================================================
    Color Philosophy: 60-30-10
-   60% Warm Ivory  |  30% Deep Sage  |  10% Warm Coral
+   60% 冷灰白 (--ivory #F4F6F8, H210°)
+   30% 雾霾蓝 (--sage  #5B82A6, H209°)   ← 注意：不是"绿 sage"
+   10% 暖珊瑚 (--coral #FF8A65, H14°)
+
+   ⚠️ P2-4：本行描述此前写的是 "Warm Ivory | Deep Sage | Warm Coral"，
+   与实际取值完全不符 —— --ivory 是冷灰白、--sage 早就是雾霾蓝，
+   而所有卡片描边（--border）当时还是 H40° 的暖米色，色相与卡面相差 170°。
+   按名字取色的新人（期望 color: var(--sage) 得到绿色）一定会拿错。
+   语义别名：--brand-blue === --sage（新代码建议用前者，别再按名字猜色相）。
    ============================================================ */
 
 /* Font loaded via CSS in HTML for offline support */
@@ -27,8 +35,11 @@
   --sage-light:      #E3ECF4;
   --sage-surface:    #EEF4F9;
   --sage-hover:      #4A6F93;
+  /* P2-4：--sage 的名字与实际色相不符（雾霾蓝，不是鼠尾草绿）。
+     保留旧名以免大范围重构，补一个语义别名给新代码用。 */
+  --brand-blue:      var(--sage);
   /* ── 品牌「墨色」：专供「浅底上的品牌文字/图标」──
-     与 --sage-deep 的区别：--sage-deep 在深色主题下会翻亮成 #9FC5E4（浅蓝），
+     与 --sage-deep 的区别：--sage-deep 在深色主题下会翻亮成 var(--sage-light)（浅蓝），
      拿它当浅底上的前景色会直接失效。--brand-ink 恒定不翻转，白底实测 8.03:1。
      典型用法：深色渐变 hero 上的实心白按钮（见 nav.css 的 .ai-hero .btn-primary）。 */
   --brand-ink:       #33536F;
@@ -41,7 +52,15 @@
   --coral-surface:   #FFF5F0;
 
   /* ── Semantic Colors ── */
-  --success:         #4CAF50;
+  /* ── 语义色（P2-3c：统一血统）────────────────────────────────────
+     原 success #4CAF50 / warning #FFA726 是 Material 库存色（S39% / S100%），
+     与品牌色 --sage(S30%) 不同血统。首页 4 张统计卡把 4 个家族摆在一起时，
+     饱和度在 30% 与 100% 之间跳变 —— 这是"像拼凑的"的直接来源。
+     现向品牌色区间靠（S 45–70%、L 48–58%）：
+       success #4CAF50(H122 S39 L49) → #4E9E7A(H157 S34 L46)
+       warning #FFA726(H36 S100 L57) → #E0A040(H35 S68 L56)
+     明度基本保持，不影响原有的对比度结论。 */
+  --success:         #4E9E7A;
   --success-light:   #E8F5E9;
   --success-dark:    #388E3C;
 
@@ -50,7 +69,7 @@
   /* 原 #D32F2F 在 --danger-light 底上仅 4.36:1，压深一档到 4.92:1 */
   --danger-dark:     #C62828;
 
-  --warning:         #FFA726;
+  --warning:         #E0A040;
   --warning-light:   #FFF3E0;
   /* --amber 是历史遗留名，全项目 4 处引用却从未定义（background/color/border 静默失效）。
      此处统一别名到 --warning，修复 .ai-tip-prevent 徽章无底色、发音中等分无配色等问题。 */
@@ -62,7 +81,10 @@
   --coral-text:      #B04A28;   /* 白底 5.45:1 / ivory 底 5.03:1 / sage-surface 底 4.91:1 */
   --warning-text:    #8A5300;   /* warning-light 底 ≈5.5:1 */
 
-  --info:            #42A5F5;
+  /* --info 原 #42A5F5 是 H207° S90%，与 --sage #5B82A6(H209° S30%) 色相几乎相同，
+     却因饱和/明度差巨大而被当成两种颜色 —— 实际摆在一起会被读成同一层级的两个蓝。
+     P2-3：明确拉开到青色 H190°，让"它是另一种信息色"这件事在色相上就成立。 */
+  --info:            #3FA9C4;
   --info-light:      #E3F2FD;
 
   /* ── Text Colors ── */
@@ -80,10 +102,10 @@
 
   /* ── AI 气泡（语义令牌） ──
      用户气泡原先直接用 --sage 配白字，实测仅 4.05:1，低于 WCAG AA 正文 4.5:1；
-     改用深一档的 #4A6F93 后为 5.27:1。深色主题另给一套映射（见文件末尾 DARK THEME）。 */
-  --bubble-user-bg:     #4A6F93;
+     改用深一档的 var(--sage-hover) 后为 5.27:1。深色主题另给一套映射（见文件末尾 DARK THEME）。 */
+  --bubble-user-bg:     var(--sage-hover);
   --bubble-user-text:   #FFFFFF;
-  --bubble-user-border: #4A6F93;
+  --bubble-user-border: var(--sage-hover);
   --bubble-ai-text:     var(--text);
 
   /* ── Background ── */
@@ -93,13 +115,47 @@
   --surface-hover:   var(--sage-surface);
 
   /* ── Border ── */
-  --border:          #E5E2DC;
-  --border-light:    #EDEAE5;
+  /* ── Border（P2-3：色温修正）────────────────────────────────────
+     原 --border #E5E2DC 是 H40° 暖米色，--border-light #EDEAE5 是 H37°，
+     而卡面(--ivory)、品牌(--sage)、面层(--sage-surface) 全在 H207–210° ——
+     色相相差约 170°，正好在对立面。卡片描边、分隔线因此在一片冷调里泛暖，
+     这就是报告说的"可量化的脏感"。这是"暖米白 + 绿 sage"时代的遗留：
+     文件头注释至今仍写着 Warm Ivory / Deep Sage / Warm Coral，
+     而 --sage 的取值早已是雾霾蓝。
+     现吸附到 H210° 家族，明度基本不变（不改动层次关系）：
+       #E5E2DC(H40) → #E4E8EC(H210)      #EDEAE5(H37) → #EDF1F4(H210) */
+  --border:          #E4E8EC;
+  --border-light:    #EDF1F4;
   --border-focus:    var(--sage);
   --border-sage:     var(--sage-light);
 
+  /* ── Track（进度条/滑块等的空轨道，P1-6）─────────────────────────
+     独立语义角色：它既不是「边框」也不是「背景」，借用任何一方都会出问题——
+     借 --border-light(#EDEAE5, H37°) 会让空进度条呈现暖米色，在冷灰卡面上
+     像一块没加载完的骨架；借 --ivory-deep(#E9EDF1) 又太贴近白色（1.14:1），
+     轨道几乎看不见。
+     取值与卡面同色族（H≈215 冷中性），并保证填充色对轨道 ≥3:1：
+       浅色 #5B82A6 对 #DCE3EA = 3.21:1
+       深色 #7BA9CE 对 #33353A = 4.91:1
+     轨道对卡面的对比刻意控制在 1.2 左右（对称 1.26 / 1.23）——它是容器不是内容，
+     太抢眼会盖过填充部分。 */
+  --track:           #DCE3EA;
+
+  /* ── Skeleton（骨架屏，P1-1）──────────────────────────────────────
+     骨架同样是一个独立语义角色：它要"像内容但明确不是内容"——
+     所以既不能借用 --track（那是容器轨道，太实），也不能借用 --border。
+     base 与 highlight 只差一档明度：骨架的视觉重量必须低于真实文本，
+     否则读屏之外的用户会把加载态误读成"内容就是这样"。
+       浅色：#E7EBF0 → #DDE3EA（对卡面 1.13:1，刻意压到几乎不可见的差别）
+       深色：#31343A → #3C4048
+     判定依据（脚本 scripts/probe-loading-costs.mjs 实测）：
+       本地词库就绪窗口 603ms，慢机/慢网可达数秒 → 唯一值得上骨架的等待；
+       而 createPaper 仅 17.4ms，给它盖全屏过场只会制造闪烁（已否决该方案）。 */
+  --skeleton-base:       #E7EBF0;
+  --skeleton-highlight:  #DDE3EA;
+
   /* ── Sidebar ── */
-  --sidebar-bg:      linear-gradient(180deg, #2A3B4E 0%, #3E5F7F 100%);
+  --sidebar-bg:      linear-gradient(180deg, #2A3B4E 0%, var(--sage-deep) 100%);
   --sidebar-text:    rgba(255,255,255,0.9);
   --sidebar-active:  rgba(255,255,255,0.2);
   --sidebar-hover:   rgba(255,255,255,0.1);
@@ -112,6 +168,9 @@
 
   /* Font Sizes */
   --text-xs:         0.75rem;    /* 12px */
+  /* 13px 是报告新增的一级：12 与 14 之间原本靠 0.85rem(13.6px) 这类硬编码填补，
+     全项目共 36 处。补一级之后这一段才有正式落点。 */
+  --text-2xs:        0.8125rem;  /* 13px */
   --text-sm:         0.875rem;   /* 14px */
   --text-base:       1rem;       /* 16px */
   --text-lg:         1.125rem;   /* 18px */
@@ -152,6 +211,15 @@
   --sp-16:  4rem;      /* 64px */
   --sp-20:  5rem;      /* 80px */
   --sp-24:  6rem;      /* 96px */
+
+  /* ── 栅格外的两个显式例外（P2-2）────────────────────────────────
+     报告要求"例外豁免要显式"：这两类值不是随手微调，而是有明确用途，
+     所以给它们正式令牌，而不是散落 45 + 33 处裸写 6px / 2px。
+       · --sp-icon-gap：图标与文字之间的光学对齐（视觉上比等距更贴）
+       · --sp-hairline：发丝分隔线/描边的内缩量
+     其余 10px(45)、14px(30) 仍是"就近吸附"的双向选择，留给下一批逐处判断。 */
+  --sp-icon-gap:  6px;
+  --sp-hairline:  2px;
 
   /* ============================================================
      4. BORDER RADIUS
@@ -267,9 +335,9 @@
 
   /* ── AI 气泡（深色专项） ──
      深色主题下 --sage 翻成 #7BA9CE，白字仅 2.50:1。改为浅蓝底配深色字（#0E141B）= 5.37:1。 */
-  --bubble-user-bg:     #5E8FB8;
+  --bubble-user-bg:     var(--sage-muted);
   --bubble-user-text:   #0E141B;
-  --bubble-user-border: #5E8FB8;
+  --bubble-user-border: var(--sage-muted);
   --bubble-ai-text:     var(--text);
 
   /* ── Background ── */
@@ -283,6 +351,11 @@
   --border-light:    #2E2F32;
   --border-focus:    var(--sage);
   --border-sage:     var(--sage-light);
+
+  /* ── Track（详见浅色主题处的说明）── */
+  --track:           #33353A;
+  --skeleton-base:       #31343A;
+  --skeleton-highlight:  #3C4048;
 
   /* ── Sidebar ── */
   --sidebar-bg:      linear-gradient(180deg, #141A22 0%, #1C2B3D 100%);
@@ -310,7 +383,7 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: var(--text-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -364,16 +437,13 @@ body {
   transform: scale(0.98);
 }
 
-.btn-primary {
-  background: var(--sage);
-  color: var(--text-inverse);
-  box-shadow: var(--shadow-sage);
-}
-
-.btn-primary:hover {
-  background: var(--sage-deep);
-  box-shadow: var(--shadow-lg);
-}
+/* ⚠️ P2-4b：.btn-primary 的定义已从这里删除。
+   它与 css/style.css:194 的同名规则冲突，而 style.css 加载更晚（index.html:40→42），
+   永远胜出 —— 写在这里的"实色版"是一段不会生效的死代码。
+   设计交接时最坑的就是它：改了 design-system.css，页面没有任何变化。
+   现在**唯一事实来源是 css/style.css**（渐变版）；
+   想改主按钮外观请改那边，或先把两边合并成一处再动。
+   扫描同类冲突：node scripts/check-css-duplicates.mjs */
 
 .btn-accent {
   background: var(--coral);
@@ -496,6 +566,80 @@ body {
   .btn-spinner { animation-duration: 1.8s; }
 }
 
+/* ── 区块骨架（加载状态体系的第二态，P1-1）──────────────────────────
+   解决的问题：首屏数据未就绪时，原有实现有两种表达——
+     · 留空 / 展示硬编码占位词（#current-word 里写死 "Abandon"）
+     · 显示 0（「词库总量 0 词」，把"加载中"误导成"这个 App 没词"）
+   骨架把"没有"和"还没到"区分开。
+
+   关键约束（改这里之前请先读）：
+   1. 默认藏法是加 .is-skeleton + CSS 隐藏元素子节点，**不搬动 DOM**。
+      #word-card 内部挂着 #current-word / #word-front 等 id 节点，搬进
+      DocumentFragment 后 getElementById 会取到 null，等待窗口内用户点
+      「朗读」「下一张」就会抛错。
+   2. 纯文本宿主（#dash-total 这类 <b>0</b>）必须走 swap:true，
+      文本节点不受 display 影响，否则会"0"和骨架并排显示。
+   3. 骨架块带 role="status"，宿主带 aria-busy="true"，读屏用户知道在等。 */
+.is-skeleton > *:not([data-skeleton]) { display: none; }
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 0;
+}
+.skeleton-line {
+  display: block;
+  width: 100%;
+  height: 12px;
+  border-radius:var(--radius-xs);
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-highlight) 37%,
+    var(--skeleton-base) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0 50%; }
+}
+
+/* 变体：卡片区（背单词卡等块级区域）——行更高、更像真实排版。
+   grid-area:1/1 是关键：.word-card 是 `display:grid; align-content:center`，
+   正面/背面用 grid-area:1/1 叠在同一格。骨架若默认自动放入"下一行"，
+   会被 align-content:center 整体推到卡片下半部——实测截图里骨架浮在卡底、
+   和真实内容（居中）不在一个位置。占同一格才能落在内容本该出现的地方。 */
+.skeleton--card {
+  grid-area: 1 / 1;
+  align-self: center;
+  width: 100%;
+  gap: 12px;
+  padding: 8px 0;
+}
+.skeleton--card .skeleton-line { height: 14px; }
+
+/* 变体：行内数值（统计卡里"词库总量"这类 <b>）——
+   必须 inline-flex，块级骨架会把 .dash-val 撑成两行 */
+.skeleton--inline {
+  display: inline-flex;
+  vertical-align: middle;
+  gap: 4px;
+  padding: 0;
+  width: 3.2em;
+}
+.skeleton--inline .skeleton-line { height: 1em; border-radius: 4px; }
+
+/* 尊重降低动效偏好：骨架完全静止。
+   与 spinner 不同，骨架停扫不会读成"卡住"——它本身就是"暂无内容"的形状，
+   用户通过内容出现来感知完成，而不是通过运动。 */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line { animation: none; }
+}
+
 /* ── 复选框统一尺寸与品牌色 ──
    此前设置页的 checkbox 走浏览器默认 13×13（阅读页/自动保存行写了 16px），
    在移动端既难看清也难点中。统一抬到 20px（移动端 24px）并用品牌色渲染勾选态；
@@ -545,14 +689,14 @@ select {
 /* ── Progress Bar ── */
 .progress {
   height: 8px;
-  background: var(--ivory-deep);
+  background: var(--track);
   border-radius: var(--radius-full);
   overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--sage), var(--sage-muted));
+  background: linear-gradient(90deg, var(--sage), var(--sage-deep));
   border-radius: var(--radius-full);
   transition: width var(--duration-slow) var(--ease);
 }
@@ -657,6 +801,75 @@ select {
 /* 主内容区接收锚点焦点时不显示默认焦点框（只有键盘跳转才会到这里） */
 #main-content:focus { outline: none; }
 #main-content:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* ── 全局键盘焦点环（P1-4） ──────────────────────────────────────────────
+   背景：此前全项目没有一条全局 :focus-visible 规则，只有三处白名单
+   （#page-home 的按钮、侧边栏导航项、.skip-link）。后果是 19 个页面里
+   18 个页面键盘用户看不到焦点在哪，而项目其实已经实现了空格翻转 / 1-2-3
+   打分这套快捷键（js/app.js）——投入了大半，却因为缺一条规则基本作废。
+
+   为什么用 !important：style.css 里有十余条 `.xxx:focus{outline:none}`
+   是针对鼠标点击写的（它们改用 border-color / box-shadow 表达聚焦）。
+   本规则的 specificity 是 0,2,0，与它们打平，而 design-system.css 在
+   index.html 里先加载（40 行 vs style.css 42 行），平手时后加载者胜，
+   所以不加 !important 会被这些组件规则静默吃掉。
+   焦点可见性是 WCAG 2.4.7 的硬性要求、且不允许被组件样式意外抑制，
+   这里用 !important 是有意为之，不是偷懒。
+
+   对比度：--border-focus 浅色 #5B82A6 对白色卡面 4.05:1、对 --ivory
+   卡面 3.74:1；深色 #7BA9CE 对深色底 5.75:1 —— 均高于非文本对比 3:1。 */
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--border-focus) !important;
+  outline-offset: 2px !important;
+}
+
+/* 例外 1：跳过导航链接浮在 --sage-deep 实底上，品牌色描边会糊在一起，
+   保留它原有的反色描边（--text-inverse）。 */
+.skip-link:focus-visible {
+  outline-color: var(--text-inverse) !important;
+}
+
+/* 例外 2：输入框已有 box-shadow 光环表达聚焦，两者叠加会出现双层环。
+   统一改为只保留描边——描边比 1px 的 border-color 变化显眼得多，
+   对低视力用户更可靠。 */
+.input:focus-visible,
+.assess-input:focus-visible {
+  box-shadow: none !important;
+}
+
+/* ── 快捷键提示条（P1-4 的可发现性一半） ──────────────────────────────────
+   默认 display:none，只在「有精确指针」的设备上由 JS 加 .is-on 才显示。
+   触屏（hover:none / pointer:coarse）永远不会出现——告诉手机用户
+   「按空格键」只会增加噪音。 */
+.word-keyhint {
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2) var(--sp-4);
+  margin: var(--sp-3) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--text-tertiary);
+}
+@media (hover: hover) and (pointer: fine) {
+  .word-keyhint.is-on { display: flex; }
+}
+.word-keyhint kbd {
+  display: inline-block;
+  min-width: 20px;
+  margin: 0 2px;
+  padding: 1px 5px;
+  font-family: var(--font-primary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+}
 
 .hidden { display: none !important; }
 .visible { display: block !important; }

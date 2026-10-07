@@ -148,6 +148,11 @@ const MODULES = [
   'js/core/errors.js',
   'js/core/events.js',
   'js/core/store.js',
+  // 进度条统一写入。必须与 index.html / build.js 的 jsOrder 保持同一相对顺序：
+  // 练习模块的 render() 会调 ProgressBar.set()，漏了这一项会让所有练习类用例
+  // 以「ProgressBar is not defined」集体变红（本批次真踩过）。
+  'js/core/progress.js',
+  'js/core/loading.js',
   'js/api-config.js',
   'js/tts-manager.js',
   'js/story.js',

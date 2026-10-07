@@ -154,17 +154,18 @@
 .dp-progress {
   flex-basis: 100%;
   height: 9px;
-  background: var(--surface-hover);
+  background: var(--track);
   border-radius: var(--radius-full);
   overflow: hidden;
 }
 .dp-bar-fill {
   height: 100%;
   border-radius: var(--radius-full);
-  background: linear-gradient(90deg, var(--sage), var(--sage-muted));
+  background: linear-gradient(90deg, var(--sage), var(--sage-deep));
   transition: width var(--duration-slow) var(--ease);
 }
-.dash-master-bar { background: linear-gradient(90deg, var(--coral), var(--coral-deep)); }
+/* 词库掌握进度同样是「越多越好」的进度，不该用 coral 收尾（P1-6） */
+.dash-master-bar { background: linear-gradient(90deg, var(--sage), var(--sage-deep)); }
 
 .dash-actions {
   display: flex;

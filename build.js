@@ -13,6 +13,8 @@ const jsOrder = [
   'js/core/errors.js', // 统一错误处理（依赖 logger 的 window.Log）
   'js/core/events.js', // EventBus 事件总线（模块解耦）
   'js/core/store.js', // UserState 统一状态访问层（含幂等 migration）
+  'js/core/progress.js', // 进度条统一写入（视觉宽度 + aria-valuenow 同源）
+  'js/core/loading.js', // 三态加载体系（按钮 loading / 区块骨架 / 等待词库）
   'js/tts-manager.js', // 全局统一 TTS 服务必须最先加载（其他文件都依赖 window.TTSManager）
   'js/nativetts-bridge.js', // Capacitor 原生 TTS 桥接层（Android 端由 tts-manager 调用）
   'js/android-ui-init.js', // Android UI 初始化（StatusBar、NavigationBar、触摸反馈、启动屏）

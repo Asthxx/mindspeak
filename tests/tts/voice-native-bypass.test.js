@@ -98,14 +98,30 @@ describe('显式选择的声音必须绕过原生引擎', () => {
     expect(globalThis.speechSynthesis.speak.mock.calls[0][0].voice.name).toBe('Microsoft Zira');
   });
 
-  it('default_no_selection_still_prefers_native_fast_path', async () => {
+  it('default_no_selection_keeps_native_as_fallback_when_no_server', async () => {
     localStorage.removeItem('tts_voice');
     localStorage.removeItem('selectedVoice');
     localStorage.removeItem('voice_name');
+    // 无 server（_serverDown=true）：原生是 WebView 语音不可用时唯一能出声的
+    // 通道，必须保留。这里的前提是「没有可用的 server」，而非「永远优先原生」。
+    globalThis.window.SpeechUtil._serverDown = true;
     var tts = globalThis.TTSManager;
     tts.speak('hello', { immediate: true });
     await flushMicrotasks();
-    // 系统默认：保留原生快速路径（Android WebView 的 speechSynthesis 有已知问题）
+    // 系统默认 + 无 server：保留原生快速路径（Android WebView 的 speechSynthesis 有已知问题）
     expect(globalThis.window.NativeTTSBridge.speak).toHaveBeenCalledTimes(1);
+  });
+
+  it('default_no_selection_defers_to_shared_route_when_server_reachable', async () => {
+    localStorage.removeItem('tts_voice');
+    localStorage.removeItem('selectedVoice');
+    localStorage.removeItem('voice_name');
+    // 已确认 server 可达：原生不再是唯一出声通道，若仍占用会播出系统引擎音色，
+    // 与走 SpeechUtil 的其余功能不一致，故让路给全站统一路由。
+    globalThis.window.SpeechUtil._serverDown = false;
+    var tts = globalThis.TTSManager;
+    tts.speak('hello', { immediate: true });
+    await flushMicrotasks();
+    expect(globalThis.window.NativeTTSBridge.speak).not.toHaveBeenCalled();
   });
 });

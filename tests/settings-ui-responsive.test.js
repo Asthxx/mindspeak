@@ -13,9 +13,14 @@ const styleCss = readFileSync(join(root, 'css', 'style.css'), 'utf8');
 const mobileCss = readFileSync(join(root, 'css', 'mobile.css'), 'utf8');
 const swJs = readFileSync(join(root, 'sw.js'), 'utf8');
 
+// .dm-grid 块的边界：从容器开标签到行首缩进的闭合标签。
+// 不要锚定「紧跟其后的那个元素」——P1-5 在它和自动保存块之间插入了解释性注释，
+// 旧锚点 `<label class="auto-save-toggle">` 立刻失配（本节初版就栽在这）。
+const DM_GRID_RE = /<div class="dm-grid">([\s\S]*?)\n\s*<\/div>/;
+
 /** 提取 index.html 中数据管理组的 .dm-grid 块 */
 function dmGridBlock() {
-  const m = html.match(/<div class="dm-grid">([\s\S]*?)<\/div>\s*<label class="auto-save-toggle">/);
+  const m = html.match(DM_GRID_RE);
   return m ? m[1] : '';
 }
 
@@ -58,7 +63,7 @@ describe('设置页：HTML 结构（index.html）', () => {
       expect(block, `缺少按钮 ${id}`).toContain(`id="${id}"`);
     }
     // 网格外不再残留这些按钮（防止双份 DOM）
-    const htmlWithoutGrid = html.replace(/<div class="dm-grid">[\s\S]*?<\/div>\s*<label class="auto-save-toggle">/, '');
+    const htmlWithoutGrid = html.replace(DM_GRID_RE, '');
     expect(htmlWithoutGrid).not.toContain('id="btn-save-progress"');
   });
 
@@ -83,8 +88,51 @@ describe('设置页：手机端适配（mobile.css）', () => {
     expect(mobileCss).toMatch(/#page-settings \.dm-grid \.btn\{width:100%\}/);
   });
 
-  it('设置组内直接子按钮（保存设置/试听声音等）在手机上全宽', () => {
+  it('设置组内直接子按钮（试听声音等）在手机上全宽', () => {
     expect(mobileCss).toMatch(/#page-settings \.settings-group > \.btn\{display:flex;width:100%;justify-content:center\}/);
+  });
+});
+
+describe('设置页：保存模型统一为「改完即生效」（P1-5）', () => {
+  const appJs = readFileSync(join(root, 'js', 'app.js'), 'utf8');
+
+  it('「保存设置」按钮已移除，每日目标改为 input/change 即时落盘', () => {
+    expect(html).not.toContain('btn-save-goal');
+    // 精确匹配"元素内文案"，不要用 not.toContain('保存设置')——
+    // 解释这段改动的 HTML 注释里也会出现这四个字，那会误报（本节初版就栽在这）。
+    expect(html).not.toMatch(/>\s*保存设置\s*</);
+    expect(appJs).not.toContain('btn-save-goal');
+    expect(appJs).toContain("dailyGoalInput.addEventListener('change', commitDailyGoal)");
+    // 输入过程有防抖，避免把「1」→「15」的中间态写进存储
+    expect(appJs).toMatch(/setTimeout\(commitDailyGoal,\s*\d+\)/);
+    expect(appJs).toContain('clearTimeout(dailyGoalTimer)');
+  });
+
+  it('每日目标仍是 setting-row 两列结构（标签在左、控件在右），并带说明文字位', () => {
+    expect(html).toMatch(/<div class="setting-row">\s*<label class="setting-label" for="daily-goal">每日新词数量<\/label>/);
+    expect(html).toMatch(/class="setting-row"[\s\S]*?<input type="number" id="daily-goal"/);
+    expect(html).toMatch(/class="setting-help">改完立即生效/);
+  });
+
+  it('自动保存的说明文字不再包在勾选框的 label 里（点说明不会误切开关）', () => {
+    // 外层必须是 div；勾选框与间隔输入各自拥有 label
+    expect(html).toMatch(/<div class="auto-save-block">/);
+    expect(html).toMatch(/<label class="auto-save-toggle" for="auto-save">/);
+    expect(html).toMatch(/<label for="auto-save-interval">每\s*<input type="number" id="auto-save-interval"/);
+    // 危险的旧结构：说明文字与输入框同处勾选框 label 内部
+    expect(html).not.toMatch(/<label class="auto-save-toggle">[\s\S]*?id="auto-save-interval"[\s\S]*?<\/label>/);
+    // 包裹用的 span 已删，对应 CSS 也要一起清掉
+    expect(html).not.toContain('class="auto-save-interval"');
+    expect(styleCss).not.toMatch(/\.auto-save-toggle \.auto-save-interval\{/);
+  });
+
+  it('间隔输入框的样式锚点已改为 .auto-save-block（跟着 DOM 迁移）', () => {
+    expect(styleCss).toMatch(/\.auto-save-block #auto-save-interval\{/);
+    expect(styleCss).toMatch(/\.auto-save-block \.auto-save-toggle\{margin:0\}/);
+  });
+
+  it('朗读声音的长说明改用 .setting-help，不再写行内 style', () => {
+    expect(html).toMatch(/<p class="setting-help">可选<b>在线音色<\/b>/);
   });
 });
 

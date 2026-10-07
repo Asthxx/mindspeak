@@ -241,7 +241,18 @@ var TTSManager = (function() {
       // 引擎默认声。仅"系统默认（自动选本地语音）"才走原生快速路径。
       var _explicitVoice = '';
       try { _explicitVoice = this._getVoiceName(); } catch (_e) {}
-      if (!_explicitVoice && window.NativeTTSBridge && window.NativeTTSBridge.available && this._nativeDead !== true) {
+      // _serverDown === false = 已确认本机 server 可达。此时原生引擎并非唯一
+      // 出声通道（WebView 的 speechSynthesis 在 server 可达时也能工作），却会
+      // 播出系统引擎的音色，与走 SpeechUtil 的其余 11 个功能（server SAPI）
+      // 不同声 —— 即"换了声音仍有页面不统一"。故让路给全站统一路由。
+      // 安全极性：只有「确认可达」(=== false) 才让路。=== true(无 server) 与
+      // undefined(探测未完成) 一律保留原生 —— 那正是 Android WebView 语音不可用
+      // （国产机无 Google TTS，见 app.js:409）时唯一能出声的通道，写反会导致静音。
+      var _serverUp = !!(window.SpeechUtil && window.SpeechUtil._serverDown === false);
+      var _useNative = !!(!_explicitVoice && window.NativeTTSBridge && window.NativeTTSBridge.available && this._nativeDead !== true && !_serverUp);
+      // [TEMP-DEBUG] 真机验证 G 用；验证完请连同 _speakWeb 内同类标记一并删除
+      try { Logger.log('TTSManager', '[TEMP-DEBUG] speak voice=' + JSON.stringify(_explicitVoice) + ' bridge=' + !!window.NativeTTSBridge + ' dead=' + (this._nativeDead === true) + ' serverUp=' + _serverUp + ' -> ' + (_useNative ? 'NATIVE' : 'WEB')); } catch (_e) {}
+      if (_useNative) {
         try { window.NativeTTSBridge.stop(); } catch (_e) {}
         const self = this;
         const token = {};              // 会话令牌：新一轮 speak / cancel 使旧看门狗失效
@@ -317,9 +328,12 @@ var TTSManager = (function() {
       // 会带着 onstart/onend/onerror 回调再次调用本方法；若此时再委托回 SpeechUtil，
       // 就成了 speak → _speakTTSOnline → speak 的死循环。该来源一律直连
       // speechSynthesis —— 那本就是 _speakTTSOnline 的最终兜底。
-      if (!_vn && !_hasRealVoice && !(opts && opts.fromSpeechUtil) && window.SpeechUtil) {
+      if (!_vn && !_hasRealVoice && !(opts && opts.fromSpeechUtil) && window.SpeechUtil
+          && typeof window.SpeechUtil.speak === 'function') {
         try { window.speechSynthesis.cancel(); } catch (_e) {}
         try { window.SpeechUtil._stopLocalAudio(); } catch (_e) {}
+        // [TEMP-DEBUG] 真机验证 G 用；验证完请删除
+        try { Logger.log('TTSManager', '[TEMP-DEBUG] _speakWeb 委派 SpeechUtil（instant 决策交回全站单一来源）'); } catch (_e) {}
         return window.SpeechUtil.speak(text, lang, opts);
       }
       if (_vn && !_hasRealVoice && window.SpeechUtil) {

@@ -49,6 +49,13 @@ src-tauri/node-runtime/
 .workbuddy/
 browser-shots/
 test-screenshots/
+# UI 审计产物：scripts/ui-audit.mjs 每次运行会产出 audit-shots/（约 6.4MB，80 张截图），
+# 并把上一轮备份成 audit-shots.bak-<UTC 时间戳>/（保留最近 1 份）。这些都是可再生的
+# 检查证据，不是源码，别把它们当提交产物。
+audit-shots/
+audit-shots.bak-*/
+# 审查过程中手工截取的证据图（docs/ui-review-*.md 的配图除外）
+docs/review-shots-*/
 *.bak
 *draft-backup.js
 

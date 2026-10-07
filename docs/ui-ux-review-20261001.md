@@ -260,6 +260,34 @@ if (typeof WORD_LIBRARY === 'undefined' || ...) {
 
 **预期效果**：用户能区分"没数据"和"还在加载"；减少"点了没反应"的重复点击。
 
+#### ✅ 已修复（第二批收尾，TDD 实现）
+
+**先做了耗时实测再决定要不要加骨架**——`scripts/probe-loading-costs.mjs`（真实 Chromium，重复取中位数）：
+
+| 候选路径 | 实测 | 结论 |
+|---|---|---|
+| 词库就绪窗口 | **603ms**（119987 词；慢机/慢网首达数秒） | 唯一值得上加载态的真实等待 |
+| `createPaper` 生成试卷 | **17.4ms** | **否决整页过场** |
+
+→ **对原建议第 3 条的更正**：给 17ms 的任务盖全屏遮罩只会制造一次闪烁，是负优化。方案改为**以词库窗口为核心**，不引入整页过场；这条结论已写进 `js/core/loading.js` 的注释与源码级守卫，防止以后凭直觉再加。
+
+**落地形态**：`js/core/loading.js`（`window.Loading`，排在 `app.js` 之前加载，三张加载表同步注册）
+
+| 能力 | 说明 |
+|---|---|
+| `Loading.button(btn, {label})` / `.end()` | 禁用 + 转圈 + **`aria-busy`**（只禁用不标注，读屏会读成"按钮坏了"） |
+| `Loading.skeleton(host, {variant, rows})` / `.end()` / `.clear()` | 区块骨架；默认**不搬动 DOM**（只加 `.is-skeleton` 让 CSS 隐藏子元素），文本宿主用 `swap:true` |
+| `Loading.awaitLibrary({...})` | 统一接管词库等待：**延迟 200ms 显形**（防闪烁）、轮询、15s 超时、`cancel()` |
+
+**接入的 3 处**（都换掉了各自的临时实现）：
+- `js/app.js` `populateCategories`：自造的 500ms 重试 + toast → 统一入口；卡区显示骨架。此前 `#current-word` 里硬编码的占位词 **"Abandon"** 会被用户在等待期当成今天要背的词
+- `js/dashboard.js` `_setLibraryTotal`：「词库总量 **0** 词」→ 骨架（swap 模式，文本节点不受 CSS 隐藏影响）
+- `js/assessment.js` `_libraryBusy`：改走统一入口，补上 `aria-busy`
+
+**新增**：`tests/core/loading-system.test.js`（22 条，含与 `js/core/progress.js` 同款的源码级守卫）、`tests/core/loading-wiring.test.js`（6 条行为级，走 `bootstrapApp` 真实加载生产代码）、`scripts/verify-loading.mjs`（真实浏览器验收：把词库脚本人为延迟 3s 造出可观测窗口，16/16 通过）。
+
+**测试期抓到的真实缺陷**：`skeleton()` 漏了返回值，导致 `awaitLibrary` 收态时 `undefined.end()` 抛错——这条是测试先写、实现先跑红才暴露的。
+
 ---
 
 ### P1-2 背单词的翻转与切词**零动效**，是硬切【操作反馈 / 点击响应】
@@ -397,6 +425,30 @@ css/design-system.css:627  #main-content:focus { outline: none; }
 - 首页作为"根"，其余页面都从首页可达——现在这一点成立（首页有快捷入口），所以回首页是天然合理的退路。
 
 **预期效果**：返回键从"要么无效要么退出 App"变成符合直觉的逐层后退；页面可分享、可收藏。
+
+#### ✅ 已修复（第三批，TDD 实现）
+
+**落地形态**（`js/app.js`）：
+
+| 能力 | 实现 |
+|---|---|
+| 切页写 hash | `showTab()` 用 `history.replaceState({msTab}, '', '#/'+tab)` |
+| hash 反向驱动 | `_initHashRouting()` 监听 `hashchange` → `showTab()`；未知 hash 由 `_tabFromHash()` 挡掉（校验 `#/xxx` 必须对应真实存在的 `#page-xxx`，否则界面会被带到一个没有 `.active` 的空白区） |
+| 深链 / 刷新保持 | 构造末尾读 `_tabFromHash()`，命中则 `showTab()`；未命中时补写 `#/home`，否则用户复制地址栏拿到的是不带页面信息的裸链接 |
+| 返回键 | 优先级抽成 `App.prototype._onBackPressed()`：抽屉 → 确认框 → 其它可见弹窗 → **非首页则回首页** → 双击退出。原来这段埋在 Capacitor 回调里，没法写测试 |
+
+**两条实测才发现的取舍与坑**：
+
+1. **首屏 hash 为空**：深链只在命中 hash 时 `showTab()`，无 hash 时地址栏一直是裸链接。已补写 `#/home`（真实浏览器验收时抓到）。
+2. **浏览器前进/后退曾在一段时期内刻意未打通，现已打通**（当时的说明保留在此，因为它是后续重构的直接原因）：切页用 `replaceState`，不压历史条目，所以浏览器后退会退到上一个文档而不是应用内切页。之所以这么取舍，是因为抽屉打开时会 `pushState({msDrawer})` 占位、`showTab()` 里还有一次 `history.back()` 去回收它；若切页也 `pushState`，那次回收会与 `hashchange` 反向驱动互相打断（实测会切了又弹回去）。
+
+   **后续是怎么把它做完的**（见本节末尾「剩余 4 项」里的 P1-7 回归）：先把"抽屉占位靠 `history.back()` 异步回收"这个**冲突根源**换掉——改成在切页时把那条占位条目**同步改写**成本页条目（`replaceState`）。根源消失后，切页就可以放心地 `pushState`，浏览器前进/后退天然打通，无需另做历史栈管理。
+
+   现在的行为：切 word → practice → settings，浏览器后退依次回到 practice、word，前进回到 practice；退到栈底时界面仍完整。真实浏览器验收 `scripts/verify-routing.mjs` 12/12。
+
+**新增**：`tests/core/routing.test.js`（14 条行为级）、`scripts/verify-routing.mjs`（真实浏览器验收，12/12）。
+
+**测试踩坑**：`history.back()` / `forward()` 在 jsdom 里**不可信**——初版写了两条用例，它们"立刻就通过了"，测的其实是 jsdom 的实现而不是我们的代码，已删除，改用真实浏览器验证。另外只改 hash 的 `Page.navigate` 是**同文档跳转**、不会重载应用，验深链时必须带 query 参数强制真实加载。
 
 ---
 
@@ -671,7 +723,7 @@ emoji 在不同系统渲染成完全不同的形状与色彩（Windows 彩色、
 | `showTab()` 开头复位 `#main-content.scrollTop = 0` | `js/app.js:5738` | P0-2 |
 | 底部导航 4 个 `data-tab` 改为聚合入口（或改标签） | `index.html:1729-1732` | P0-1 |
 | `.btn-primary` 在渐变底的实例改实心白底+深字 | `css/nav.css:108` 附近 | P0-4 |
-| 首页双主按钮降级为单一 primary | `index.html:397` | P0-3 |
+| 首页首屏收敛为单一 primary（去背单词、测评 CTA 双双降级） | `index.html:405`、`index.html:433` | P0-3 |
 | 兑换按钮补 `disabled` + 「还差 N 积分」 | `js/items.js:283` | P0-6 |
 | 返回键选择器改为 `#modal-confirm:not(.hidden)` | `js/app.js:5713` | P0-7 |
 | 词库重试去掉 toast，改按钮就地 loading | `js/assessment.js:401-405` | P0-8 |
@@ -680,7 +732,7 @@ emoji 在不同系统渲染成完全不同的形状与色彩（Windows 彩色、
 
 ### 第二批 · 需要半天到一天（建立状态与反馈体系）
 
-- 三态加载体系（按钮 loading / 区块骨架 / 整页过场）+ `aria-busy` → **P1-1**
+- 三态加载体系（按钮 loading / 区块骨架 / 等待词库统一入口）+ `aria-busy` → **P1-1** ✅ 已落地（整页过场经实测否决，见 P1-1 修复记录）
 - 卡片翻转与切卡的动效（含 `prefers-reduced-motion` 降级）→ **P1-2**
 - 全局 `:focus-visible` + 快捷键可发现性提示 → **P1-4**
 - 表单：统一即时保存、拆开嵌套 label → **P1-5**
@@ -754,9 +806,15 @@ emoji 在不同系统渲染成完全不同的形状与色彩（Windows 彩色、
   - 深浅两主题各有 hover 专项（深色下 `--sage-light` 是 `#1C2B3D`，不能当 hover 底，否则深底配深字失效）。
 
 ### P0-3 首页主操作唯一
-- 「去背单词」降为默认 `.btn`，与同组「开始复习」「词文串学」同级。
-- 测评 CTA 是**常驻卡**（已测评后变「重新测评」），所以主次改为动态分配（`js/onboarding.js` 的 `renderCTA`）：未测评时「立即测一测」是首屏主角、「开始学习」降为次级；已测评后反转。
-  - 静态改类名做不到——原来无论什么状态都是两个蓝色主按钮并存。
+- 「去背单词」降为默认 `.btn`，与同组「开始复习」「词文串学」同级（`index.html:405`）。
+- 「立即测一测」同样降为默认 `.btn`（`index.html:433`）。
+- **主次由静态样式承担，不做动态互换**：「开始学习」恒为 `btn-primary`，测评 CTA 恒为次级。
+
+> **一次被截图否决的方案（值得记下）**：最初按"谁更该被点谁当主角"的思路，在 `renderCTA()` 里做了状态互换——未测评时把 `btn-primary` 让给「立即测一测」，「开始学习」降次级；已测评后反转。
+> 代码通过、测试通过、桌面截图看着也对。但移动端截图 `audit-shots/mobile/home-light.png` 暴露了问题：**首屏一个蓝色按钮都没有**。
+> 原因是测评 CTA 卡位于首屏之下（要滚动才可见），桌面端同屏所以看不出来；互换之后可视区只剩「开始学习」这一个已被降级的白按钮。
+> 已回退为静态分配：首屏永远保留「开始学习」这一个蓝色落点，CTA 卡靠自身标题「还不知道自己的水平？」+ 描述承担召唤，按钮用次级足够。
+> 教训：**跨视口验证不能只看桌面**——首屏之外的元素参与"首屏主次"决策时，桌面截图会给出错误的通过信号。
 
 ### P0-6 主题兑换
 - `js/items.js` 新增 `_points()` 作为积分唯一取数入口，`render()` 与 `buy()` 共用，避免两处算法漂移。
@@ -784,8 +842,11 @@ emoji 在不同系统渲染成完全不同的形状与色彩（Windows 彩色、
 ### 验证
 - `node --check` 全部改动文件通过。
 - 测试：**677 / 678 通过**（唯一失败为 `signing-secrets` 的 `git EBUSY`，存量环境问题，与本轮无关）。
-- `node build.js` 通过（bundle 589.5KB → 341.6KB）。
+- `node build.js` 通过（bundle 589.8KB → 341.6KB）。
 - `node scripts/ui-audit.mjs` 复跑：76 → **80 屏**（新增 practice × 2 视口 × 2 主题）。
+- 审计读数（80 屏汇总）：**低对比度 0 处**、**console 错误 0 条**、**横向溢出页面 0 个**。
+  - AI 页 8 个"越界元素"全部来自**关闭状态的侧滑抽屉**（`#ai-drawer-close` 等，`right:1780` vs `vw:1440`），属刻意的离屏定位，非缺陷。
+- 逐屏视觉复核：`home`（移动浅/深）首屏各只有 1 个蓝色主按钮；`practice` 新页 8 卡与首页快捷入口同族；`items` 全部按钮为「还差 N 积分」+ 禁用态；`ai`（浅/深）hero 白底按钮可读、雷达显示「暂无数据」+ 轴标签「—」。
 
 ### 本轮踩坑（下次同类改动注意）
 - **两个测试是源码级正则守卫**，重构实现后断言必须同步更新，否则会误报为"功能回归"：
@@ -793,11 +854,90 @@ emoji 在不同系统渲染成完全不同的形状与色彩（Windows 彩色、
   - `tests/core/data-async-load.test.js` 断言 `Toast.info` 被调用 —— 这正是本次要移除的行为。已改为断言"不再弹 toast"+"按钮进入 loading 态"。
 - **新增页面要同步 `scripts/ui-audit.mjs` 的 `TABS`**，否则新页面永远不在审计覆盖里。
 - **审查阶段的一处自我更正**：报告初稿写"首页 4 张统计卡是 coral 色大字 0"，是把缩略图上的彩色图标底误读成了数字色。实际 `.dash-stat-num` 是 `color: var(--text)`（`css/dashboard.css:88`），彩色的是卡片左上角的**图标底**（`css/dashboard.css:80-85`）。结论"0 值不该占用强调字重"仍然成立，但证据描述已在正文更正。
+- **审计的"越界"指标有稳定误报源**：离屏抽屉/弹出层（`transform` 移出视口但未 `display:none`）会被判为越界。读报告时先看 `right` 与 `vw` 的差值——若等于抽屉宽度且元素属于 `*-drawer-*`，是设计行为而非布局溢出。真正的横向溢出要看 `overflowX: true`。
+- **审计脚本会自建备份**：每次运行把上一轮 `audit-shots/` 备份为 `audit-shots.bak-<时间戳>/`（约 6.5MB），并保留最近 1 份、自动清理更早的。不需要手工管理，但**不要把 `audit-shots.bak-*` 当成需要提交的产物**。
 
 ---
 
 **审查人**：UI Designer
 **审查日期**：2026-10-01
 **第一批修复**：2026-10-02
-**复核方式**：截图证据见 `audit-shots/`；代码证据均带 `文件:行号`；色彩数据可用 `scripts/` 下的脚本复算。
-**状态**：第一批已实施并验证；P1 / P2 待排期
+**第二批（P1）**：2026-10-06
+**第三批（P1-7 起 + P2/P3 大部分）**：2026-10-06
+**复核方式**：截图证据见 `audit-shots/`；代码证据均带 `文件:行号`；色彩与令牌数据可用 `scripts/` 下的脚本复算。
+**状态**：第一批 / 第二批 / 第三批全部完成，报告中的问题项已清零（19/19）。
+其中 4 项（P2-7 / P2-8 / P3-6 / P3-7）未沿用本报告的原方案，换了另一套做法，见文末「剩余 4 项（已按另一套方案落地）」；
+P1-7 的"浏览器前进/后退未打通"限制也已收尾，见「两条实测才发现的取舍与坑」第 2 条。
+
+---
+
+## 修复记录 · 第二 / 三批（2026-10-06）
+
+### 已完成
+
+| 项 | 内容 | 关键产物 |
+|---|---|---|
+| **P1-1** | 三态加载体系（按钮 loading / 区块骨架 / 等待词库）。**TDD 实现**；先实测再决定，`createPaper` 仅 17.4ms 故**否决了原方案的整页过场** | `js/core/loading.js`、`tests/core/loading-system.test.js`、`loading-wiring.test.js`、`scripts/verify-loading.mjs`（16/16） |
+| **P1-2/P1-3** | 卡片 3D 翻转与切卡动效（含 `prefers-reduced-motion` 降级）、左右滑动手势 | `css/style.css`、`scripts/verify-card-motion.mjs` |
+| **P1-4** | 全局 `:focus-visible` + 快捷键可发现性 | `css/design-system.css`、`scripts/verify-focus.mjs` |
+| **P1-5** | 设置页表单：拆嵌套 label、去掉与即时保存矛盾的保存按钮 | `tests/settings-ui-responsive.test.js` |
+| **P1-6** | 进度条语义：视觉宽度与 `aria-valuenow` 同源；新增独立 `--track` 轨道令牌 | `js/core/progress.js`、`tests/core/progress-semantics.test.js` |
+| **P1-7** | 轻量 hash 路由 + 深链 + 返回键回首页；**浏览器前进/后退也已打通**（切页改 `pushState`，抽屉占位由"异步 `history.back()` 回收"改为"同步改写条目"，冲突根源消失） | `tests/core/routing.test.js`（14）、`scripts/verify-routing.mjs`（12/12） |
+| **P1-8** | 顶栏统计条去掉"整块翻主色"的假可点 hover（降级为只变底色） | `css/style.css`、`tests/core/toast.test.js` 守卫 |
+| **P2-1** | 字号令牌化：硬编码 **345 → 11**（余下为 41–80px 展示级字号，有意保留）；补 13px 字阶级 `--text-2xs` | `scripts/apply-token-convergence.mjs` |
+| **P2-2** | 间距例外显式令牌化：`--sp-icon-gap:6px` / `--sp-hairline:2px`，脱轨 **203 → 161**（10/14px 双向选择留待下一批） | 同上 |
+| **P2-3** | 修 `--border` 色温（H40°→H210°，与卡面同族）；`--success/--warning` 向品牌饱和度区间靠拢；`--info` 从 H207° 拉开到 H190°；清除 sage 家族手抄蓝 | `css/design-system.css` |
+| **P2-4** | 补语义别名 `--brand-blue`；修正与取值不符的文件头描述；删除 `design-system.css` 里被 `style.css` 覆盖的死规则 `.btn-primary` | `scripts/check-css-duplicates.mjs` |
+| **P2-5** | 圆角：`var(--r-*)` 别名 **99 → 0**，脱轨裸值 **42 → 0** | 同上 |
+| **P2-6** | 彩色 emoji 全部换成 SVG sprite（新增 `i-star/i-share/i-mail/i-heart/i-coffee/i-palette`）；规则全仓锁定 | `tests/core/visual-consistency.test.js` |
+| **P2-9** | Toast：可手动关闭、时长按字数自适应（1600+字数×80ms，上限 8s）、开关类与主题切换不再弹、移动端已在底部（`css/mobile.css`） | `tests/core/toast.test.js` |
+| **P3-1** | index.html 138 处 `class="icon""` 畸形引号清零 —— 它会把紧跟的 `aria-hidden` 吞掉（实测有 1 个 svg 因此进了无障碍树） | `tests/core/html-hygiene.test.js` |
+| **P3-2** | 主题第三态「跟随系统」（默认），手动选择优先；按钮可访问名说明"现在是什么、点了变什么" | `tests/core/theme.test.js` |
+| **P3-3** | 主题切换加 `background-color/color/border-color` 过渡，`prefers-reduced-motion` 下降级为无过渡 | 同上 |
+| **P3-4** | Tailwind indigo/violet 残留清除（`.phd-symbol`、`.cal-dot-*`、`.story-tag-fresh`）；主题色包内的紫色属合法内容，检查按选择器跳过 | `tests/core/visual-consistency.test.js` |
+| **P3-5** | 移动端「更多工具」补 `class="btn"`，不再渲染成浏览器默认按钮 | `tests/core/html-hygiene.test.js` |
+| **P3-8** | 移除单词卡四角装饰括号 —— 全站唯一的装饰母题，孤立存在会被读成渲染残留 | `css/style.css` |
+| **P3-9** | 阅读页未选文章时三个开关置 `disabled` + 容器降透明 | `tests/core/disabled-states.test.js` |
+| **P3-10** | 单词卡首/末位时「上一个/下一个」置 `disabled` + `aria-disabled` | 同上 |
+| **P3-11** | 顶栏只留身份类（等级/积分），学习数据交给首页卡片；`updateGlobalStats` 补空值保护 | `tests/core/visual-consistency.test.js` |
+| **P3-12** | 侧边栏分组标题高度 32px → ≥40px | `css/nav.css` |
+
+**新增度量/检查脚本**（都可重复执行，供 CI 引用）：
+
+```bash
+node scripts/measure-token-drift.mjs      # 字号/间距/圆角/颜色 的令牌漂移读数
+node scripts/check-token-selfref.mjs      # 扫 --x: var(--x) 自引用（会静默失效）
+node scripts/check-css-duplicates.mjs     # 扫跨文件重复选择器（后加载者胜出 → 前者是死代码）
+node scripts/apply-token-convergence.mjs  # 一次性批量收敛（--dry 可预览）
+```
+
+**本批最值得记的一次事故**：批量 hex→token 替换时连**令牌定义行本身**也替换了，产出
+`--sage-deep: var(--sage-deep);` 这类自引用。CSS 变量自引用是无效声明且**不报任何错**，
+结果是三个 sage 令牌整体失效：主按钮渐变被冲淡、全站低对比项从 0 飙到 **248**。
+修好后回到 0。已固化为 `scripts/check-token-selfref.mjs` + 测试守卫，并让批量脚本跳过令牌定义行。
+
+### 剩余 4 项（已按另一套方案落地）
+
+这 4 项在实施时**没有沿用本报告原先的建议**，而是换了一套方案。差异与理由：
+
+| 项 | 本报告原方案 | 实际采用 | 为什么换 |
+|---|---|---|---|
+| **P2-7 侧边栏分组** | 按「学 / 练 / 看 / 用」**全量重排** 19 项 | **最小搬迁**：只搬真正错位的 3 项 | 全量重排会摧毁所有老用户的位置记忆，而报告指出的三个具体问题（PK 属训练、番茄钟属工具、成长组只有 1 项）只需 3 次搬移即可全部解决 |
+| **P2-8 设置页 IA** | 把「学习报告」搬到「我的」页顶部摘要位（新建摘要卡） | **原地压缩 + 重排** | 「我的」就是设置页本身（`index.html:1732` 的底部 Tab 指向 `#page-settings`），"搬去我的页顶部"等于原地重排；且不必新建 DOM 块 |
+| **P3-6 跳转控件** | 二选一：一体化控件 / 输入框 + 内联按钮 | 一体化 `第 [__] / 共 N 页`，**但保留图标提交按钮** | 只靠 Enter 提交会变成"不可发现的操作"——没有键盘提示时用户不知道可以回车 |
+| **P3-7 百分比入环** | 把百分比移入环内 | 环内本就已是百分比，改去修真正的问题 | 实测 `ring-text` 早已是 `pct + '%'`，本条其实已成立；真正的残存问题是**0% 时圆环几乎不可见**（轨道借用了 `--border`，对卡面仅 1.08:1） |
+
+**落地内容**
+
+- **P2-7**：单词PK 学习→训练；番茄钟 训练→工具；主题商店从单项目「成长」组并入工具组并删除该组。结果 3 个分组（学习 6 / 训练 6 / 工具 4）+ 顶层 3 项，19 个入口一个不缺。
+- **P2-8**：设置页重排为 **概览条 → 设置项（学习模式／朗读声音／每日目标／主题颜色／自定义背景）→ 记录与任务（每日挑战／打卡日历／使用提示）→ 数据管理 → 折叠区**。4 张统计卡压成一行 `.report-strip`（约 100px）；7 天图表与学习分析折进原生 `<details id="report-trend">`（免 JS、键盘可达、读屏会播报展开态）。**破坏性操作（数据管理）从第一屏移到最后一屏**，顺带降低了误触风险。
+- **P3-6**：`第 [__] / 共 N 页` 一体化药丸（高度 44px 与翻页箭头对齐）；总数与输入上限由 `_syncJumpTotal()` 随卡数同步；提交按钮改为图标 + `aria-label`。移动端全局的 44px 触控规则把 input 撑高，与其对抗不如**顺势让它填满药丸** —— 初版把输入框画成独立小方框，控件被撑到 50px 且像两个零件拼在一起。
+- **P3-7**：环轨道改 `--track`（与全站进度条同一令牌）→ 0% 时环的形状可见；新增 `#ring-caption` 说明行（新词 / 阶段 N/8 / 已掌握）承载阶段语义；`#word-progress` 只留位置（`3/10000`），不再与环各说各话。
+
+**顺带修掉一个真机才能复现的导航 bug（P1-7 的回归）**
+
+开抽屉（`pushState({msDrawer})` 占位）后点导航项 → 页面切过去后 **300ms 内被弹回原页**。
+
+成因：`showTab()` 先写 `#/settings`，随后回收抽屉占位的 `history.back()` 落地，把 hash 拉回 `#/home`；那一次 hash 变化被 `hashchange` 路由监听读成"用户切页"，于是把刚切好的页面弹了回去。单元测试全绿（jsdom 的会话历史不触发这套时序），是**真实浏览器验收**才抓到的。
+
+修复：`showTab()` 检测到"正在回收抽屉占位"时**不立刻写 hash**，改由 `popstate` 处理器在回收完成后调用 `_writeHash()` 对齐（`_writeHash` 现在是 hash 的唯一写入口）。回归防线：`tests/core/routing.test.js` 的契约测试 + `scripts/verify-nav-metrics.mjs` 里的真机断言（开抽屉 → 点番茄钟 → 1.6s 后仍停在该页）。

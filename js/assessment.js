@@ -379,16 +379,24 @@ var AssessmentModule = (function() {
 
   // 词库未就绪时的就地 loading：把"等待"这件事挂在用户刚点的那个按钮上，
   // 比弹一条飘在右上角的提示更贴近操作点，也不会重复堆叠。
+  //
+  // 实现走 js/core/loading.js 的统一入口（P1-1）：行为与改造前一致
+  // （禁用 + 转圈 + 「词库加载中…」），只是多写了 aria-busy ——
+  // 只禁用不标注，读屏用户听到的是"这个按钮坏了"，而不是"正在忙"。
   AssessmentModule.prototype._libraryBusy = function(on) {
     var btn = document.getElementById('btn-assessment-start');
     if (!btn) return;
+    var L = window.Loading;
     if (on) {
+      if (L) { L.button(btn, { label: '词库加载中…' }); return; }
+      // 兜底：core 未加载时保持旧行为，不允许等待态整体失效
       if (btn.getAttribute('data-orig-html') === null) btn.setAttribute('data-orig-html', btn.innerHTML);
       btn.disabled = true;
       btn.classList.add('is-loading');
       btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> 词库加载中…';
     } else {
       clearTimeout(this._libWaitTimer);
+      if (L) { L.buttonEnd(btn); return; }
       btn.disabled = false;
       btn.classList.remove('is-loading');
       var orig = btn.getAttribute('data-orig-html');
@@ -460,8 +468,8 @@ var AssessmentModule = (function() {
   AssessmentModule.prototype._progressUI = function() {
     var prog = document.getElementById('assess-progress-text');
     if (prog) prog.textContent = '第 ' + (this._cur + 1) + ' / ' + this._paper.length + ' 题';
-    var fill = document.getElementById('assess-progress-fill');
-    if (fill) fill.style.width = ((this._cur + 1) / this._paper.length * 100) + '%';
+    // 走统一入口：视觉宽度与 aria-valuenow 同源（P1-6）
+    if (window.ProgressBar) ProgressBar.set('assess-progress-fill', (this._cur + 1) / this._paper.length * 100);
   };
 
   AssessmentModule.prototype._renderQuestion = function() {

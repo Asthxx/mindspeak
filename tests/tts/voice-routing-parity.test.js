@@ -113,3 +113,52 @@ describe('跟读/字母朗读与全站声音统一', () => {
     expect(trace, '显式选 Zira 时 TTSManager 应走 serverSAPI').toContain('serverSAPI');
   });
 });
+
+describe('Android 原生 TTS 与全站统一', () => {
+  let su, tm, bridge;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    await bootstrapApp();
+    su = globalThis.SpeechUtil;
+    tm = globalThis.TTSManager;
+    localStorage.clear();
+    su._settings = null;
+    tm.voice = null;
+    tm._nativeDead = false;
+    tm.cancel = vi.fn();
+    // 模拟 Android：原生 TTS 桥可用
+    bridge = { available: true, speak: vi.fn(() => true), stop: vi.fn(), init: vi.fn() };
+    globalThis.NativeTTSBridge = bridge;
+    globalThis.window.NativeTTSBridge = bridge;
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('已确认 server 可达：跟读应让路给全站统一的 server SAPI', async () => {
+    su._serverDown = false;
+    const trace = instrument(su);
+    tm.speak('apple', { lang: 'en-US' });
+    await Promise.resolve();
+    expect(bridge.speak, 'server 可达时不应占用原生引擎（否则与其它 11 个功能不同声）').not.toHaveBeenCalled();
+    expect(trace, '应落到与其它功能相同的 server SAPI').toContain('serverSAPI');
+  });
+
+  it('无 server：必须仍走原生引擎（WebView 语音不可用时唯一出声通道）', async () => {
+    su._serverDown = true;
+    tm.speak('apple', { lang: 'en-US' });
+    await Promise.resolve();
+    expect(bridge.speak, '无 server 时必须保留原生引擎，否则 Android 可能静音').toHaveBeenCalled();
+  });
+
+  it('server 探测未完成：必须仍走原生引擎（安全极性，防静音回归）', async () => {
+    su._serverDown = undefined;
+    tm.speak('apple', { lang: 'en-US' });
+    await Promise.resolve();
+    expect(bridge.speak, '探测未完成时按未知处理，必须保留原生引擎').toHaveBeenCalled();
+  });
+});

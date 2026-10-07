@@ -13,13 +13,16 @@
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
-  padding: 8px 12px;
+  /* P3-12：原 padding 8px 12px，实测高度仅 32px，远低于 44px 的可点基准。
+     桌面鼠标场景 36px 尚可接受，但分组标题是折叠开关，值得更舒展 → 撑到 40px。 */
+  padding: 11px 12px;
+  min-height: 40px;
   border: none;
   background: none;
   color: var(--sidebar-text);
   opacity: 0.55;
   font-family: var(--font);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -78,7 +81,7 @@
   padding: 18px 22px;
   border-radius: var(--radius-lg);
   /* 渐变终点原为 --sage-muted #7FB6D9（偏亮），白字标题仅 2.19:1、副标题（85% 白）更低。
-     终点改 --sage-hover #4A6F93（白字 5.27:1），起点 --sage-deep 6.67:1，整条渐变均达 AA。 */
+     终点改 --sage-hover var(--sage-hover)（白字 5.27:1），起点 --sage-deep 6.67:1，整条渐变均达 AA。 */
   background: linear-gradient(135deg, var(--sage-deep), var(--sage-hover));
   color: #fff;
   box-shadow: var(--shadow-md);
@@ -86,7 +89,7 @@
 }
 #page-ai .ai-hero h2 {
   margin: 0 0 2px;
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
   color: #fff;
 }
 #page-ai .ai-hero p {
@@ -136,7 +139,7 @@
   background: #DCE7F1;
 }
 
-/* 深色主题：原渐变两端（--sage-deep #9FC5E4 / --sage-muted #5E8FB8）在深色画布上
+/* 深色主题：原渐变两端（--sage-deep var(--sage-light) / --sage-muted var(--sage-muted)）在深色画布上
    是一整块亮蓝色，与周围深表面割裂。改为深色表面渐变 + 浅色文字，随主题一体化。 */
 [data-theme="dark"] #page-ai .ai-hero {
   background: linear-gradient(135deg, var(--sage-surface), var(--sage-light));
@@ -150,7 +153,7 @@
 /* 窄屏防孤字：标题被右侧按钮挤压时会断成「AI 英语教 / 练」 */
 @media (max-width:768px) {
   #page-ai .ai-hero { flex-wrap: wrap; gap: 12px; padding: 16px; }
-  #page-ai .ai-hero h2 { white-space: nowrap; font-size: 1.15rem; }
+  #page-ai .ai-hero h2 { white-space: nowrap; font-size: var(--text-lg); }
 }
 
 .ai-grid {
@@ -168,9 +171,9 @@
 .ai-card-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-icon-gap);
   margin: 0 0 12px;
-  font-size: 1rem;
+  font-size: var(--text-base);
   font-weight: var(--weight-semibold);
 }
 
@@ -186,10 +189,10 @@
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-hairline);
 }
 .ai-ov-num {
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
   font-weight: var(--weight-bold);
   color: var(--sage-deep);
   line-height: 1.2;
@@ -327,7 +330,7 @@
    改为：填充色降饱和或改用浅底深字，保证 12px/600 字重下 ≥4.5:1。 */
 .ai-tip-urgent .ai-tip-badge { background: var(--coral-text); color: #fff; }      /* #B04A28 白字 5.45:1 */
 .ai-tip-prevent .ai-tip-badge { background: var(--warning-light); color: var(--warning-text); }
-.ai-tip-encourage .ai-tip-badge { background: var(--sage-hover); color: #fff; }   /* #4A6F93 白字 5.27:1 */
+.ai-tip-encourage .ai-tip-badge { background: var(--sage-hover); color: #fff; }   /* var(--sage-hover) 白字 5.27:1 */
 /* 深色主题：暖色本身很亮，改为浅底深字反而更差，统一走「深底 + 亮字」 */
 [data-theme="dark"] .ai-tip-urgent .ai-tip-badge { background: var(--coral-light); color: var(--coral); }    /* 7.66:1 */
 [data-theme="dark"] .ai-tip-prevent .ai-tip-badge { background: var(--warning-light); color: var(--warning); }
@@ -346,7 +349,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-hairline);
   padding: 10px 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -354,7 +357,7 @@
   text-align: center;
 }
 .ai-report-item b {
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
   color: var(--sage-deep);
   font-weight: var(--weight-bold);
 }
@@ -401,7 +404,7 @@
 }
 .ai-radar-label {
   fill: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-family: var(--font);
 }
 /* 雷达空状态：无数据时不画数据面，只在网格中心给出一句引导。
@@ -409,12 +412,12 @@
    读起来像"各项能力都很强"，与实际完全相反。 */
 .ai-radar-empty {
   fill: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-2xs);
   font-family: var(--font);
 }
 .ai-radar-empty-sub {
   fill: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-family: var(--font);
 }
 
