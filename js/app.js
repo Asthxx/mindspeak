@@ -2399,6 +2399,18 @@ function WordModule() {
     var jumpInput = document.getElementById('word-jump-input');
     if (jumpInput) {
       jumpInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); self.jumpWord(); } });
+      // 智能联动（2026-10-17）：输入框常态回显当前页码，聚焦即全选——
+      // 点一下即可直接输入新序号覆盖，不用先手动清空。
+      // click 事件是兜底：部分 WebView 的 focus 不触发可靠的 select()。
+      var selectAll = function() { try { jumpInput.select(); } catch (e) {} };
+      jumpInput.addEventListener('focus', selectAll);
+      jumpInput.addEventListener('click', selectAll);
+      // 失焦丢弃未提交的输入，回显当前页码。必须延迟一帧：点「跳转」按钮时
+      // blur 先于 click 触发，同步重置会把刚输的序号抹掉，跳转跳回当前页。
+      // 跳转本身会把输入框设为落点页码，所以延迟后执行两种焦点行为结果一致。
+      jumpInput.addEventListener('blur', function() {
+        setTimeout(function() { self._syncJumpInput(self.getCardWords().length); }, 0);
+      });
     }
     safeBind('btn-cancel-add', 'click', function() { self.hideAddModal(); });
     safeBind('form-add-word', 'submit', function(e) { self.addWord(e); });
@@ -2897,7 +2909,7 @@ cat.words = merged;
 
   WordModule.prototype.showCurrentWord = function(dir) {
     var words = this.getCardWords();
-    if (!words.length) return;
+    if (!words.length) { this._syncJumpInput(0); return; }
     // 防御：currentIndex 越界（词库被外部缩短/边界场景）时归零，避免下面 words[currentIndex].word 抛错
     if (this.currentIndex < 0 || this.currentIndex >= words.length) this.currentIndex = 0;
     var w = words[this.currentIndex];
@@ -2920,6 +2932,8 @@ cat.words = merged;
     this._syncNavButtons(words.length);
     // P3-6：一体化分页控件的总数位，随卡数同步（换分类 / 精选开关都会改变它）
     this._syncJumpTotal(words.length);
+    // 输入框位置联动：未聚焦时回显当前页码（详见 _syncJumpInput）
+    this._syncJumpInput(words.length);
     // 复习环显示当前阶段的记忆保持率，替代原先的阶段数/8
     var retention = DataStore.ebbinghausRetention;
     var pct = isMastered ? 100 : (reviewCount > 0 ? retention[Math.min(reviewCount - 1, retention.length - 1)] : 0);
@@ -3017,16 +3031,26 @@ WordModule.prototype.speakCurrent = function() {
   // 方向参数只影响入场动画（P1-2）：新卡从手势/评分的对应方向进来
   WordModule.prototype.prevWord = function() { if (this.currentIndex > 0) { this.currentIndex--; this.showCurrentWord('left'); this.saveCardPos(); } };
   WordModule.prototype.nextWord = function(dir) { var words = this.getCardWords(); if (this.currentIndex < words.length - 1) { this.currentIndex++; this.showCurrentWord(dir || 'right'); this.saveCardPos(); } };
-  // P3-6：一体化分页控件的总数位。输入上限也跟着走，
-  // 否则用户能输入一个超出总数的序号，点下去只能收到一句"超过总数"的提示。
+  // P3-6：一体化分页控件的总数位，随卡数同步（换分类 / 精选开关都会改变它）。
+  // 越界防护在 jumpWord 里夹取并 toast——输入框已于 2026-10-17 改为
+  // type=text + inputmode=numeric（number 不支持 select()，"聚焦即全选"不可用），
+  // 不再有原生 max 可同步。
   WordModule.prototype._syncJumpTotal = function(total) {
     var el = document.getElementById('word-jump-total');
     if (el) el.textContent = String(total);
     var input = document.getElementById('word-jump-input');
-    if (input) {
-      input.max = String(total);
-      if (input.placeholder === '跳转') input.placeholder = '';   // 旧文案兜底清理
-    }
+    if (input && input.placeholder === '跳转') input.placeholder = '';   // 旧文案兜底清理
+  };
+
+  // 跳页输入框与当前卡片联动（2026-10-17 用户选定「智能联动」方案）：
+  // 未聚焦（未编辑）时回显当前页码——控件因此二合一，既是"我在第几张"的
+  // 位置指示，也是跳转器；聚焦中不覆盖用户正在输入的数字。
+  // 空池时清空：留着旧序号会让人以为还有卡片可翻。
+  WordModule.prototype._syncJumpInput = function(total) {
+    var input = document.getElementById('word-jump-input');
+    if (!input) return;
+    if (document.activeElement === input) return;   // 正在编辑，不覆盖
+    input.value = (typeof total === 'number' && total > 0) ? String(this.currentIndex + 1) : '';
   };
 
   // 翻页按钮的可用态：只有"确实能往那边翻"时才可点。
@@ -3046,19 +3070,22 @@ WordModule.prototype.speakCurrent = function() {
       else el.removeAttribute('aria-disabled');
     });
   };
-  // 按输入序号跳转：1 起，边界内合法即跳，越界 toast 提示
+  // 按输入序号跳转：1 起，边界内合法即跳，越界 toast 提示。
+  // 智能联动（2026-10-17）：跳转后不清空输入框——回显落点页码并全选，
+  // 连续跳转直接输入新数字即可，也是"我跳到了哪"的确认。
   WordModule.prototype.jumpWord = function() {
     var input = document.getElementById('word-jump-input');
     if (!input) return;
     var n = parseInt(input.value, 10);
-    if (isNaN(n) || n < 1) { Toast.warning('请输入有效页码（≥1）'); return; }
+    if (isNaN(n) || n < 1) { Toast.warning('请输入有效页码（≥1）'); input.select(); return; }
     var words = this.getCardWords();
     if (!words.length) { Toast.info('当前词库无单词'); return; }
     if (n > words.length) { Toast.warning('超过总数 ' + words.length + '，已跳到末页'); n = words.length; }
     this.currentIndex = n - 1;  // 输入是 1 起，转成 0 基
     this.showCurrentWord();
     this.saveCardPos();
-    input.value = '';
+    input.value = String(this.currentIndex + 1);
+    input.select();
   };
   // ── 背单词翻页位置持久化：按词库存卡片位置 + 列表视图页码，刷新/切回继续上次的进度 ──
 WordModule.prototype.saveCardPos = function() {

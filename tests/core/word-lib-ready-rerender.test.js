@@ -66,7 +66,9 @@ describe('词库延迟就绪后背单词页的完整重渲染（回归）', () =
       .toBe((wm.currentIndex + 1) + '/' + pool.length);
     expect(document.getElementById('word-jump-total').textContent, '就绪后跳页总数没有补上（仍是 0）')
       .toBe(String(pool.length));
-    expect(document.getElementById('word-jump-input').max, '跳页输入上限没有同步').toBe(String(pool.length));
+    // 输入框回显当前页码（智能联动）；越界夹取在 jumpWord 里，另见 word-jump-control
+    expect(document.getElementById('word-jump-input').value, '就绪后输入框没有回显当前页码')
+      .toBe(String(wm.currentIndex + 1));
     expect(document.getElementById('word-card').querySelector('[data-skeleton]'), '就绪后骨架没收掉').toBeNull();
     expect(document.getElementById('word-card').getAttribute('aria-busy'), '就绪后 aria-busy 没清').toBe(null);
   });

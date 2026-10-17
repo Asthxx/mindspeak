@@ -1,20 +1,17 @@
-// verify-word-lib-ready.mjs — 词库延迟就绪后，背单词页完整重渲染的真实浏览器验收
+// verify-word-page.mjs — 背单词页真实浏览器验收（两部分）
 //
-// 背景（2026-10-17 真机反馈）：「页数没有加载出来；卡片显示的单词和我朗读发出
-// 的单词不是同一个；按左右切换才变回来」。根因是 populateCategories 的
-// awaitLibrary ready 回调只补填分类、没有补渲染。
+// 一、词库延迟就绪后的完整重渲染（2026-10-17 真机 bug 修复）
+// 反馈：「页数没有加载出来；卡片显示的单词和我朗读发出的单词不是同一个；
+// 按左右切换才变回来」。根因是 populateCategories 的 awaitLibrary ready
+// 回调只补填分类、没有补渲染。用 Fetch.enable 把 all-data.js 掐住再放行，
+// 精确复现"慢网首开"——jsdom 里没有真实的 async 脚本时序。
 //
-// 为什么必须真机验：这条路径取决于 data/all-data.js（约 9.9MB，async）在
-// App 构造之后才落地——jsdom 里没有真实的 async 脚本时序。本脚本用
-// Fetch.enable 把 all-data.js 掐住 ~2.5s 再放行，精确复现"慢网首开"。
+// 二、跳页控件「智能联动」（2026-10-17 用户选定方案）
+// 未聚焦时输入框回显当前页码（位置指示 + 跳转器二合一）；聚焦即全选；
+// 跳转后不清空、回显落点并全选待连跳；失焦丢弃未提交输入。
+// select() 在 number 输入框上的行为依赖浏览器实现，必须真机验。
 //
-// 覆盖：
-//   1. 词库迟到期间：卡区骨架、页码 0/0、跳页总数 0、卡片=静态占位词
-//   2. 词库落地后：卡片=真实当前词、页码 N/M、跳页总数 M、输入上限同步
-//   3. 朗读发出的词与卡片显示的词一致（speakCurrent 打桩监听）
-//   4. 列表视图同步补渲染（renderWordList 分支）
-//
-// 用法：node scripts/verify-word-lib-ready.mjs
+// 用法：node scripts/verify-word-page.mjs
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -81,7 +78,7 @@ const SNAP = `JSON.stringify({
   cardWord: document.getElementById('current-word').textContent,
   progress: document.getElementById('word-progress').textContent,
   jumpTotal: document.getElementById('word-jump-total').textContent,
-  jumpMax: document.getElementById('word-jump-input').max,
+  inputEcho: document.getElementById('word-jump-input').value,
   hasSkeleton: !!document.getElementById('word-card').querySelector('[data-skeleton]'),
   ariaBusy: document.getElementById('word-card').getAttribute('aria-busy'),
   listRows: document.querySelectorAll('#word-list-body .wl-row').length,
@@ -111,6 +108,9 @@ try {
   await cdp.open();
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
+  // 焦点仿真：headless 下 document.hasFocus() 为 false，focus/blur 事件被抑制，
+  // 跳页控件的"聚焦即全选/失焦回显"两条路径会验不到（无头假象，真机不会）。
+  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await cdp.send('Emulation.setUserAgentOverride', { userAgent: ANDROID_UA });
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, mobile: true, deviceScaleFactor: 3 });
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
@@ -132,8 +132,9 @@ try {
     throw new Error('应用启动超时');
   };
 
-  console.log('\n=== 词库延迟就绪 · 背单词页完整重渲染 · 真实浏览器验收 ===\n');
-  console.log(`（all-data.js 被掐住 ${HOLD_MS}ms 后放行，复现慢网首开）\n`);
+  console.log('\n=== 词库延迟就绪 · 背单词页完整重渲染 · 真实浏览器验收 ===');
+  console.log(`（all-data.js 被掐住 ${HOLD_MS}ms 后放行，复现慢网首开）`);
+  console.log('（后半段：跳页控件智能联动）\n');
 
   // 首访落地 + 跳过引导盖层
   await cdp.send('Page.navigate', { url: BASE });
@@ -183,7 +184,7 @@ try {
     `card=${s.cardWord} real=${s.poolWord}`);
   check(s.progress === (s.curIdx + 1) + '/' + s.poolLen, '页码补成 N/M', `progress=${s.progress} expect=${s.curIdx + 1}/${s.poolLen}`);
   check(s.jumpTotal === String(s.poolLen), '跳页总数补成 M', `total=${s.jumpTotal} expect=${s.poolLen}`);
-  check(s.jumpMax === String(s.poolLen), '跳页输入上限同步', 'max=' + s.jumpMax);
+  check(s.inputEcho === String(s.curIdx + 1), '输入框回显当前页码（智能联动）', `echo=${s.inputEcho} cur=${s.curIdx + 1}`);
 
   // 朗读一致性：打桩 SpeechUtil.speakWord，比对发出的词与卡片显示的词
   const spoken = await evalJs(cdp, `(function(){
@@ -210,9 +211,79 @@ try {
   const s3 = JSON.parse(await evalJs(cdp, SNAP));
   check(s3.listRows > 0, '列表视图同步补渲染（.wl-row > 0）', 'rows=' + s3.listRows);
 
-  // 回到卡片视图截图
+  // 回到卡片视图截图（等过入场动画，抓稳定态——初版 400ms 时卡片还在
+  // _playCardEnter 的过渡里，文字位置偏移，差点被误判成布局回归）
   await evalJs(cdp, `window.app.wordModule.switchView('card'); 'ok'`);
+  await sleep(1200);
+
+  // ==================== 二、跳页控件智能联动 ====================
+  console.log('\n—— 跳页控件智能联动 ——');
+
+  // 1) 未聚焦回显当前页码
+  let j = JSON.parse(await evalJs(cdp, `JSON.stringify({
+    v: document.getElementById('word-jump-input').value,
+    cur: window.app.wordModule.currentIndex,
+  })`));
+  check(j.v === String(j.cur + 1), '未聚焦时回显当前页码', `value=${j.v} cur=${j.cur + 1}`);
+
+  // 2) 聚焦即全选（number 输入框的 select 行为，真机才能验）
+  let sel = JSON.parse(await evalJs(cdp, `(function(){
+    var el = document.getElementById('word-jump-input');
+    el.focus();
+    el.select();
+    return JSON.stringify({ s: el.selectionStart, e: el.selectionEnd, len: el.value.length, active: document.activeElement === el });
+  })()`));
+  check(sel.active && sel.s === 0 && sel.e === sel.len, '聚焦即全选（可直接输入新序号覆盖）', JSON.stringify(sel));
+
+  // 3) 输入序号 + 回车 → 跳转，box 回显落点、仍聚焦、全选待连跳
+  await evalJs(cdp, `(function(){
+    var el = document.getElementById('word-jump-input');
+    el.value = '500';
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    return 'ok';
+  })()`);
+  await sleep(500);
+  j = JSON.parse(await evalJs(cdp, `JSON.stringify({
+    cur: window.app.wordModule.currentIndex,
+    v: document.getElementById('word-jump-input').value,
+    s: document.getElementById('word-jump-input').selectionStart,
+    e: document.getElementById('word-jump-input').selectionEnd,
+    active: document.activeElement === document.getElementById('word-jump-input'),
+    progress: document.getElementById('word-progress').textContent,
+  })`));
+  check(j.cur === 499, '回车跳转到第 500 张', 'cur=' + j.cur);
+  check(j.v === '500' && j.active && j.s === 0 && j.e === 3, '跳转后回显落点、仍聚焦且全选待连跳', JSON.stringify(j));
+  check(j.progress === '500/' + j.cur + 1 + '' || j.progress === '500/10000', '进度行同步', 'progress=' + j.progress);
+
+  // 4) 连跳：全选状态下直接输入新序号即可（无需手动清空）
+  await evalJs(cdp, `(function(){
+    var el = document.getElementById('word-jump-input');
+    el.value = '800';
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    return 'ok';
+  })()`);
+  await sleep(500);
+  j = JSON.parse(await evalJs(cdp, `JSON.stringify({ cur: window.app.wordModule.currentIndex, v: document.getElementById('word-jump-input').value })`));
+  check(j.cur === 799 && j.v === '800', '连跳第二次直达第 800 张', JSON.stringify(j));
+
+  // 5) 失焦丢弃未提交输入，回显当前页码
+  await evalJs(cdp, `(function(){
+    var el = document.getElementById('word-jump-input');
+    el.focus(); el.select();
+    el.value = '123';        // 改了但不回车、不点跳转
+    el.blur();
+    return 'ok';
+  })()`);
+  await sleep(120);   // 实现里失焦同步延迟一帧
+  j = JSON.parse(await evalJs(cdp, `JSON.stringify({ v: document.getElementById('word-jump-input').value, cur: window.app.wordModule.currentIndex })`));
+  check(j.v === String(j.cur + 1), '失焦丢弃未提交输入，回显当前页码', `value=${j.v} cur=${j.cur + 1}`);
+
+  // 6) 翻卡时输入框跟随（失焦态）
+  await evalJs(cdp, `window.app.wordModule.nextWord(); 'ok'`);
   await sleep(400);
+  j = JSON.parse(await evalJs(cdp, `JSON.stringify({ v: document.getElementById('word-jump-input').value, cur: window.app.wordModule.currentIndex })`));
+  check(j.v === String(j.cur + 1), '翻卡后输入框跟随更新', `value=${j.v} cur=${j.cur + 1}`);
+
   const { data: shot } = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
   writeFileSync(join(OUT, 'word-lib-ready.png'), Buffer.from(shot, 'base64'));
 

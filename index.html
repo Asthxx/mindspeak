@@ -652,7 +652,10 @@
                用户根本不知道可以回车），图标按钮同时给出明确的可点击目标。 -->
           <div class="word-jump-wrap" id="word-jump-wrap" role="group" aria-label="跳转到指定卡片">
             <span class="wj-part">第</span>
-            <input type="number" id="word-jump-input" class="wj-input" min="1" aria-label="卡片序号" title="输入序号后回车跳转到对应卡片">
+            <!-- type=text + inputmode=numeric：number 输入框不支持 select()，
+             聚焦全选不可用（Chromium 实测 selectionStart 返回 null）；
+             inputmode 保证移动端仍是数字键盘，iOS 字号由 mobile.css 的 16px 规则兜底 -->
+            <input type="text" id="word-jump-input" class="wj-input" inputmode="numeric" pattern="[0-9]*" aria-label="卡片序号" title="显示当前页码；输入序号后回车跳转，点按可全选">
             <span class="wj-part">/</span>
             <span class="wj-total" id="word-jump-total">0</span>
             <span class="wj-part">页</span>
