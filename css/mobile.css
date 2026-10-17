@@ -198,6 +198,26 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .word-tools-extra .btn-sm{justify-content:flex-start;min-height:44px}
   .section-header select,.section-header input{width:100%;padding:10px 12px;font-size: var(--text-base)}
   .word-list-toolbar{padding:var(--sp-3)}
+
+  /* 背单词页顶部工具栏瘦身（用户反馈"按钮太大"）：
+     上面 380 行的全站规则为了让触控目标 ≥44px，把 .content .btn-sm 的
+     padding 从桌面 6px 12px 放大到 12px 16px、并统一 min-height:44px。
+     背单词页顶部这一串（词库下拉/精选学习/更多工具/每日目标/折叠区工具）
+     全是低频次要控件，不需要那么大的体量——50px 高的全宽按钮会把单词卡
+     挤出首屏。这里只收缩"次要控件"，主操作键（认识/有点印象/不认识/翻转/
+     朗读/翻页箭头）不动，保证主要交互的点击面积不缩水。
+     触控高度仍保持 ≥32px，满足 WCAG 2.2 AA（2.5.8）的 24px 底线。 */
+  #page-word .section-header .btn-sm{padding:8px 12px;min-height:32px;font-size:var(--text-2xs)}
+  #page-word .section-header select{padding:8px 12px;font-size:var(--text-sm)}
+  #page-word .word-tools-extra .btn-sm{min-height:32px;padding:8px 12px}
+  /* 朗读：原 .btn-speak 是 --text-lg(18px) + 8px 14px，夹在两个 44px 小箭头
+     之间显得格外粗。降一档字号并收紧内边距，与左右箭头更协调。
+     高度交给全站 .content .btn 的 min-height:44px，不再单独压。 */
+  #page-word .word-nav .btn-speak{font-size:var(--text-base);padding:8px 12px}
+  /* 主操作行：收藏/挑入精选是纯图标按钮，却被 .word-actions .btn{flex:1}
+     和带文字的四个键平均分配，拉成 114x52 的大空框——图标缩在中间，四周全是空白。
+     改成固定方形，省下的宽度还给带文字的四个操作键。 */
+  #page-word .word-actions .btn-fav{flex:0 0 auto;width:48px;min-width:0;padding:0}
   .word-search{min-width:0;width:100%;padding:12px 14px;font-size: var(--text-base)}
   .filter-btn{padding:8px 14px;font-size: var(--text-sm)}
 
