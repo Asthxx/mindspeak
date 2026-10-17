@@ -2575,11 +2575,23 @@ function WordModule() {
           ready: function() {
             self._libWaitHandle = null;
             self.populateCategories();
+            // 词库就绪后必须补一次完整渲染。initUI 里的 showCurrentWord 是在
+            // 空池状态下提前 return 的——只补填分类不补渲染，卡片/页码/跳页
+            // 总数会一直停在占位态：卡片显示静态占位词、#word-progress 与
+            // 跳页总数停在 0/0 与 0，而 speakCurrent 读的已是真实当前词，
+            // 于是"看到的词和朗读发出的词不是同一个"，按左右箭头才恢复
+            // （2026-10-17 真机反馈）。列表视图下还要补列表渲染。
+            self.showCurrentWord();
+            self.renderStats();
+            if (self.currentView === 'list') self.renderWordList();
           },
           onTimeout: function() {
             self._libWaitHandle = null;
             Toast.error('词库加载失败，请检查 data/ 文件是否齐全或刷新页面');
             self.categories = [];
+            // 失败态下翻页按钮必须置灰：空池里 prev/next 本就是静默无效，
+            // 不置灰用户会以为"按钮坏了"，而不是"词库没加载出来"
+            self._syncNavButtons(0);
           },
         });
         return;

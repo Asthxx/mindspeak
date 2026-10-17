@@ -75,6 +75,17 @@ describe('背单词页等待词库时的加载态（P1-1）', () => {
   });
 
   it('词库就绪后骨架收掉，卡片渲染出真实单词', async () => {
+    // 先把卡片挪到第 3 张再让词库"迟到"：就绪后 populateCategories 会把位置
+    // 恢复到存档值（这里是 0）。若 ready 回调只补填分类不补渲染，卡片将停在
+    // 旧词上——原断言只查 textContent.length > 0，静态占位词和旧词都能让它
+    // 通过，2026-10-17 的真机 bug（卡片/页码停在占位态、朗读却是另一个词）
+    // 正是从这条断言底下漏过去的。必须比对准真实当前词。
+    var wm = window.app.wordModule;
+    wm.currentIndex = 2;
+    wm.showCurrentWord();
+    var stale = document.getElementById('current-word').textContent;
+    expect(wm.getCardWords().length, '词库没就绪，这条用例的前提不成立').toBeGreaterThan(2);
+
     globalThis.WORD_LIBRARY.categories = [];
     window.app.wordModule.initUI();
     await sleep(300);
@@ -86,7 +97,10 @@ describe('背单词页等待词库时的加载态（P1-1）', () => {
 
     expect(card.querySelector('[data-skeleton]'), '就绪后骨架没收掉').toBeNull();
     expect(card.hasAttribute('aria-busy')).toBe(false);
-    expect(document.getElementById('word-front').textContent.length, '卡片没有渲染内容').toBeGreaterThan(0);
+    var cur = wm.getCardWords()[wm.currentIndex];
+    expect(document.getElementById('current-word').textContent,
+      '就绪后卡片没有渲染成真实当前词（旧文案：' + stale + '，真实当前词：' + (cur && cur.word) + '）')
+      .toBe(cur.word);
   });
 });
 
