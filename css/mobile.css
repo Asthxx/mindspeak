@@ -20,8 +20,17 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 /* AI English Growth Companion - Mobile Responsive (App级适配)
    适配目标：PWA / WebView 打包成手机软件——
    全屏沉浸、安全区(刘海/底部手势条)、动态视口(dvh)、
-   44px 触摸目标、防误触/双击缩放、无横向溢出、布局重排。 */
-@media (max-width:768px){
+   44px 触摸目标、防误触/双击缩放、无横向溢出、布局重排。
+
+   生效条件（两条，满足其一即走移动布局）：
+   ① 竖屏 / 窄屏：宽 ≤768px——常规手机竖持；
+   ② 横屏手机：landscape + 高度 <500px + 触屏。旋屏后宽度通常 >768px，
+      但设备是手机，必须继续走移动布局——否则底部导航会在旋屏后消失
+      （桌面样式不显示它），侧边栏也会变回常驻栏、抽屉里重新出现
+      已交由底部导航承接的分组。hover:none + pointer:coarse 同时要求，
+      防止桌面小窗口（含分屏、矮浏览器窗口）误入移动布局。 */
+@media (max-width:768px),
+       (orientation:landscape) and (max-height:500px) and (hover:none) and (pointer:coarse){
   /* 顶部安全区：刘海屏状态栏不透出顶栏 */
   :root{
     --header:calc(48px + env(safe-area-inset-top,0px));
@@ -98,6 +107,10 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .sidebar > .nav-btn + .nav-group{
     margin-top:var(--sp-3);padding-top:var(--sp-2);border-top:1px solid rgba(255,255,255,0.08)
   }
+  /* 学习 / 训练 / 工具 三个分组已由底部导航的对应 Tab 承接（聚合页见
+     #page-learn / #page-train / #page-tool），抽屉内不再重复出现。
+     本规则只在移动布局生效——桌面端侧边栏保留分组原样，不受影响。 */
+  .sidebar .nav-group{display:none}
 
   /* 遮罩 */
   .sidebar-scrim{
@@ -119,7 +132,9 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 
   /* ---- 移动端底部导航（App 级）· 悬浮药丸壳体 ---- */
   .bottom-nav,html.platform-ios .bottom-nav,html.platform-android .bottom-nav{
-    position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:95;
+    /* 左右安全区：竖屏下 inset-left/right 恒为 0（与改动前一致）；
+       横屏刘海屏按左右 inset 收进，避免药纶压住摄像头/传感器区域。 */
+    position:fixed;left:calc(12px + env(safe-area-inset-left,0px));right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:95;
     display:flex;align-items:stretch;justify-content:space-around;
     height:64px;padding:var(--sp-icon-gap);
     background:rgba(255,255,255,0.94);
@@ -462,7 +477,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 
 /* 安全区兜底：不支持 env() 的旧 Android WebView 也能正常显示 */
 @supports not (padding-top:env(safe-area-inset-top)){
-  @media (max-width:768px){
+  @media (max-width:768px), (orientation:landscape) and (max-height:500px) and (hover:none) and (pointer:coarse){
     :root{--header:48px}
   }
 }
@@ -481,7 +496,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 .stat-card,.report-card{transition:all var(--duration-normal) var(--ease-out)}
 
 /* ===== 手机质感升级 · 默认模式（主题模式由 theme-fx 接管，html 带 data-theme-id 时自动不生效） ===== */
-@media (max-width:768px){
+@media (max-width:768px), (orientation:landscape) and (max-height:500px) and (hover:none) and (pointer:coarse){
   /* 1) 首屏/切页 · 卡片组 stagger 渐进浮现 */
   .page.active > *{animation:fadeUp .40s var(--ease-out) both}
   .page.active > *:nth-child(1){animation-delay:.03s}
@@ -651,7 +666,7 @@ html.platform-android{
    审计实测：设置页 5 个复选框仅 13×13、阅读页 16×16、每日目标/自动保存间隔
    输入框高 21–34px、AI 历史项删除键 28×28。触屏下统一抬到 44px 命中区。
    ============================================================ */
-@media (max-width:768px){
+@media (max-width:768px), (orientation:landscape) and (max-height:500px) and (hover:none) and (pointer:coarse){
   /* 复选框视觉放大到 24px（桌面 20px），外层 label 整行作为命中区 */
   input[type="checkbox"]{ width:24px; height:24px; }
 
@@ -707,7 +722,7 @@ html.platform-android{
    桌面坐标是 top:80px;right:20px，搬到 390px 屏上正好压住页面标题和主题切换按钮。
    移动端改到底部导航之上：下沿 = 底栏 64px + 外边距 10px + 手势条安全区，
    左右各留 16px，与悬浮药丸底栏同宽，视觉上也更贴近拇指区。 */
-@media (max-width:768px){
+@media (max-width:768px), (orientation:landscape) and (max-height:500px) and (hover:none) and (pointer:coarse){
   .toast-container,
   html.platform-ios .toast-container,
   html.platform-android .toast-container{
@@ -725,4 +740,30 @@ html.forced-mobile .toast-container{
   left:16px;right:16px;
   max-height:40vh;
   align-items:stretch;
+}
+
+/* ---- 横屏手机压缩 ------------------------------------------------
+   横屏下屏幕高度仅 ~390px：悬浮药纶按比例收窄，把高度让给内容。
+   选择器带上 platform-* 是为了压过本文件前面两条同特异性、但写在更前面的
+   平台专属高度规则（html.platform-ios .bottom-nav 58px /
+   html.platform-android .bottom-nav 62px）——同特异性按源码次序决胜。 */
+@media (orientation:landscape) and (max-height:500px) and (hover:none) and (pointer:coarse){
+  .bottom-nav,
+  html.platform-ios .bottom-nav,
+  html.platform-android .bottom-nav{
+    height:52px;                                  /* 竖屏是 64px */
+    bottom:calc(8px + env(safe-area-inset-bottom,0px));
+  }
+  .bottom-nav-btn{gap:1px;padding:2px}
+  .bottom-nav-btn .icon{width:18px;height:18px}   /* 竖屏是 22px */
+  .bottom-nav-btn span{font-size:var(--text-2xs)} /* 竖屏是 --text-xs */
+  /* 内容区底部留白随导航高度收缩：竖屏是 sp-6 + 92px（64px 药纶 + 10px 边距 + 余量），
+     这里压到 sp-4 + 68px（52px 药纶 + 8px 边距 + 余量） */
+  .content{padding-bottom:calc(var(--sp-4) + 68px + env(safe-area-inset-bottom,0px))}
+  /* Toast 贴着压缩后的底栏上方（竖屏公式是 64 + 10 + 14 = 88px） */
+  .toast-container,
+  html.platform-ios .toast-container,
+  html.platform-android .toast-container{
+    bottom:calc(72px + env(safe-area-inset-bottom,0px));
+  }
 }

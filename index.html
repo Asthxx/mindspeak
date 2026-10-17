@@ -232,6 +232,10 @@
       <span class="label">首页</span>
     </button>
 
+    <!-- 学习 / 训练 / 工具 三个分组：桌面端侧边栏保留原文不变；
+         移动端抽屉内由 CSS 隐藏（css/mobile.css 的 .sidebar .nav-group），
+         这三个入口已集成到底部导航（见 #bottom-nav），落点为
+         #page-learn / #page-train / #page-tool，避免两处导航重复。 -->
     <!-- 学习 -->
     <div class="nav-group" id="group-learn">
       <button type="button" id="group-learn-title" class="nav-group-title" aria-expanded="true" aria-controls="group-learn-items">
@@ -1826,16 +1830,120 @@
         </button>
       </div>
     </section>
+
+    <!-- ============ 以下三个聚合页：移动端底部导航「学习 / 训练 / 工具」Tab 的落点 ============
+         桌面端底部导航隐藏，这三个页面不可达也无妨——桌面侧边栏仍按分组展示全部入口。
+         条目与侧边栏同名分组一一对应；跳转复用文档级 data-goto 委托（dashboard.js
+         的 _bindDelegation），零新增逻辑；样式复用练习中心的 .practice-grid 体系。 -->
+    <section id="page-learn" class="page" aria-labelledby="learn-title">
+      <h2 id="learn-title"><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-book" xlink:href="#i-book"/></svg> 学习</h2>
+      <p class="practice-sub">从认识到会用，按顺序完成每一课</p>
+      <div class="practice-grid">
+        <button type="button" class="practice-btn" data-goto="word">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-translate"/></svg></span>
+          <span class="practice-name">背单词</span>
+          <span class="practice-desc">卡片刷词，标记认识 / 不认识</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="story">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span>
+          <span class="practice-name">词文串学</span>
+          <span class="practice-desc">生成短文，在语境里串记一组词</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="listening">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-headphones"/></svg></span>
+          <span class="practice-name">听力训练</span>
+          <span class="practice-desc">听单词拼写、听句填空</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="reading">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-article"/></svg></span>
+          <span class="practice-name">阅读训练</span>
+          <span class="practice-desc">分级文章 + 理解题</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="grammar">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-edit"/></svg></span>
+          <span class="practice-name">语法练习</span>
+          <span class="practice-desc">选择、填空、句型变换</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="context">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-text"/></svg></span>
+          <span class="practice-name">语境填空</span>
+          <span class="practice-desc">在句子里选对单词</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 「训练」分组原文含「练习中心」——那本身是一个聚合页（8 个训练入口），
+         其条目已被本页与 #page-learn 完整覆盖，故不再收录，避免聚合页套聚合页。 -->
+    <section id="page-train" class="page" aria-labelledby="train-title">
+      <h2 id="train-title"><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 训练</h2>
+      <p class="practice-sub">用练习把学过的词练熟</p>
+      <div class="practice-grid">
+        <button type="button" class="practice-btn" data-goto="spelling">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-spellcheck"/></svg></span>
+          <span class="practice-name">拼写测试</span>
+          <span class="practice-desc">看中文写英文、听音写词</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="mistakes">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-error"/></svg></span>
+          <span class="practice-name">错题本</span>
+          <span class="practice-desc">回顾错过的单词，重新掌握</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="mistake-train">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target"/></svg></span>
+          <span class="practice-name">错词强化</span>
+          <span class="practice-desc">只练你错过的词</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="speak">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-mic"/></svg></span>
+          <span class="practice-name">跟读练习</span>
+          <span class="practice-desc">朗读并对比发音</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="pk">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-trophy"/></svg></span>
+          <span class="practice-name">单词 PK</span>
+          <span class="practice-desc">限时抢答，练反应速度</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="page-tool" class="page" aria-labelledby="tool-title">
+      <h2 id="tool-title"><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-list" xlink:href="#i-list"/></svg> 工具</h2>
+      <p class="practice-sub">查词、复习与专注，随手可用</p>
+      <div class="practice-grid">
+        <button type="button" class="practice-btn" data-goto="search">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-search"/></svg></span>
+          <span class="practice-name">查单词</span>
+          <span class="practice-desc">中英互译，带例句与发音</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="favorites">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bookmark"/></svg></span>
+          <span class="practice-name">收藏夹</span>
+          <span class="practice-desc">收藏的单词集中复习</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="pomodoro">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-timer"/></svg></span>
+          <span class="practice-name">番茄钟</span>
+          <span class="practice-desc">25 分钟专注，5 分钟休息</span>
+        </button>
+        <button type="button" class="practice-btn" data-goto="items">
+          <span class="practice-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sparkle"/></svg></span>
+          <span class="practice-name">主题商店</span>
+          <span class="practice-desc">用积分兑换主题皮肤</span>
+        </button>
+      </div>
+    </section>
   </main>
 
-  <!-- 移动端底部导航（App 级，仅 ≤768px 显示，桌面端隐藏） -->
+  <!-- 移动端底部导航（App 级，仅移动布局显示，桌面端隐藏）
+       标签必须与打开的页面一致。「学习 / 训练 / 工具」三个分类 Tab 承接原侧边栏
+       抽屉里的同名分组（桌面端侧边栏仍保留分组原文，两处导航不冲突），
+       点击进入对应聚合页（#page-learn / #page-train / #page-tool），
+       页内卡片再进入具体功能页。 -->
   <nav class="bottom-nav" id="bottom-nav" aria-label="底部导航">
-    <!-- 底部导航：标签必须与打开的页面一致。原「学习」直达背单词、「练习」直达语法练习，
-         用户会误以为「练习」就是语法，找不到拼写/听力/阅读/PK 等其它训练入口。
-         「背单词」保留直达（最高频），「练习」指向新增的练习中心聚合页。 -->
     <button type="button" class="bottom-nav-btn active" data-tab="home" aria-current="page"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chart" xlink:href="#i-chart"/></svg><span>首页</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="word"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-book" xlink:href="#i-book"/></svg><span>背单词</span></button>
-    <button type="button" class="bottom-nav-btn" data-tab="practice"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg><span>练习</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="learn"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-book" xlink:href="#i-book"/></svg><span>学习</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="train"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg><span>训练</span></button>
+    <button type="button" class="bottom-nav-btn" data-tab="tool"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-list" xlink:href="#i-list"/></svg><span>工具</span></button>
     <button type="button" class="bottom-nav-btn" data-tab="settings"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-user" xlink:href="#i-user"/></svg><span>我的</span></button>
   </nav>
 

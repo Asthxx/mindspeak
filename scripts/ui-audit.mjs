@@ -14,8 +14,10 @@ const BASE = `http://localhost:${PORT}/`;
 const OUT = join(root, 'audit-shots');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// practice = 练习中心（移动端底部「练习」Tab 的聚合落点，2026-10-02 新增）
-const TABS = ['home','word','practice','story','listening','reading','grammar','context','spelling',
+// learn / train / tool = 底部导航三个分类 Tab 的聚合落点（2026-10-17 新增，
+//   承接原侧边栏抽屉里的同名分组；桌面端侧边栏仍保留分组原文）
+// practice = 练习中心（桌面侧边栏「训练」组内入口；移动端由 page-train 承接）
+const TABS = ['home','learn','train','tool','word','practice','story','listening','reading','grammar','context','spelling',
   'pk','speak','mistakes','mistake-train','favorites','search','pomodoro','items','ai','support','settings'];
 
 const VIEWPORTS = [
