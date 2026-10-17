@@ -17,10 +17,16 @@ var TTSManager = (function() {
       this.volume = 1;     // 音量
       this._ready = false;
       this._loaded = false;
-      // 原生 TTS 降级状态：_nativeDead=本会话判定原生不可用；_nativeToken/_nativeWatchdog=看门狗
+      // 原生 TTS 降级状态：_nativeDead=本会话判定原生不可用；_nativeToken=当前原生朗读令牌；
+      // _nativeCtx=当前这次朗读的上下文（真实回调按它路由）；两个看门狗分别盯
+      // "引擎是否真的开始出声"与"开始后是否真的播完"。
       this._nativeDead = false;
       this._nativeToken = null;
+      this._nativeCtx = null;
       this._nativeWatchdog = null;
+      this._nativeDoneWatchdog = null;
+      this._nativeBound = false;   // 引擎事件是否已订阅
+      this._nativeSeq = 0;         // utterance id 自增序号
       this.init();
     }
 
@@ -225,15 +231,6 @@ var TTSManager = (function() {
       const lang = (opts.lang || (this.voice && this.voice.lang) || 'en-US');
       const rate = (typeof opts.rate === 'number') ? opts.rate : this.rate;
       // Capacitor 原生 TTS 优先（Android WebView 的 speechSynthesis 有已知问题）。
-      // 可靠性对策（Java 端 onInit 失败只写 logcat、插件 Promise 无论引擎能否出声
-      // 都立即 resolve —— "受理成功"证明不了"引擎可用"，直接信任会永久静音）：
-      //   ① 桥接层把插件调用包成 Promise + 3s 超时，明确失败返回 false → 立即降级；
-      //   ② 这里再加 3s 确认窗口：resolve 只算乐观受理（照发 onstart/onend 保持 UI 流程），
-      //      到期一律判定原生不可用并锁定本会话走 web 链路。若合成 onend 已发出
-      //      （短文本已播完）则不再重播，仅锁链路；否则停原生、触发 opts.onerror 并降级。
-      //   ③ 代价：即使原生健康，每会话首次朗读最迟 3s 后也会切到 web 音色
-      //      （解锁时的音量预热通常充当这次探测，用户基本无感知）——这是 JS 层
-      //      无引擎回调可依赖时的唯一可靠判定方式。
       // 用户显式选择过声音（tts_voice 非空）时必须绕过原生引擎：
       // 原生插件只支持 text/lang/rate、无法指定音色，而本方法的原生分支
       // 优先于 _speakWeb 的 voice_name 路由——若放行拦截，手机上设置里
@@ -250,57 +247,124 @@ var TTSManager = (function() {
       // （国产机无 Google TTS，见 app.js:409）时唯一能出声的通道，写反会导致静音。
       var _serverUp = !!(window.SpeechUtil && window.SpeechUtil._serverDown === false);
       var _useNative = !!(!_explicitVoice && window.NativeTTSBridge && window.NativeTTSBridge.available && this._nativeDead !== true && !_serverUp);
-      // [TEMP-DEBUG] 真机验证 G 用；验证完请连同 _speakWeb 内同类标记一并删除
-      try { Logger.log('TTSManager', '[TEMP-DEBUG] speak voice=' + JSON.stringify(_explicitVoice) + ' bridge=' + !!window.NativeTTSBridge + ' dead=' + (this._nativeDead === true) + ' serverUp=' + _serverUp + ' -> ' + (_useNative ? 'NATIVE' : 'WEB')); } catch (_e) {}
       if (_useNative) {
         try { window.NativeTTSBridge.stop(); } catch (_e) {}
         const self = this;
         const token = {};              // 会话令牌：新一轮 speak / cancel 使旧看门狗失效
         this._nativeToken = token;
-        let synthEnded = false;        // 合成 onend 已发出（短文本视为播完，超时只锁不重播）
-        const finishWatchdog = function() {
-          if (self._nativeWatchdog) { clearTimeout(self._nativeWatchdog); self._nativeWatchdog = null; }
-        };
-        const succeed = function() {
-          if (self._nativeToken !== token) return;
-          if (opts.onstart) { try { opts.onstart(); } catch (_e) {} }
-          if (opts.onend) { setTimeout(function() { synthEnded = true; try { opts.onend(); } catch (_e) {} }, 800); }
-        };
-        const degrade = function(reason) {
-          if (self._nativeToken !== token) return;
-          self._nativeToken = null;
-          finishWatchdog();
-          self._nativeDead = true;     // 本会话不再尝试原生
-          try { window.NativeTTSBridge.stop(); } catch (_e) {}
-          Logger.log('TTSManager', 'native TTS 不可用(' + reason + ')，本会话锁定 web TTS');
-          if (!synthEnded) {
-            // 未确认播完才需要补救出声；短文本已合成 onend 的仅锁定链路，避免重播
-            if (opts.onerror) { try { opts.onerror({ error: 'native-unavailable', reason: reason }); } catch (_e) {} }
-            self._speakWeb(text, opts);
-          }
-        };
+        const uid = 'ns' + (++this._nativeSeq) + '_' + Date.now();
+        const wctx = { token: token, uid: uid, text: text, rate: rate, opts: opts, started: false, finished: false };
+        this._nativeCtx = wctx;
+        this._bindNativeEvents();
+
+        // 上一轮残留的看门狗先清掉：新一轮 speak 会把 _nativeCtx 顶掉，
+        // 旧定时器若留着，到期时会误判到新的一次上。
+        if (this._nativeWatchdog) { clearTimeout(this._nativeWatchdog); this._nativeWatchdog = null; }
+        if (this._nativeDoneWatchdog) { clearTimeout(this._nativeDoneWatchdog); this._nativeDoneWatchdog = null; }
+
+        // 确认看门狗：等 Java 端外传的真实 ttsStart。旧实现在插件 resolve 后
+        // 盲设 800ms 定时器把 synthEnded 置真，导致 3s 看门狗到时"以为已播完"，
+        // 跳过降级分支 —— 引擎初始化失败（插件仍 resolve）时表现为彻底静音。
+        // 现在只有真实 ttsStart 能证明引擎在出声；3s 内没来就是假成功。
+        // 注意闭包必须捕获 wctx 而不是读 this._nativeCtx：连续朗读时后者已是新的一次。
+        this._nativeWatchdog = setTimeout(function() {
+          if (wctx.started) return;              // 已出声，交给完成看门狗
+          self._nativeDegrade(wctx, 'no-start-3s');
+        }, 3000);
+
         let ok = null;
-        try { ok = window.NativeTTSBridge.speak(text || '', lang, rate); } catch (_err) { ok = false; }
+        try { ok = window.NativeTTSBridge.speak(text || '', lang, rate, uid); } catch (_err) { ok = false; }
         if (ok && typeof ok.then === 'function') {
           ok.then(function(res) {
-            if (res) succeed();
-            else degrade('bridge-false');
+            // 受理成功不发声学回调：onstart/onend 一律等真实 ttsStart/ttsDone。
+            // 明确失败（含"插件 3s 完全不应答"）才立刻降级。
+            if (!res) self._nativeDegrade(wctx, 'bridge-false');
           }, function(e) {
-            degrade('bridge-error:' + ((e && e.message) || 'rejected'));
+            self._nativeDegrade(wctx, 'bridge-error:' + ((e && e.message) || 'rejected'));
           });
         } else if (ok === true) {
-          succeed();                   // 同步布尔兼容（旧式实现）
+          // 同步布尔受理（旧式实现），同样只等真实事件
         } else {
-          degrade('sync-false');
-        }
-        // 3s 确认窗口对"已受理"的调用同样生效（同步布尔与 Promise 一视同仁）：
-        // 同步明确失败的已在上面降级，无需再看门狗。
-        if (ok === true || (ok && typeof ok.then === 'function')) {
-          this._nativeWatchdog = setTimeout(function() { degrade('unconfirmed-3s'); }, 3000);
+          this._nativeDegrade(wctx, 'sync-false');
         }
         return { native: true };
       }
       return this._speakWeb(text, opts);
+    }
+
+    // 订阅 Java 端外传的引擎事件（只订一次）。tts-manager.js 先于业务模块加载，
+    // 但 Capacitor 插件桥是启动时就绪的，这里仍做惰性绑定 + available 复检，
+    // 避免在非 Capacitor 环境（浏览器 / 测试）里空跑。
+    _bindNativeEvents() {
+      const b = window.NativeTTSBridge;
+      if (!b || !b.available || typeof b.onEvent !== 'function') return;
+      if (this._nativeBound) return;
+      const self = this;
+      this._nativeBound = true;
+      b.onEvent('ttsStart', function(d) { self._onNativeEvent('start', d); });
+      b.onEvent('ttsDone', function(d) { self._onNativeEvent('done', d); });
+      b.onEvent('ttsError', function(d) { self._onNativeEvent('error', d); });
+      b.onEvent('ttsInitFailed', function(d) {
+        // 引擎初始化失败：在播的那次立刻降级；没有在播的则直接把本会话锁到 web
+        if (self._nativeCtx) self._onNativeEvent('error', d || { reason: 'init-failed' });
+        else self._nativeDead = true;
+      });
+    }
+
+    _onNativeEvent(kind, data) {
+      const ctx = this._nativeCtx;
+      // 已被 cancel / 新一轮 speak 取代 → 迟到事件一律忽略
+      if (!ctx || ctx.token !== this._nativeToken) return;
+      // 只认当前这次朗读的 utterance id，旧 utterance 的迟到回调不掺和
+      if (data && data.id && ctx.uid && data.id !== ctx.uid) return;
+      if (ctx.finished) return;
+      const opts = ctx.opts || {};
+      if (kind === 'start') {
+        if (ctx.started) return;
+        ctx.started = true;
+        if (this._nativeWatchdog) { clearTimeout(this._nativeWatchdog); this._nativeWatchdog = null; }
+        if (opts.onstart) { try { opts.onstart(); } catch (_e) {} }
+        // 已确认出声，改等真实 ttsDone。上限按文本长度与语速估算（含 10s 底噪），
+        // 只为防引擎挂在半句上永不回调；正常朗读远早于它结束。
+        const cap = Math.max(10000, Math.round(String(ctx.text || '').length * 220 / Math.max(0.5, ctx.rate || 1)));
+        const self = this;
+        this._nativeDoneWatchdog = setTimeout(function() {
+          // 播过一部分但没等到 onDone：停掉原生、锁死本会话，不重播
+          // （换音色从头再来比静默更吵，且这条路在有了真实回调后应极少触发）
+          self._nativeDegrade(ctx, 'no-done', false);
+        }, cap);
+      } else if (kind === 'done') {
+        ctx.finished = true;
+        if (this._nativeWatchdog) { clearTimeout(this._nativeWatchdog); this._nativeWatchdog = null; }
+        if (this._nativeDoneWatchdog) { clearTimeout(this._nativeDoneWatchdog); this._nativeDoneWatchdog = null; }
+        this._nativeToken = null;
+        this._nativeCtx = null;
+        if (opts.onend) { try { opts.onend(); } catch (_e) {} }
+      } else {
+        this._nativeDegrade(ctx, (data && data.reason) || 'engine-error');
+      }
+    }
+
+    // 判定原生不可用：停引擎、锁死本会话，并按需降级到 web 重播。
+    // replay=false 用于"已播过一部分"的场景（只锁不补播）。
+    _nativeDegrade(ctx, reason, replay) {
+      if (!ctx || ctx.finished) return;
+      ctx.finished = true;
+      // 已被新一轮 speak 顶替：只记录"原生不可用"，绝不重播
+      // （否则旧句子会把正在播的新一句盖掉）
+      if (this._nativeToken !== ctx.token) { this._nativeDead = true; return; }
+      const opts = ctx.opts || {};
+      if (this._nativeWatchdog) { clearTimeout(this._nativeWatchdog); this._nativeWatchdog = null; }
+      if (this._nativeDoneWatchdog) { clearTimeout(this._nativeDoneWatchdog); this._nativeDoneWatchdog = null; }
+      this._nativeToken = null;
+      this._nativeCtx = null;
+      this._nativeDead = true;     // 本会话不再尝试原生
+      try { window.NativeTTSBridge.stop(); } catch (_e) {}
+      Logger.log('TTSManager', 'native TTS 不可用(' + reason + ')，本会话锁定 web TTS');
+      if (replay === false) return;
+      // 一次都没出声过才需要补救：停原生、报错、用 web 链路重新读一遍
+      if (opts.onerror) { try { opts.onerror({ error: 'native-unavailable', reason: reason }); } catch (_e) {} }
+      this._speakWeb(ctx.text, opts);
     }
 
     // web TTS 兜底链路：voice_name 路由（本地 SAPI / Piper / 在线音色）→ speechSynthesis。
@@ -332,8 +396,6 @@ var TTSManager = (function() {
           && typeof window.SpeechUtil.speak === 'function') {
         try { window.speechSynthesis.cancel(); } catch (_e) {}
         try { window.SpeechUtil._stopLocalAudio(); } catch (_e) {}
-        // [TEMP-DEBUG] 真机验证 G 用；验证完请删除
-        try { Logger.log('TTSManager', '[TEMP-DEBUG] _speakWeb 委派 SpeechUtil（instant 决策交回全站单一来源）'); } catch (_e) {}
         return window.SpeechUtil.speak(text, lang, opts);
       }
       if (_vn && !_hasRealVoice && window.SpeechUtil) {
@@ -439,9 +501,11 @@ var TTSManager = (function() {
     // 所有"停止/打断朗读"的场景都必须走这里，禁止在 tts-manager.js 之外直接调 speechSynthesis.cancel()。
     cancel() {
       if (window.NativeTTSBridge && window.NativeTTSBridge.available) {
-        // 使挂起的原生看门狗失效，避免 stop 之后降级逻辑又把声音"救活"
+        // 使挂起的看门狗与在播上下文失效，避免 stop 之后降级逻辑又把声音"救活"
         this._nativeToken = null;
+        this._nativeCtx = null;
         if (this._nativeWatchdog) { clearTimeout(this._nativeWatchdog); this._nativeWatchdog = null; }
+        if (this._nativeDoneWatchdog) { clearTimeout(this._nativeDoneWatchdog); this._nativeDoneWatchdog = null; }
         try { window.NativeTTSBridge.stop(); } catch (_e) {}
       }
       if (!('speechSynthesis' in window)) return;

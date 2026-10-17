@@ -2438,12 +2438,17 @@ h2{
 
 /* ============ 打卡日历补签 ============ */
 .cal-day.cal-missed{
-  background:var(--surface);border:1.5px dashed var(--coral);
-  color:var(--coral);cursor:pointer;
+  /* 边框是非文本 UI 边界，同样要满足 1.4.11 的 3:1；--coral 白底仅 2.31:1。
+     与 color 一并走 --coral-text（白底 5.45:1 / 深色卡片 7.30:1）。 */
+  background:var(--surface);border:1.5px dashed var(--coral-text);
+  /* --coral 白底仅 2.31:1，12px 小字远达不到 AA 的 4.5:1；
+     --coral-text 是专为文字场景准备的珊瑚色（白底 5.45:1 / 深色卡片 7.30:1）。 */
+  color:var(--coral-text);cursor:pointer;
 }
 .cal-day.cal-missed:hover{background:var(--coral-surface);border-style:solid}
+/* 图例色块必须与格子同色，否则图例就不再代表格子（见 1724 行注释）。 */
 .cal-dot-missed{
-  background:var(--surface);border:1px dashed var(--coral);
+  background:var(--surface);border:1px dashed var(--coral-text);
 }
 
 /* ============ 每日学习计划 ============ */

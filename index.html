@@ -615,7 +615,7 @@
     <section id="page-word" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-translate" xlink:href="#i-translate"/></svg> 背单词</h2>
       <div class="section-header">
-        <label>选择词库：</label>
+        <label for="word-category">选择词库：</label>
         <select id="word-category">
           <option value="">加载中...</option>
         </select>
@@ -859,13 +859,13 @@
     <section id="page-spelling" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-spellcheck" xlink:href="#i-spellcheck"/></svg> 拼写测试</h2>
       <div class="section-header">
-        <label>测试模式：</label>
+        <label for="spelling-mode">测试模式：</label>
         <select id="spelling-mode">
           <option value="cn2en">看中文写英文</option>
           <option value="listen2en">听发音写英文</option>
           <option value="en2cn">看英文选中文</option>
         </select>
-        <label>词库：</label>
+        <label for="spelling-category">词库：</label>
         <select id="spelling-category">
           <option value="">加载中...</option>
         </select>
@@ -907,7 +907,7 @@
     <section id="page-mistakes" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-error" xlink:href="#i-error"/></svg> 错题本</h2>
       <div class="section-header">
-        <label>来源：</label>
+        <label for="mistake-source">来源：</label>
         <select id="mistake-source">
           <option value="all">全部来源</option>
           <option value="spelling">拼写测试</option>
@@ -958,7 +958,7 @@
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 错词强化训练</h2>
       <p style="color:var(--text-secondary);margin-bottom:var(--sp-4)">针对错题本中的单词进行专项训练，直到全部掌握</p>
       <div class="section-header">
-        <label>来源：</label>
+        <label for="mt-source">来源：</label>
         <select id="mt-source">
           <option value="all">全部来源</option>
           <option value="spelling">拼写测试</option>
@@ -1021,7 +1021,7 @@
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-mic" xlink:href="#i-mic"/></svg> 国际音标学习</h2>
 
       <div class="section-header">
-        <label>分类：</label>
+        <label for="phonetic-category">分类：</label>
         <select id="phonetic-category">
           <option value="all">全部(48个)</option>
           <option value="vowels">元音(20个)</option>
@@ -1110,7 +1110,7 @@
         提示：如果每次都弹出麦克风权限请求，请右键 index.html → Open with Live Server 打开
       </div>
       <div class="section-header">
-        <label>词库：</label>
+        <label for="speak-category">词库：</label>
         <select id="speak-category">
           <option value="0">加载中...</option>
         </select>
@@ -1170,14 +1170,14 @@
     <section id="page-grammar" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-edit" xlink:href="#i-edit"/></svg> 语法练习</h2>
       <div class="section-header">
-        <label>选择练习类型：</label>
+        <label for="grammar-type">选择练习类型：</label>
         <select id="grammar-type">
           <option value="all">综合练习</option>
           <option value="choice">选择题</option>
           <option value="fill_blank">填空题</option>
           <option value="sentence_transform">句型变换</option>
         </select>
-        <label>难度：</label>
+        <label for="grammar-difficulty">难度：</label>
         <select id="grammar-difficulty">
           <option value="all">全部</option>
           <option value="basic">基础</option>
@@ -1225,11 +1225,11 @@
     <section id="page-reading" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-article" xlink:href="#i-article"/></svg> 阅读训练</h2>
       <div class="section-header">
-        <label>选择文章：</label>
+        <label for="reading-select">选择文章：</label>
         <select id="reading-select">
           <option value="">加载中...</option>
         </select>
-        <label>难度：</label>
+        <label for="reading-difficulty">难度：</label>
         <select id="reading-difficulty">
           <option value="all">全部</option>
           <option value="CET-4">CET-4</option>
@@ -1263,12 +1263,12 @@
 <section id="page-listening" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-headphones" xlink:href="#i-headphones"/></svg> 听力训练</h2>
       <div class="section-header">
-        <label>训练模式：</label>
+        <label for="listening-mode">训练模式：</label>
         <select id="listening-mode">
           <option value="word">听单词拼写</option>
           <option value="sentence">听句子填空</option>
         </select>
-        <label>词库：</label>
+        <label for="listening-category">词库：</label>
         <select id="listening-category">
           <option value="">加载中...</option>
         </select>
@@ -1312,7 +1312,7 @@
     <section id="page-pk" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-trophy" xlink:href="#i-trophy"/></svg> 单词PK</h2>
       <div class="section-header">
-        <label>词库：</label>
+        <label for="pk-category">词库：</label>
         <select id="pk-category">
           <option value="0">加载中...</option>
         </select>
@@ -1355,7 +1355,7 @@
     <section id="page-favorites" class="page">
       <h2><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-bookmark" xlink:href="#i-bookmark"/></svg> 收藏夹</h2>
       <div class="section-header">
-        <label>来源：</label>
+        <label for="fav-source">来源：</label>
         <select id="fav-source">
           <option value="all">全部来源</option>
           <option value="manual">手动收藏</option>
@@ -1493,7 +1493,7 @@
         </div>
         <div id="custom-color-picker" class="custom-color-area hidden">
           <div class="custom-color-row">
-            <label>选择主色调：</label>
+            <label for="custom-color-input">选择主色调：</label>
             <input type="color" id="custom-color-input" value="#5B82A6">
             <span id="custom-color-hex">#5B82A6</span>
           </div>
@@ -1529,7 +1529,7 @@
             </div>
           </div>
           <div class="bg-opacity-control" id="bg-opacity-control" style="display:none">
-            <label>背景透明度：</label>
+            <label for="bg-opacity-slider">背景透明度：</label>
             <input type="range" id="bg-opacity-slider" min="10" max="100" value="30">
             <span id="bg-opacity-value">30%</span>
           </div>

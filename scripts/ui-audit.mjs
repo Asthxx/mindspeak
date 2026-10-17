@@ -86,6 +86,10 @@ const PROBE = `(() => {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) return;                 // 不可见
     if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') return;
+    // 有布局盒但没被渲染的子树（离屏抽屉、折叠的 <details>、toast 入场动画中途）：
+    // 视觉类判定（触控区 / 可访问名 / 越界）对它们不成立，参与统计只会产出假阳性。
+    if (cs0.visibility === 'hidden') return;
+    if (el.closest('details:not([open])')) return;
     const key = el.tagName + '|' + (el.id || el.className) + '|' + Math.round(r.x) + ',' + Math.round(r.y);
     if (seen.has(key)) return; seen.add(key);
     // 触控区
@@ -97,7 +101,13 @@ const PROBE = `(() => {
       });
     }
     // 可访问名
-    const name = (el.innerText || '').trim() || el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || '';
+    // input/select/textarea 的 innerText 恒为空，必须改走 label 关联（el.labels）；
+    // 文本用 textContent 兜底：离屏/折叠子树里 innerText 为空，但可访问名是真实存在的。
+    // 字段类不能拿 textContent 兜底——<select> 的 textContent 是选项文本，会把「无名字」掩盖掉。
+    const isField = el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA';
+    const ownText = ((el.innerText || '') || (!isField ? (el.textContent || '') : '')).trim();
+    const viaLabel = el.labels && el.labels.length ? (el.labels[0].textContent || '').trim() : '';
+    const name = ownText || viaLabel || el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || '';
     if (!name) {
       out.namelessBtns.push({
         sel: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.') : ''),
@@ -105,7 +115,20 @@ const PROBE = `(() => {
       });
     }
     // 溢出视口右侧（横向滚动元凶）
-    if (r.right > vw + 1 && getComputedStyle(el).position !== 'fixed') {
+    // 横向滚动容器内的元素（如 AI 建议 chips 横滑条）由容器裁切，是设计内的局部滚动，
+    // 不是页面级横向溢出；只有不被任何滚动容器裁切的元素才算真的越界。
+    // toast 同理：平时停在 translateX(120%) 的视口外，是刻意的位置，不是溢出；
+    // 采样撞上它 0.3s 的入场动画就会记一条假的越界。
+    const inXScroller = (function () {
+      let n = el.parentElement;
+      while (n && n !== document.documentElement) {
+        const ox = getComputedStyle(n).overflowX;
+        if (ox === 'auto' || ox === 'scroll') return true;
+        n = n.parentElement;
+      }
+      return false;
+    })();
+    if (!inXScroller && !el.closest('.toast') && r.right > vw + 1 && getComputedStyle(el).position !== 'fixed') {
       out.offscreen.push({ sel: el.tagName.toLowerCase() + (el.id ? '#' + el.id : ''), right: Math.round(r.right), vw });
     }
   });
