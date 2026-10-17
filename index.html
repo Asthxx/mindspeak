@@ -7,7 +7,9 @@
        CSP 已收紧为 script-src 'self'（无 unsafe-inline），故全部提取为 js/head-boot.js 同步加载 -->
   <script src="js/head-boot.js?v=20260905-1"></script>
 <title>闻道 MindSpeak</title>
-  <meta name="app-version" content="v20260808-6">
+  <!-- app-version 由 build.js 在构建时用根目录 VERSION 文件覆盖注入，
+       此处占位值与 VERSION 保持一致，避免源码本身自相矛盾 -->
+  <meta name="app-version" content="v1.1.0">
   <meta name="description" content="闻道 MindSpeak — AI 英语学习成长伴侣">
   <!-- App 化适配：全屏沉浸 + 状态栏配色 + 去浏览器 UI（配合 PWA/WebView 打包） -->
   <meta name="theme-color" content="#F4F6F8">
