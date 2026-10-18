@@ -1077,6 +1077,13 @@ h2{
 /* 朗读声音字段：桌面横排，下拉保持可读宽度 */
 .settings-group .voice-field{flex-wrap:wrap}
 .settings-group .voice-field select{min-width:180px}
+/* 提醒时间：与下拉同一套字段样式，宽度按内容给（时间只有 5 个字符） */
+.settings-group .voice-field input[type="time"]{
+  min-width:140px;padding:var(--sp-2) var(--sp-3);
+  border:1.5px solid var(--border);
+  border-radius:var(--radius-sm);font-size:var(--text-sm);
+  background:var(--surface);color:var(--text);
+}
 .settings-group input[type="number"]{
   width:72px;padding:var(--sp-2) var(--sp-3);
   border:1.5px solid var(--border);

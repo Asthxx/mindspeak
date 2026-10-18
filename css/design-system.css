@@ -96,6 +96,11 @@
   --text-tertiary:   #616B76;
   /* ghost 仅用于占位符等装饰性文字，保持轻量；不得承载正文语义 */
   --text-ghost:      #B0B0B0;
+  /* --bg-card 在 android.css / android-nav.css / android-animations.css 里被 9 处使用
+     （设置分组卡片、底部导航、浮动按钮…），但此前**从未定义过**，
+     于是永远走 var(--bg-card, #fff) 的兜底 —— 深色主题下这些组件仍是白底，
+     配深色文字令牌实测只有 2.98:1，不达 AA。这里补上定义并挂到 --ivory-card：
+     浅色 #FFFFFF 与原来的兜底值完全相同（零回归），深色自动翻到 #252629。 */
   --text-inverse:    #FFFFFF;
   --text-sage:       var(--sage);
   --text-coral:      var(--coral);
@@ -113,6 +118,7 @@
   --bg-warm:         var(--ivory-warm);
   --surface:         var(--ivory-card);
   --surface-hover:   var(--sage-surface);
+  --bg-card:         var(--ivory-card);
 
   /* ── Border ── */
   /* ── Border（P2-3：色温修正）────────────────────────────────────
@@ -345,6 +351,7 @@
   --bg-warm:         var(--ivory-warm);
   --surface:         var(--ivory-card);
   --surface-hover:   var(--sage-surface);
+  --bg-card:         var(--ivory-card);
 
   /* ── Border ── */
   --border:          #3A3B3E;

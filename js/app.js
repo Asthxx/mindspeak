@@ -4775,6 +4775,15 @@ PomodoroModule.prototype.start = function() {
       this._playAlertSound();
       this._vibrate();
     }
+    // 系统通知：App 退到后台/锁屏时 setInterval 会被浏览器节流甚至挂起，
+    // 上面的弹窗和提示音根本到不了用户，只有本地通知能把他叫回来。
+    // 与"提醒音"开关分开控制：有人想静音但仍要收到通知。
+    try {
+      var notifyOn = typeof DataStore !== 'undefined' ? DataStore.getProgress('pomodoro_notify_enabled', true) !== false : true;
+      if (notifyOn && window.NotificationManager) {
+        window.NotificationManager.notifyNow('番茄钟完成', '专注结束啦，休息一下再继续。', { extra: { module: 'home' } });
+      }
+    } catch (e) {}
     if (window.app) window.app.recordActivity('pomodoro');
   };
   // 三连提示音：WebAudio 合成（880Hz 正弦短音 ×3），离线可用、无音频资源依赖；
@@ -6672,6 +6681,93 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
       
     });
   }
+  // 学习提醒：① 每日定时提醒（系统本地通知，App 不在前台也能到点弹出）
+  //           ② 番茄钟结束时补一条通知（后台 setInterval 会被节流，只有通知能叫回人）
+  // 权限只在用户点开关时申请：冷启动就弹授权框很招人烦，而且浏览器要求必须在手势里。
+  var dailyToggle = document.getElementById('toggle-daily-reminder');
+  var dailyTimeInput = document.getElementById('daily-reminder-time');
+  var pomoNotifyToggle = document.getElementById('toggle-pomodoro-notify');
+  var reminderHint = document.getElementById('reminder-permission-hint');
+  function setReminderHint(text) {
+    if (!reminderHint) return;
+    reminderHint.textContent = text;
+  }
+  function parseReminderTime() {
+    var v = (dailyTimeInput && dailyTimeInput.value) || '20:00';
+    var m = /^(\d{1,2})\s*:\s*(\d{2})$/.exec(v);
+    if (!m) return { hour: 20, minute: 0, text: '20:00' };
+    var h = Math.max(0, Math.min(23, parseInt(m[1], 10)));
+    var mi = Math.max(0, Math.min(59, parseInt(m[2], 10)));
+    return { hour: h, minute: mi, text: (h < 10 ? '0' + h : h) + ':' + (mi < 10 ? '0' + mi : mi) };
+  }
+  function applyDailyReminder(ask) {
+    var NM = window.NotificationManager;
+    var on = !!(dailyToggle && dailyToggle.checked);
+    DataStore.setProgress('daily_reminder_enabled', on);
+    var t = parseReminderTime();
+    if (dailyTimeInput) DataStore.setProgress('daily_reminder_time', dailyTimeInput.value);
+    if (!on) {
+      if (NM) NM.cancelDaily();
+      setReminderHint('已关闭每日提醒。');
+      return;
+    }
+    if (!NM || !NM.isSupported()) {
+      // 不支持就别留一个点了没反应的开关
+      if (dailyToggle) dailyToggle.checked = false;
+      DataStore.setProgress('daily_reminder_enabled', false);
+      setReminderHint('当前环境不支持定时通知，需安装 Android 版或使用支持通知的浏览器。');
+      return;
+    }
+    var doSchedule = function() {
+      NM.scheduleDaily(t.hour, t.minute);
+      setReminderHint('每天 ' + t.text + ' 提醒你学英语。');
+    };
+    // 用户主动点开关时，不能信缓存的"已授权"：用户完全可能之后在系统设置里把通知关掉。
+    // 已授权状态下 requestPermission 不会再弹框，所以这里总是实问一次，结果才准。
+    if (ask) {
+      NM.requestPermission().then(function(ok) {
+        if (ok) { doSchedule(); return; }
+        if (dailyToggle) dailyToggle.checked = false;
+        DataStore.setProgress('daily_reminder_enabled', false);
+        setReminderHint('通知权限未授予，请在系统设置里允许通知后再开启。');
+      });
+      return;
+    }
+    // 启动恢复：不主动弹框，已授权就补一次调度，没授权就只给说明
+    if (NM.hasPermission()) { doSchedule(); return; }
+    setReminderHint('还没拿到通知权限，打开上面的开关即可授权。');
+  }
+  // bindSettings 每进一次设置页都会重跑，这里的 handler 会触发权限请求 ——
+  // 重复绑定就会一次点击弹好几个授权框。用 dataset 做一次性标记。
+  // （页面里其它开关是纯布尔写入，重复执行也幂等，所以没加这个标记。）
+  if (dailyToggle) {
+    dailyToggle.checked = DataStore.getProgress('daily_reminder_enabled', false) === true;
+    if (!dailyToggle.dataset.msBound) {
+      dailyToggle.dataset.msBound = '1';
+      dailyToggle.addEventListener('change', function() { applyDailyReminder(true); });
+    }
+  }
+  if (dailyTimeInput) {
+    dailyTimeInput.value = DataStore.getProgress('daily_reminder_time', '20:00') || '20:00';
+    if (!dailyTimeInput.dataset.msBound) {
+      dailyTimeInput.dataset.msBound = '1';
+      dailyTimeInput.addEventListener('change', function() {
+        if (dailyToggle && dailyToggle.checked) applyDailyReminder(false);
+        else setReminderHint('每天 ' + parseReminderTime().text + ' 提醒你学英语（开启后生效）。');
+      });
+    }
+  }
+  if (pomoNotifyToggle) {
+    pomoNotifyToggle.checked = DataStore.getProgress('pomodoro_notify_enabled', true) !== false;
+    if (!pomoNotifyToggle.dataset.msBound) {
+      pomoNotifyToggle.dataset.msBound = '1';
+      pomoNotifyToggle.addEventListener('change', function() {
+        DataStore.setProgress('pomodoro_notify_enabled', pomoNotifyToggle.checked);
+      });
+    }
+  }
+  applyDailyReminder(false);
+
   // 自动保存开关：开启后按自定义间隔自动备份进度（默认 5 分钟，范围 1-1440）
   var autoSaveToggle = document.getElementById('auto-save');
   var autoSaveIntervalInput = document.getElementById('auto-save-interval');

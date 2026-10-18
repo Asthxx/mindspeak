@@ -1485,6 +1485,23 @@
           </div>
         </div>
       </div>
+      <!-- 学习提醒：每日定时提醒 + 番茄钟结束通知。
+           每日提醒靠系统本地通知（Android 即使 App 被杀也能到点弹出）；
+           浏览器没有定时推送能力，那里只做"页面开着时到点提醒一次"的降级。 -->
+      <div class="settings-group">
+        <h3><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-timer" xlink:href="#i-timer"/></svg> 学习提醒</h3>
+        <label>
+          <input type="checkbox" id="toggle-daily-reminder"> 每天到点提醒我学英语
+        </label>
+        <label class="voice-field" for="daily-reminder-time">
+          提醒时间：
+          <input type="time" id="daily-reminder-time" value="20:00" step="60" aria-describedby="reminder-permission-hint">
+        </label>
+        <label>
+          <input type="checkbox" id="toggle-pomodoro-notify" checked> 番茄钟结束时发通知（退到后台也收得到）
+        </label>
+        <p class="setting-help" id="reminder-permission-hint">开启后按设定时间推送；首次打开会请求通知权限。</p>
+      </div>
       <div class="settings-group">
         <h3><svg class="icon icon-sage" aria-hidden="true" focusable="false"><use href="#i-volume" xlink:href="#i-volume"/></svg> 朗读声音</h3>
         <label class="voice-field">

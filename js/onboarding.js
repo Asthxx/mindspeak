@@ -17,8 +17,11 @@ var OnboardingModule = (function() {
     var self = this;
     // 等首屏渲染完成后自动弹出（首次使用时）。
     // 守卫：引导已在打开状态、或测评弹窗正打开时不打断，避免重置正在进行的引导步骤。
+    // onboarding_seen：用户主动关过（×/点遮罩/Esc）—— 也算"看过"，不再自动弹。
+    // 只判 onboarding_done 的话，随手一点遮罩关掉就会每次冷启动都重弹一遍。
     setTimeout(function() {
       if (DataStore.getProgress('onboarding_done')) return;
+      if (DataStore.getProgress('onboarding_seen')) return;
       if (self._open) return;
       var am = document.getElementById('assessment-modal');
       if (am && !am.classList.contains('hidden')) return;
@@ -184,9 +187,16 @@ var OnboardingModule = (function() {
 
   // ---------- 完成引导 ----------
   // completed=true：真正完成引导（进入首页/点了开始），标记 onboarding_done；
-  // completed=false：仅关闭弹窗（误点遮罩/Esc/×），不标记完成，下次打开仍会重新展示
+  // completed=false：仅关闭弹窗（误点遮罩/Esc/×）。
+  //
+  // 这里刻意拆成两个标记，而不是只写 onboarding_done：
+  //   onboarding_done = 完整走完（能做学习计划/目标都已就绪）
+  //   onboarding_seen = 看过并主动关掉了（只是不想再看，不代表走完）
+  // 两者都会挡住"下次自动弹"，但语义分得清：将来若要在首页展示
+  // "还没完成初始设置"的提示，只看 onboarding_done 即可，不会被"关过一次"误判成已完成。
   OnboardingModule.prototype._finish = function(completed) {
     if (completed) DataStore.setProgress('onboarding_done', true);
+    else DataStore.setProgress('onboarding_seen', true);
     // 清掉可能残留的测评回调：防止引导外的测评交卷后误触发 _goto 跳步
     if (window.app && window.app.assessmentModule) window.app.assessmentModule._onComplete = null;
     this._hide();
