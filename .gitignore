@@ -56,6 +56,9 @@ audit-shots/
 audit-shots.bak-*/
 # 审查过程中手工截取的证据图（docs/ui-review-*.md 的配图除外）
 docs/review-shots-*/
+# 按日期归档的关键验收证据图（导入 docs/review-shots-*/ 的删除范围之外，
+# 这些是改动留下的唯一凭证，删了无法从脚本再生）
+docs/evidence-*/
 *.bak
 *draft-backup.js
 

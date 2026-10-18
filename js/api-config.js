@@ -11,6 +11,16 @@ window.MS = window.MS || {};
 // 本机本地服务地址（file:// 离线模式 + 本地开发共用；本地服务探测也用它，禁止散落硬编码）
 window.MS.LOCAL_API_BASE = 'http://localhost:3000';
 
+// 内置离线语音（Piper WASM）的模型文件下载源。
+// 运行时 WASM 随 APK 走 assets/vendor/piper/，不需要这里配；
+// 但 60MB 的语音模型（en_US-lessac-medium.onnx + .onnx.json）体积太大不进包，
+// 首次联网时从这里下载并缓存到 IndexedDB，之后完全离线。
+//   - 留空 = 同源（桌面/网页版由本仓库 server 的 /api/offline-voice/ 提供）
+//   - APK 里页面是 capacitor:// 本地协议，必须填公网地址，例如：
+//     window.MS.OFFLINE_VOICE_BASE = 'https://你的域名/offline-voice/';
+// 两个文件都要放上去，且主机必须返回正确的 Content-Length（否则下载进度只能显示 0/100）。
+window.MS.OFFLINE_VOICE_BASE = '';
+
 window.API_BASE = (function () {
   // ★ 部署到 GitHub Pages / 公网时，把这里改成你的后端地址，例如：
   // var REMOTE_API = 'https://xxx.trycloudflare.com';

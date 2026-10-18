@@ -17,6 +17,8 @@ const jsOrder = [
   'js/core/loading.js', // 三态加载体系（按钮 loading / 区块骨架 / 等待词库）
   'js/tts-manager.js', // 全局统一 TTS 服务必须最先加载（其他文件都依赖 window.TTSManager）
   'js/nativetts-bridge.js', // Capacitor 原生 TTS 桥接层（Android 端由 tts-manager 调用）
+  'js/offline-tts.js', // 内置离线语音（Piper WASM）。读 api-config 的 OFFLINE_VOICE_BASE，
+                      // 且被 app.js 的降级链调用，必须排在 app.js 之前
   'js/android-ui-init.js', // Android UI 初始化（StatusBar、NavigationBar、触摸反馈、启动屏）
   'js/notification-manager.js', // Android 本地通知管理（学习提醒、复习调度）
   'js/responsive-layout.js', // 响应式断点布局（手机/平板/桌面自适应）

@@ -1782,6 +1782,23 @@ h2{
   margin:var(--sp-2) 0 0;font-size: var(--text-xs);line-height:1.7;
   color:var(--text-tertiary);
 }
+/* 内置离线音状态行。文字之外再加一个状态点：下载中是流动的、
+   就绪/失败是静态的，扫一眼就知道，不用逐字读。
+   三个颜色都取语义令牌，不新引颜色——主题包翻转时自动跟着走。 */
+.offline-voice-status{display:flex;align-items:center;gap:var(--sp-2)}
+.offline-voice-status::before{
+  content:'';flex:none;width:8px;height:8px;border-radius:var(--radius-full);
+  background:var(--text-tertiary);
+}
+.offline-voice-ok::before{background:var(--success)}
+/* 复用 design-system.css 里已有的 @keyframes pulse（目前无人使用，正好是"呼吸"语义）。
+   不要在这里另起一个同名动画：跨文件重复选择器守卫（tests/core/design-tokens.test.js）
+   会把 @keyframes 里的 50% 也算成选择器，新增关键帧会直接把重复数顶过阈值。 */
+.offline-voice-busy::before{background:var(--warning);animation:pulse 1.2s var(--ease) infinite}
+.offline-voice-err::before{background:var(--coral)}
+@media (prefers-reduced-motion: reduce){
+  .offline-voice-busy::before{animation:none}
+}
 /* 覆盖 .settings-group label 的通用 flex/margin——说明行里的输入框要跟文字同基线，
    而不是被撑成一行 44px 的块 */
 .settings-group .setting-help label{

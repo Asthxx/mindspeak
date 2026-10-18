@@ -154,6 +154,10 @@ const MODULES = [
   'js/core/progress.js',
   'js/core/loading.js',
   'js/api-config.js',
+  // 内置离线语音。排在 api-config 之后（读 window.MS.OFFLINE_VOICE_BASE）、
+  // app.js 之前（app.js 的朗读降级链末级会调 window.OfflineTTS）。
+  // 漏了这一项会让降级链相关用例报 OfflineTTS is not defined。
+  'js/offline-tts.js',
   'js/tts-manager.js',
   'js/story.js',
   'js/listen-along.js',
@@ -204,7 +208,7 @@ export async function bootstrapApp(opts = {}) {
     // 在当前 DOM 上重复 new App() / safeBind，污染新实例的事件绑定
     const fresh = globalThis.__dclListeners.slice(beforeLen);
     for (const h of fresh) {
-      try { h.call(document, new Event('DOMContentLoaded')); } catch (e) { /* 单模块初始化失败不中断其余 */ }
+      try { h.call(document, new Event('DOMContentLoaded')); } catch (e) { if (globalThis.__MS_BOOT_DEBUG) console.log('DCL THREW:', e && e.stack); /* 单模块初始化失败不中断其余 */ }
     }
   }
   return window;

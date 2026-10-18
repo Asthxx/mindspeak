@@ -589,6 +589,9 @@ _speakLetterTTS: function(up, opts) {
 _speakTTS: function(text, lang, opts) {
     var self = this;
     var settings = this.getSettings();
+    // 记下本次要读的文本：降级链末级的 _deviceFail/_ttsLocalFail 拿不到 text 参数，
+    // 而内置离线音兜底需要原文。只在本轮 speak 内存活，不持久化。
+    this._currentSpeakText = text;
     // 上一次在线声朗读还挂在队列里没 START（连接慢/断线），用户又点了新朗读：
     // 直接判定在线声已坏（本会话不再尝试），本次立即走 Google 合成/SAPI 出声。
     // 健康连接经 prime 预热后 START 实测仅 ~360ms，4s 内没 START 基本就是连不上。
@@ -631,6 +634,12 @@ _speakTTS: function(text, lang, opts) {
       if (opts) for (var lk in opts) lvo[lk] = opts[lk];
       lvo.voice = settings.voiceName === '__local_zira__' ? 'zira' : 'david';
       this._speakLocal(text, lang, lvo);
+      return;
+    }
+    // 「内置离线音（Piper WASM）」：模型下载到本机后完全离线——不依赖 server、不依赖网络，
+    // 也不看设备有没有装英文系统语音。用户显式选了它就一定走它。
+    if (settings.voiceName && window.OfflineTTS && window.OfflineTTS.isOfflineVoice(settings.voiceName)) {
+      this._speakOfflineVoice(text, lang, opts);
       return;
     }
     if (settings.voiceName && settings.voiceName.indexOf('__local_piper_') === 0) {
@@ -1550,6 +1559,77 @@ _markOnlineBroken: function() {
   //    只放行"手势内发起的播放"，进了 setTimeout 的手势就作废了，iOS 尤甚）；
   // ② 远程失败 → 退回浏览器系统语音 speechSynthesis（设备有英文声时仍可出声）；
   // ③ 设备也失败 → 才真正 Toast 报错。绝不静默无声。
+  // ---- 内置离线音（Piper WASM，见 js/offline-tts.js）----
+  // 两条入口：① 用户在设置里显式选了它（_speakTTS 里直接转来）
+  //          ② 降级链走到末级、所有其它音源都失败时兜底（_tryOfflineFallback）
+  // 模型没就位时不静默失败：启动下载并提示进度，下完立刻把本次要读的文本合成出声——
+  // "首次点了没声音、再点一次才有"是很差的反馈，宁可让用户等一次下载。
+  _speakOfflineVoice: function(text, lang, opts) {
+    var self = this;
+    if (!window.OfflineTTS) {
+      if (window.Toast) Toast.info('内置离线音不可用：当前环境不支持 Web Worker / IndexedDB');
+      return;
+    }
+    this._stopLocalAudio();
+    try { TTSManager.cancel(); } catch (e) {}
+    var st = window.OfflineTTS.status();
+    var rate = 0.9;
+    try { rate = parseFloat(this.getSettings().rate) || 0.9; } catch (e) {}
+    var fireStart = opts && opts.onstart ? function () { try { opts.onstart(); } catch (e) {} } : function () {};
+    var fireEnd = opts && opts.onend ? function (d) { try { opts.onend(d); } catch (e) {} } : function () {};
+
+    var go = function () {
+      window.OfflineTTS.speak(text, {
+        rate: rate,
+        voice: st.voice,
+        onstart: fireStart,
+        onend: fireEnd,
+        onerror: function () {
+          // 合成或播放失败：不重复弹两层错，落回原有失败提示
+          self._deviceFail(opts);
+        }
+      });
+    };
+    if (st.status === 'ready') { go(); return; }
+    if (st.status === 'downloading') {
+      if (window.Toast) Toast.info('离线语音包下载中… ' + Math.round((st.progress || 0) * 100) + '%');
+      return;
+    }
+    if (window.Toast) Toast.info('首次使用离线语音，正在下载语音包（约 60MB，仅这一次）…');
+    var off = null;
+    try {
+      off = window.OfflineTTS.onChange(function (s2) {
+        if (s2.status === 'ready') {
+          if (off) { try { off(); } catch (e) {} }
+          go();
+        } else if (s2.status === 'failed') {
+          if (off) { try { off(); } catch (e) {} }
+          if (window.Toast) Toast.error('离线语音包下载失败：' + (s2.error || '网络错误'));
+        } else if (s2.status === 'downloading' && window.Toast) {
+          // 只在 25% 整数倍提示，避免 Toast 刷屏
+          var p = Math.round((s2.progress || 0) * 100);
+          if (p > 0 && p % 25 === 0) Toast.info('离线语音包下载中… ' + p + '%');
+        }
+      });
+    } catch (e) {}
+    window.OfflineTTS.ensure(st.voice)['catch'](function () {});
+  },
+
+  // 降级链末级兜底。返回 true = 已接管，调用方不要再弹"朗读失败"。
+  // 文本取自 _speakTTS 开头存下的 _currentSpeakText（_deviceFail/_ttsLocalFail 没有 text 参数）。
+  _tryOfflineFallback: function (opts) {
+    if (!window.OfflineTTS) return false;
+    var st = window.OfflineTTS.status();
+    if (st.status === 'downloading') {
+      if (window.Toast) Toast.info('离线语音包下载中… ' + Math.round((st.progress || 0) * 100) + '%');
+      return true;
+    }
+    var text = this._currentSpeakText;
+    if (!text) return false;
+    this._speakOfflineVoice(text, 'en-US', opts);
+    return true;
+  },
+
   _speakServerless: function(text, lang, opts) {
     var self = this;
     try { window.speechSynthesis.cancel(); } catch(e) {}
@@ -1567,6 +1647,9 @@ _markOnlineBroken: function() {
   },
   _deviceFail: function(opts) {
     this._stopLocalAudio();
+    // 末级兜底：设备也没有英文语音（国产机常见）时，用内置离线音接住。
+    // 放在 onerror/Toast 之前——这里原来只能弹一条"朗读失败"然后彻底没声音。
+    if (this._tryOfflineFallback(opts)) return;
     if (opts && opts.onerror) opts.onerror(new Error('device-voice-fail'));
     if (!(opts && opts.noFailToast)) {
       Toast.error('朗读失败：本机无可用的英文语音，在线发音服务也连接失败。请检查网络后重试，或到「设置-朗读声音」换一个声音');
@@ -1574,6 +1657,8 @@ _markOnlineBroken: function() {
   },
   _ttsLocalFail: function(opts) {
     this._stopLocalAudio();
+    // 同上：本地音频路径也走不通时，内置离线音是最后一道。
+    if (this._tryOfflineFallback(opts)) return;
     if (opts && opts.onerror) opts.onerror(new Error('tts-local-fail'));
     // 即时语音模式下 server 不可用由调用方回退在线声，不弹 Toast
     if (!(opts && opts.noFailToast)) {
@@ -6643,6 +6728,51 @@ safeBind('btn-import-data', 'click', function() { self.importData(); });
       var g = guessVoiceGender(v);
       return v.name + (g ? '（' + g + (lang ? ' · ' + lang : '') + '）' : (lang ? '（' + lang + '）' : ''));
     }
+// 内置离线音状态渲染（模块级）。fillVoiceOptions() 是模块级函数，拿不到 this，
+// 所以真正的实现挂在这里，App.prototype._renderOfflineVoiceStatus 只是转发。
+// 函数声明会被提升，原型方法里提前调用没有问题。
+var _ovStatusBound = false;
+function renderOfflineVoiceStatus(s) {
+  s = s || (window.OfflineTTS ? window.OfflineTTS.status() : null);
+  if (!s) return;
+  var box = document.getElementById('offline-voice-status');
+  if (!box) return;
+  var pct = Math.round((s.progress || 0) * 100);
+  var txt = '', cls = '';
+  if (s.status === 'ready') {
+    txt = '离线语音包已就绪，此后不依赖网络也能朗读。';
+    cls = 'ok';
+  } else if (s.status === 'downloading') {
+    txt = '正在下载语音包… ' + pct + '%（约 60MB，仅首次需要）';
+    cls = 'busy';
+  } else if (s.status === 'failed') {
+    txt = '下载失败：' + (s.error || '网络错误') + '。可点下方按钮重试。';
+    cls = 'err';
+  } else if (s.status === 'idle') {
+    txt = '尚未下载。选中「内置离线音」后首次朗读会自动下载（约 60MB），之后完全离线。';
+    cls = '';
+  } else {
+    txt = '正在检测本地缓存…';
+  }
+  box.textContent = txt;
+  box.className = 'setting-help offline-voice-status' + (cls ? ' offline-voice-' + cls : '');
+  // 下拉标签同步（下载中/就绪/失败三种措辞）
+  var sel = document.getElementById('voice-select');
+  if (sel) {
+    var opt = sel.querySelector('option[value="__offline_piper_us_lessac__"]');
+    if (opt) {
+      var label = '内置离线音（Piper · 美音女声';
+      if (s.status === 'ready') label += '，已就绪 · 完全离线';
+      else if (s.status === 'downloading') label += '，下载中 ' + pct + '%';
+      else if (s.status === 'failed') label += '，下载失败';
+      else if (s.status === 'idle') label += '，首次需下载约 60MB';
+      opt.textContent = label + '）';
+    }
+  }
+}
+
+// 注意：这是模块级函数，不是 App 的原型方法 —— 里面的 self 是 window.self。
+// 需要访问 App 实例时从参数拿，别在这里写 self.xxx。
 function fillVoiceOptions() {
       var voices = [];
       try { voices = window.speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
@@ -6675,6 +6805,21 @@ function fillVoiceOptions() {
       }
       var localHint = isAndroid ? '（手机版不可用，需电脑 + server 运行）' : '（离线 SAPI，需 server 运行）';
       var piperHint = isAndroid ? '（手机版不可用，需电脑 + server 运行）' : '（离线，需 server 下载）';
+      // 内置离线音（Piper WASM）和下面那几个"需电脑 + server 运行"的完全不是一回事：
+      // 它跑在 WebView 里，模型下载一次后就地缓存，手机装上也照样离线可用。
+      // 单独放一个 optgroup，免得和依赖 server 的选项混在一起被误读成"手机版不可用"。
+      // 标签带实时状态：用户在下拉里就能看出"已就绪 / 还没下载 / 正在下载"。
+      var ovLabel = '内置离线音（Piper · 美音女声，首次需下载约 60MB）';
+      if (window.OfflineTTS) {
+        var ovs = window.OfflineTTS.status();
+        if (ovs.status === 'ready') ovLabel = '内置离线音（Piper · 美音女声，已就绪 · 完全离线）';
+        else if (ovs.status === 'downloading') ovLabel = '内置离线音（Piper · 下载中 ' + Math.round((ovs.progress || 0) * 100) + '%）';
+        else if (ovs.status === 'failed') ovLabel = '内置离线音（Piper · 下载失败，选中后重试）';
+        else if (ovs.status === 'idle') ovLabel = '内置离线音（Piper · 未下载，选中后自动下载）';
+      }
+      html += '<optgroup label="内置离线（手机可用）">';
+      html += '<option value="__offline_piper_us_lessac__">' + ovLabel + '</option>';
+      html += '</optgroup>';
       html += '<optgroup label="本地离线">';
       html += '<option value="__local_piper_us_amy__">Piper 美音女声（Amy · ' + piperHint + ')</option>';
       html += '<option value="__local_piper_us_lessac__">Piper 美音男声（Lessac · ' + piperHint + ')</option>';
@@ -6715,6 +6860,16 @@ function fillVoiceOptions() {
       }
       if (cur) voiceSelect.value = cur;
       else if (voiceSettings.voiceName) voiceSelect.value = voiceSettings.voiceName;
+      // 内置离线音：进设置页就探一次本地缓存（不联网），之后状态变化时
+      // 同步刷新下拉标签和状态行。只绑一次，避免每次重绘多挂一个监听。
+      if (window.OfflineTTS && !_ovStatusBound) {
+        _ovStatusBound = true;
+        window.OfflineTTS.probe();
+        try {
+          window.OfflineTTS.onChange(function (s2) { renderOfflineVoiceStatus(s2); });
+        } catch (e) {}
+        renderOfflineVoiceStatus(window.OfflineTTS.status());
+      }
     }
     // 在线音色名称：优先用内建中文名，不认识的 __online_* 也给出可读占位名
     function onlineStaticLabel(v, fallback) {
@@ -6810,6 +6965,27 @@ function fillVoiceOptions() {
     // TTSManager，切换后立即生效），禁止页面直接调 window.TTSManager.speak()
     // 注意不能用含 "test" 的句子：有道 dictvoice 对含 test 的词组会拒绝（500）。
     SpeechUtil.speak('Hello, nice to meet you.', 'en-US');
+  });
+  // 手动触发离线语音包下载。选中「内置离线音」后首次朗读会自动下载，
+  // 这个按钮是给"我想先下好、免得第一次点朗读要等"的人用的。
+  safeBind('btn-offline-voice-download', 'click', function() {
+    if (!window.OfflineTTS) {
+      if (window.Toast) Toast.info('当前环境不支持内置离线音（需要 Web Worker 与 IndexedDB）');
+      return;
+    }
+    var st = window.OfflineTTS.status();
+    if (st.status === 'downloading') {
+      if (window.Toast) Toast.info('正在下载中… ' + Math.round((st.progress || 0) * 100) + '%');
+      return;
+    }
+    if (st.status === 'ready') {
+      if (window.Toast) Toast.info('离线语音包已就绪，无需重复下载');
+      return;
+    }
+    if (window.Toast) Toast.info('开始下载离线语音包（约 60MB，仅首次需要）…');
+    window.OfflineTTS.ensure(st.voice)['catch'](function (e) {
+      if (window.Toast) Toast.error('下载失败：' + ((e && e.message) || '网络错误'));
+    });
   });
   // P1-5：每日目标改为「改完即生效」，删掉「保存设置」按钮。
   // 原先同一屏里三种持久化模型混用（大部分开关 change 即存、这一项要手动保存、

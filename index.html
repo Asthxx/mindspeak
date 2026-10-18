@@ -1510,6 +1510,13 @@
           </select>
         </label>
         <button class="btn btn-sm btn-primary" id="btn-voice-test"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-volume" xlink:href="#i-volume"/></svg> 试听声音</button>
+        <!-- 内置离线音（Piper WASM）：跑在 WebView 里，模型下载一次后完全离线，
+             手机装上也可用——与上面「本地离线」那批需电脑 + server 的不是一回事。 -->
+        <p class="setting-help offline-voice-status" id="offline-voice-status">正在检测本地缓存…</p>
+        <button class="btn btn-sm" id="btn-offline-voice-download" type="button">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-download" xlink:href="#i-download"/></svg>
+          下载离线语音包（约 60MB）
+        </button>
         <p class="setting-help">可选<b>在线音色</b>（百度/有道/谷歌，需联网，听觉一致、手机/网页同样生效）：百度·美音国内直连最快；有道美音/英音国内直连；谷歌音色多（美/英/澳）但国内手机可能连不上。也可选<b>系统声音</b>：取决于你的设备（Windows 通常有 David 男声 / Zira、Aria 女声，Chrome 有 Google 合成音）。切换后对背单词、随声听、听力等所有朗读生效。<br>在线自然声音色好，但每次点击需连服务器（约 0.5~1 秒）；若本机部署了本地服务，则自动改用系统自带语音，几乎零延迟、不依赖网络，无需手动开关。</p>
       </div>
 
@@ -2157,6 +2164,7 @@
     <script src="js/core/progress.js?v=20261006-1"></script>
     <script src="js/core/loading.js?v=20261006-1"></script>
     <script src="js/tts-manager.js?v=20260810-2"></script>
+    <script src="js/offline-tts.js?v=20261018-1"></script>
     <script src="js/story.js?v=20260810-2"></script>
     <script src="js/listen-along.js?v=20260810-2"></script>
     <script src="js/daily-plan.js?v=20260810-2"></script>

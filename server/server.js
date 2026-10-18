@@ -342,6 +342,9 @@ app.get('/api/edge-tts', (req, res) => {
 
 // ==================== Piper TTS：本地离线神经网络语音合成 ====================
 const PIPER_DIR = path.join(os.homedir(), '.local', 'share', 'mindspeak-piper');
+// 语音包缓存目录。此前这个常量只有两处使用、从未定义——ensurePiperVoice 一被调用就
+// ReferenceError，被 /api/piper-tts 的 try/catch 吞成 502，表现为"Piper 合成失败"。
+const PIPER_VOICE_DIR = path.join(PIPER_DIR, 'voices');
 const PIPER_BIN = path.join(PIPER_DIR, 'piper' + (process.platform === 'win32' ? '.exe' : ''));
 // 固定版本 pin：rhasspy/piper release 2023.11.14-2（2026-09 已核查该 release 的 6 个资产
 // 均无 .sha256/校验和附件，官方未提供可信基准 → 无法做摘要强校验，只能依赖 HTTPS +
@@ -364,20 +367,37 @@ function ensurePiperDir() {
   try { fs.mkdirSync(PIPER_DIR, { recursive: true }); fs.mkdirSync(PIPER_VOICE_DIR, { recursive: true }); } catch (e) {}
 }
 
-function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    https.get(url, { headers: { 'User-Agent': 'mindspeak-piper/1.0' } }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        file.close();
-        return downloadFile(res.headers.location, dest).then(resolve).catch(reject);
-      }
-      if (res.statusCode !== 200) { file.close(); try { fs.unlinkSync(dest); } catch (e) {} return reject(new Error('HTTP ' + res.statusCode)); }
-      res.pipe(file);
-      file.on('finish', () => { file.close(resolve); });
-      file.on('error', (err) => { try { fs.unlinkSync(dest); } catch (e) {} reject(err); });
-    }).on('error', (err) => { file.close(); try { fs.unlinkSync(dest); } catch (e) {} reject(err); });
-  });
+// 改用 fetch 而非 https.get：上游（HF 镜像）的 307 带的是**相对** Location，
+// https.get 拿相对路径去发请求会直接抛错 —— 现象是落一个 0 字节文件或 502，
+// 日志里只剩一句"模型分发失败"，完全看不出是重定向没跟上。
+// fetch 自动跟随重定向（含相对路径），这里再补两道校验：
+//   ① 空文件必须报错，不能当成"已缓存"（0 字节会被当成命中，之后永远喂空模型）；
+//   ② 有 Content-Length 时必须收满，收到一半不能算成功。
+async function downloadFile(url, dest) {
+  const res = await fetch(url, { headers: { 'User-Agent': 'mindspeak-piper/1.0' }, redirect: 'follow' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const total = Number(res.headers.get('content-length')) || 0;
+  await fs.promises.mkdir(path.dirname(dest), { recursive: true });
+  const fh = await fs.promises.open(dest, 'w');
+  let got = 0;
+  try {
+    const reader = res.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      await fh.write(value);
+      got += value.length;
+    }
+    await fh.close();
+    if (!got || (total && got !== total)) {
+      try { fs.unlinkSync(dest); } catch (e) {}
+      throw new Error('下载不完整：' + got + '/' + total + ' 字节');
+    }
+  } catch (err) {
+    try { await fh.close(); } catch (e) {}
+    try { fs.unlinkSync(dest); } catch (e) {}
+    throw err;
+  }
 }
 
 async function ensurePiperBinary() {
@@ -489,6 +509,53 @@ app.get('/api/piper-tts', async (req, res) => {
   } catch (err) {
     clearTimeout(piperTimeout);
     finish(null, err.message);
+  }
+});
+
+// ==================== 内置离线语音的模型分发 ====================
+// 手机端的内置离线语音（js/offline-tts.js）在 WebView 里跑 Piper，60MB 的语音模型
+// 不进 APK，首次联网时从这里下载并缓存到 IndexedDB，之后完全离线。
+// 与 /api/piper-tts 的区别：那个是服务端合成好回传音频，这个是回传模型文件本身。
+//
+// 模型来源优先级：① 已在本机缓存（PIPER_VOICE_DIR）② 仓库内 server/offline-voice/
+// ③ 上游镜像（HF 镜像，国内可达；github.com 的 release 上实际并没有这些文件，
+//    老代码里的 PIPER_BASE_URL + onnxFile 一直是 404）。
+// 限流按 IP：模型 60MB，防被当免费图床刷带宽。
+app.use('/api/offline-voice', createTtsLimiter({ prefix: 'ov', limit: Number(process.env.TTS_LIMIT) || 20 }));
+const OFFLINE_VOICE_LOCAL = path.join(__dirname, 'offline-voice');
+const OFFLINE_VOICE_UPSTREAM = 'https://hf-mirror.com/rhasspy/piper-voices/resolve/main';
+const OFFLINE_VOICE_UPSTREAM_PATH = { 'en_US-lessac-medium': 'en/en_US/lessac/medium' };
+app.get('/api/offline-voice/:file', async (req, res) => {
+  const file = String(req.params.file || '').slice(0, 96).replace(/[^A-Za-z0-9._-]/g, '');
+  const voice = file.replace(/\.onnx(\.json)?$/, '');
+  if (!PIPER_VOICES[voice]) return res.status(404).json({ ok: false, message: 'unknown voice' });
+  try {
+    // 白名单 + 后缀校验：杜绝路径穿越（../ 已被 replace 掉，这里再兜一层）
+    if (!/^en_[A-Z]{2}-[a-z0-9_]+-medium\.onnx(\.json)?$/.test(file)) {
+      return res.status(404).json({ ok: false, message: 'bad file name' });
+    }
+    // 命中缓存的条件必须带上"非空"：以前只判 existsSync，一旦某次下载中断留下
+    // 0 字节残文件，之后每次都会把它当命中回给客户端，表现为"下载成功但永远没声音"。
+    const candidates = [path.join(PIPER_VOICE_DIR, file), path.join(OFFLINE_VOICE_LOCAL, file)];
+    let dest = candidates.find(p => fs.existsSync(p) && fs.statSync(p).size > 0);
+    if (!dest) {
+      const up = OFFLINE_VOICE_UPSTREAM_PATH[voice];
+      if (!up) return res.status(404).json({ ok: false, message: 'no upstream for voice' });
+      dest = path.join(PIPER_VOICE_DIR, file);
+      ensurePiperDir();
+      // OFFLINE_VOICE_UPSTREAM_PATH 存的是仓库内的相对目录，必须拼上镜像根，
+      // 直接用相对路径去 fetch 会 "Failed to parse URL"。
+      await downloadFile(OFFLINE_VOICE_UPSTREAM + '/' + up + '/' + file, dest);
+    }
+    const stat = fs.statSync(dest);
+    res.setHeader('Content-Type', file.endsWith('.json') ? 'application/json' : 'application/octet-stream');
+    // Content-Length 必须有：客户端靠它算下载进度，缺了就只剩 0/100
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.sendFile(dest);
+  } catch (err) {
+    logger.warn('offline-voice', '模型分发失败', { file, reason: err.message });
+    return res.status(502).json({ ok: false, message: err.message });
   }
 });
 
