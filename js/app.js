@@ -5750,6 +5750,19 @@ var CalendarModule = (function() {
 
 // ==================== 学习图表 ====================
 var ChartModule = (function() {
+  // 主题色注入用的 <style>：index.html 里并没有这个元素，必须按需创建。
+  // 少了它，.week-row-fill 只有高度和圆角、没有 background —— 进度条整条透明，
+  // 图表看起来像一排空槽。这里兜底创建，同时保留"元素已存在则复用"的写法。
+  function themeStyle(doc) {
+    var el = doc.getElementById('week-days-list-theme');
+    if (!el) {
+      el = doc.createElement('style');
+      el.id = 'week-days-list-theme';
+      (doc.head || doc.documentElement).appendChild(el);
+    }
+    return el;
+  }
+
   function ChartModule() { this.render(); }
   ChartModule.prototype.render = function() {
     var listEl = document.getElementById('week-days-list');
@@ -5776,8 +5789,7 @@ var ChartModule = (function() {
         + '<p class="week-empty-sub">今天先学 10 个词，这里就会出现第一条。</p>'
         + '<button type="button" class="btn btn-sm" data-goto="word">去背单词</button>'
         + '</div>';
-      var emptyStyle = listEl.ownerDocument.getElementById('week-days-list-theme');
-      if (emptyStyle) emptyStyle.textContent = '';
+      themeStyle(listEl.ownerDocument).textContent = '';
       return;
     }
 
@@ -5806,8 +5818,7 @@ var ChartModule = (function() {
     listEl.innerHTML = html;
 
     // 进度条主题色跟随当前主题变量
-    var style = listEl.ownerDocument.getElementById('week-days-list-theme');
-    if (style) style.textContent = ''
+    themeStyle(listEl.ownerDocument).textContent = ''
       + '.week-row-fill{background:linear-gradient(90deg,' + sage + ',' + sage + 'cc);}'
       + '.week-row-today .week-row-fill{background:linear-gradient(90deg,' + accent + ',' + accent + 'cc);}'
       + '.week-row-count-today{color:' + accent + ';}';
