@@ -128,7 +128,9 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   }
   .sidebar-scrim.show{opacity:1;visibility:visible}
 
-  /* ---- 内容区全宽：留出底部手势条安全区 ---- */
+  /* ---- 内容区全宽：留出底部手势条安全区 + 底部导航药丸 ----
+     92px = 药丸净高 64 + 底距 10 + 18 呼吸。药丸是悬浮的（不占文档流），
+     所以必须靠这里的 padding-bottom 把最后一张卡顶出它的覆盖范围。 */
   .content{
     margin-left:0;margin-top:var(--header);
     padding:var(--sp-3) var(--sp-3);
@@ -137,6 +139,41 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;
   }
+
+  /* ---- AI 页：撑满视口的弹性列，对话是绝对主角 ----
+     桌面端 .ai-workspace 是固定高度网格（height:min(76vh,760) / min-height:520），
+     塞进滚动文档后 composer 被推到首屏之外——手机上点开 AI Tab 只看得到
+     hero 和「学习概况」，输入框在第二屏，得先滚过半屏才摸得到。
+     这里把 .content 换成"弹性列"：#page-ai 撑满剩余高度，工作区再撑满 #page-ai，
+     消息列表自己滚（.ai-msg-scroll），composer 永远贴在底栏上方。
+     只对 html[data-tab="ai"] 生效，其他页面的滚动行为一点没动。
+
+     三个刻意的选择：
+     ① 不设 overflow:hidden——横屏矮屏或「学习概况」展开时内容仍可能超高，
+        保住页面滚动，composer 不会被挤到够不着的地方；
+     ② .content 的 padding-bottom 改回"只要药丸那份"（药丸高 + 10px 底距 + 安全区）。
+        原来那份 92px 是给"滚到底的最后一张卡"留的，弹性布局下不需要；
+     ③ #page-ai 里的 .ai-scrim / .ai-drawer / .ai-voice 都是 position:fixed，
+         变成弹性子项后自动脱离流，不会挤占对话区。 */
+  /* Android 的 body 带 padding-bottom:var(--android-nav-height)（56px，见 android.css
+     的 html.platform-android body），那是给"贴底的通栏 Android 导航"留的。
+     现在的底栏是悬浮药丸（bottom:10px + 净高 --nav-h），顶边在 72px 处，
+     比 body 那 56px 预留区高出 16px——于是药纶会压进 .content 16px，
+     而 .content 的 padding-bottom 又是从"body 内容盒底边"算起的，两边基准不同，
+     composer 只好停在药纶上方 57px 处，白浪费一截首屏（实测过）。
+     AI 页改弹性布局后不再需要这份 body 预留（.content 的 padding-bottom 已按药纶算过），
+     这里把它归零，让 .content 一直延伸到视口底边，公式才对得上。
+     选择器与 android.css 那条同特异性 (0,2,1)，靠写在后面取胜（android.css 由
+     head-boot.js 插在 mobile.css 之前）。 */
+  html[data-tab="ai"] body{padding-bottom:0}
+  html[data-tab="ai"] .content{
+    display:flex;flex-direction:column;
+    padding-bottom:calc(var(--nav-h,64px) + 10px + env(safe-area-inset-bottom,0px));
+  }
+  html[data-tab="ai"] #page-ai{display:flex;flex-direction:column;flex:1;min-height:0}
+  html[data-tab="ai"] .ai-hero{flex:none;margin-bottom:var(--sp-3)}
+  html[data-tab="ai"] .ai-overview{flex:none}
+  html[data-tab="ai"] .ai-workspace{flex:1;min-height:0;height:auto;margin-top:var(--sp-3)}
 
   /* ---- 移动端底部导航（App 级）· 悬浮药丸壳体 ---- */
   .bottom-nav,html.platform-ios .bottom-nav,html.platform-android .bottom-nav{
@@ -416,11 +453,21 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   /* AI 对话：输入区字号 ≥16px + 底部安全区，键盘弹出不遮挡 */
   .ai-chat-input-row input{font-size: var(--text-base)}
   .ai-chat-card{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-  .ai-chat-msgs{max-height:45dvh}
+  /* 不要再给 .ai-chat-msgs 加 max-height：它是 .ai-msg-scroll（flex:1 + overflow-y:auto）
+     里的内容盒，限死内容盒的高度只会让消息区白白少用一截滚动空间——
+     弹性布局下工作区已经自己算好了该有多高。 */
   /* 快捷提问 Chips：横向滚动，不换行撑高，拇指可横向滑动 */
   .ai-chat-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px;padding:var(--sp-hairline);scrollbar-width:none}
   .ai-chat-chips::-webkit-scrollbar{display:none}
   .ai-chip{flex-shrink:0;white-space:nowrap;min-height:40px;display:inline-flex;align-items:center}
+
+  /* ---- AI 输入区 meta 行（字数 + 快捷键提示）----
+     触屏没有 Enter 键，"Enter 发送 · Shift+Enter 换行"在手机上纯属噪声
+     （≤767 已由 ai-chat.css 隐藏 .ai-hint）；剩下那个 "0 / 1000" 计数器
+     在没打字时也是白占一行。这里整行改成聚焦才显示——要打字的人才需要看字数，
+     不打字时把这一行高度还给消息区。 */
+  html[data-tab="ai"] .ai-composer-meta{display:none}
+  html[data-tab="ai"] .ai-composer:focus-within .ai-composer-meta{display:flex}
 
   /* 抽屉/汉堡按钮：键盘可达时显示清晰焦点环 */
   .sidebar.open .nav-btn:focus-visible,
@@ -501,7 +548,10 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
    @media (prefers-color-scheme:dark) removed — it conflicted with the user's manual toggle. */
 
 /* Animations + 触摸反馈 */
-@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* 末帧写 transform:none 而非 translateY(0)：两者视觉等价，但 none 不会留下变换值。
+   注意：仅此还不够 —— 见下面 .page.active > * 处的说明，含 transform 的入场动画
+   即便已结束，Chromium 仍会让该元素成为 fixed 后代的包含块。 */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
 
@@ -512,8 +562,19 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 
 /* ===== 手机质感升级 · 默认模式（主题模式由 theme-fx 接管，html 带 data-theme-id 时自动不生效） ===== */
 @media (max-width:768px), (orientation:landscape) and (max-height:500px) and (hover:none) and (pointer:coarse){
-  /* 1) 首屏/切页 · 卡片组 stagger 渐进浮现 */
-  .page.active > *{animation:fadeUp .40s var(--ease-out) both}
+  /* 1) 首屏/切页 · 卡片组 stagger 渐进浮现
+     ⚠ 这里必须用 fadeIn（只动 opacity），**不能**用带 transform 的 fadeUp。
+     实测（scripts/verify-ai-chat-gestures.mjs 的定位实验）：只要元素上有 transform 类
+     入场动画，即便动画早已结束、fill-mode 为 none、computed transform 已是 none，
+     Chromium 仍会把它当作后代 position:fixed 的**包含块**，并维持层叠上下文。后果：
+       ① 抽屉的 top/left/bottom 不再相对视口，而是相对该元素盒子 —— 历史抽屉实测变成
+          [13,340,322,592]，只覆盖工作区卡片那一块，而不是整屏；
+       ② 被该元素的 overflow:hidden 裁剪；
+       ③ z-index 被关在该上下文里，无法与外层兄弟节点比较 —— 表现为"抽屉 z-index 85
+          却被 z-index 70 的遮罩盖住"，移动端打开历史抽屉后点任何位置都只是关抽屉。
+     换成 opacity 动画后抽屉实测回到 [0,0,322,844]，命中测试也正确。
+     位移感让位给正确性：这里的入场观感靠 opacity + 错峰延迟已经足够。 */
+  .page.active > *{animation:fadeIn .40s var(--ease-out)}
   .page.active > *:nth-child(1){animation-delay:.03s}
   .page.active > *:nth-child(2){animation-delay:.08s}
   .page.active > *:nth-child(3){animation-delay:.13s}
@@ -762,6 +823,23 @@ html.forced-mobile .toast-container{
   align-items:stretch;
 }
 
+/* ---- AI 页：toast 要避开 composer ---------------------------------
+   AI 页改弹性布局后 composer 常驻在底栏上方，高约 140px（chips 横滑条 +
+   输入壳 + 聚焦时才显示的 meta 行）。全局那条 88px 只够清掉底栏，
+   toast 会整块盖住消息操作栏（复制 / 朗读 / 重新生成）——截图里能看到
+   那条「朗读失败」正好压在三颗按钮上。
+   composer 的真实高度由 ai-chat.js 量好后写进 --ai-composer-h
+   （chips 增减、输入框展开都会变，不能写死），这里只负责算位置。
+   末尾的 4px 是给亚像素取序留的余量：composer 顶边和 toast 下沿都用
+   getBoundingClientRect 取整，理论值相同的情况下实测会差出 1px，
+   加 4px 让"不进入 composer 区域"这条判据稳定成立，而不是靠断言放水。
+   选择器与上面两条同特异性 (0,2,1)，靠写在后面取胜。 */
+html[data-tab="ai"] .toast-container,
+html.forced-mobile[data-tab="ai"] .toast-container{
+  top:auto;
+  bottom:calc(var(--ai-composer-h,140px) + var(--nav-h,64px) + 10px + 4px + env(safe-area-inset-bottom,0px));
+}
+
 /* ---- 横屏手机压缩 ------------------------------------------------
    横屏下屏幕高度仅 ~390px：悬浮药纶按比例收窄，把高度让给内容。
    选择器带上 platform-* 是为了压过本文件前面两条同特异性、但写在更前面的
@@ -792,4 +870,20 @@ html.forced-mobile .toast-container{
   html.platform-android .toast-container{
     bottom:calc(72px + env(safe-area-inset-bottom,0px));
   }
+  /* ---- AI 页横屏：屏幕只剩 ~390px 高，装饰性内容全部让位 ----
+     算一笔账就明白为什么必须这么干：可用高度 390 - 顶栏 48 = 342，
+     扣掉 .content 的上下内边距（12 + 药纶 52+10）剩 268。
+     对话区自己的底线 = 身份栏 52 + composer 96（chips 压成 30px 那档）= 148，
+     再给消息区留 120px，正好 268——一点余量都不剩。
+     所以 hero（66px）和「学习概况」折叠行（42px）在横屏只能整个收起：
+     它们是"介绍你是谁"和"看看数据"，横屏下用户要的是直接打字。
+     想看得起概览就旋回竖屏，details 的展开状态由 JS 按宽度决定，不会丢。 */
+  /* 选择器必须带上 #page-ai：nav.css 里 hero 的规则全是 #page-ai .ai-hero（特异性
+     (1,1,0)），只写 html[data-tab="ai"] .ai-hero（(0,2,1)）会被 ID 那条压住，
+     display:none 根本不生效——实测横屏下 hero 还是 92px，把消息区挤成 0。 */
+  html[data-tab="ai"] #page-ai .ai-hero{display:none}
+  html[data-tab="ai"] .ai-overview{display:none}
+  html[data-tab="ai"] .ai-workspace{margin-top:0}
+  html[data-tab="ai"] .ai-chip{min-height:30px;padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs)}
+  html[data-tab="ai"] .ai-conv-head{min-height:44px}
 }

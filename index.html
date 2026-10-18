@@ -80,6 +80,7 @@
     <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
     <symbol id="i-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>
     <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>
     <symbol id="i-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
     <symbol id="i-carousel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></symbol>
@@ -454,6 +455,15 @@
         </div>
         <button type="button" class="btn btn-primary" id="btn-assessment"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-target" xlink:href="#i-target"/></svg> 能力测评</button>
       </div>
+      <!-- 移动端优先：概览卡片组可折叠，把首屏让给对话工作区（v3）。
+           details 原生可访问、无 JS 依赖；桌面端默认展开（open），
+           ≤767px 由 ai-chat.js 在初始化时收起。 -->
+      <details class="ai-overview" id="ai-overview" open>
+        <summary class="ai-overview-summary">
+          <svg class="icon icon-sm icon-sage" aria-hidden="true" focusable="false"><use href="#i-analytics" xlink:href="#i-analytics"/></svg>
+          学习概况与建议
+          <svg class="icon icon-sm ai-overview-chevron" aria-hidden="true" focusable="false"><use href="#i-chevron-down" xlink:href="#i-chevron-down"/></svg>
+        </summary>
       <div class="ai-grid">
         <!-- 学习概况 -->
         <div class="ai-card">
@@ -484,8 +494,9 @@
           <div class="ai-actions" id="ai-actions"></div>
         </div>
       </div>
+      </details>
 
-      <!-- AI 对话工作区（v2：历史栏 / 消息流 / 上下文栏 / 输入区 / 设置抽屉）
+      <!-- AI 对话工作区（v3 移动优先：消息流 / 语音输入 / 历史抽屉 / 设置抽屉）
            兼容约束：#ai-chat-msgs / #ai-chat-input / #ai-chat-send / #ai-chat-chips 四个 id
            与 [data-goto] 属性契约保持不变（ai-chat.js 与 dashboard.js 依赖）。 -->
       <div class="ai-workspace" id="ai-workspace">
@@ -502,6 +513,7 @@
             <input type="search" id="ai-hist-search" placeholder="搜索历史对话" aria-label="搜索历史对话" autocomplete="off">
           </div>
           <div class="ai-hist-list" id="ai-hist-list"></div>
+          <p class="ai-hist-hint">长按会话可删除</p>
         </aside>
 
         <!-- ② 对话主区 -->
@@ -510,7 +522,13 @@
             <button type="button" class="ai-icon-btn ai-rail-toggle" id="ai-hist-toggle" aria-label="打开对话历史" aria-expanded="false" aria-controls="ai-history-rail">
               <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-menu" xlink:href="#i-menu"/></svg>
             </button>
-            <h3 class="ai-card-title"><svg class="icon icon-sm icon-sage" aria-hidden="true" focusable="false"><use href="#i-robot" xlink:href="#i-robot"/></svg> AI 英语教练</h3>
+            <span class="ai-conv-id">
+              <span class="ai-conv-avatar" aria-hidden="true"><svg class="icon" focusable="false"><use href="#i-robot" xlink:href="#i-robot"/></svg></span>
+              <span class="ai-conv-name">
+                <b class="ai-card-title">AI 英语教练</b>
+                <span class="ai-conv-status" id="ai-conv-status"></span>
+              </span>
+            </span>
             <span class="ai-conv-spacer"></span>
             <button type="button" class="ai-icon-btn" id="ai-settings-toggle" aria-label="打开助手设置" aria-expanded="false" aria-controls="ai-settings-drawer">
               <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-settings" xlink:href="#i-settings"/></svg>
@@ -529,10 +547,10 @@
           <div class="ai-composer">
             <div class="ai-chat-chips" id="ai-chat-chips"></div>
             <div class="ai-input-shell">
-              <button type="button" class="ai-icon-btn ai-mic" id="ai-mic" aria-label="语音输入" hidden>
+              <textarea id="ai-chat-input" rows="1" maxlength="1000" placeholder="问单词、要例句、分析错题…" aria-label="输入你的问题" autocomplete="off"></textarea>
+              <button type="button" class="ai-icon-btn ai-mic" id="ai-mic" aria-label="语音输入" aria-pressed="false">
                 <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-mic" xlink:href="#i-mic"/></svg>
               </button>
-              <textarea id="ai-chat-input" rows="1" maxlength="1000" placeholder="问单词、要例句、分析错题…" aria-label="输入你的问题" autocomplete="off"></textarea>
               <button type="button" class="ai-send" id="ai-chat-send" aria-label="发送" disabled>
                 <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-send" xlink:href="#i-send"/></svg>
               </button>
@@ -615,6 +633,26 @@
           </div>
         </div>
       </aside>
+
+      <!-- ⑤ 语音输入覆盖层（v3：全屏波形 / 计时 / 实时转写 / 上滑取消） -->
+      <section class="ai-voice" id="ai-voice" role="dialog" aria-modal="true" aria-label="语音输入" aria-hidden="true">
+        <span class="ai-voice-grip" aria-hidden="true"></span>
+        <div class="ai-voice-state">
+          <span class="ai-voice-led" aria-hidden="true"></span>
+          <span class="ai-voice-timer" id="ai-voice-timer">0:00</span>
+        </div>
+        <div class="ai-voice-wave" id="ai-voice-wave" aria-hidden="true"></div>
+        <p class="ai-voice-transcript" id="ai-voice-transcript">正在聆听…</p>
+        <p class="ai-voice-hint" id="ai-voice-hint">松开发送 · 上滑取消</p>
+        <div class="ai-voice-actions">
+          <button type="button" class="ai-voice-btn ai-voice-cancel" id="ai-voice-cancel" aria-label="取消语音输入">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-close" xlink:href="#i-close"/></svg>
+          </button>
+          <button type="button" class="ai-voice-btn ai-voice-send" id="ai-voice-send" aria-label="发送语音" disabled>
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up" xlink:href="#i-arrow-up"/></svg>
+          </button>
+        </div>
+      </section>
     </section>
 
     <!-- 背单词页面 -->

@@ -156,6 +156,30 @@
   #page-ai .ai-hero h2 { white-space: nowrap; font-size: var(--text-lg); }
 }
 
+/* ≤767（真手机）：hero 压成一条紧凑带。
+   副标题「基于你的学习数据生成个性化报告与行动建议」在手机上信息量最低——
+   读一遍就没用了，却要占掉近 30px 首屏。砍掉它、图标收小、按钮不换行，
+   hero 从 ~110px 降到 ~56px，省下的高度全给对话区。
+   「能力测评」按钮保留：它是 hero 上唯一的功能入口，砍了就得另找地方放。 */
+@media (max-width:767px) {
+  #page-ai .ai-hero{
+    flex-wrap:nowrap;
+    gap:var(--sp-3);
+    padding:var(--sp-3) var(--sp-4);
+    margin-bottom:var(--sp-3);
+  }
+  #page-ai .ai-hero p{display:none}
+  #page-ai .ai-hero h2{font-size:var(--text-base)}
+  #page-ai .ai-hero .btn{
+    margin-left:auto;
+    padding:var(--sp-2) var(--sp-3);
+    font-size:var(--text-sm);
+    min-height:36px;
+  }
+  .ai-hero-icon{width:32px;height:32px;border-radius:var(--radius-sm)}
+  .ai-hero-icon svg{width:18px;height:18px}
+}
+
 .ai-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

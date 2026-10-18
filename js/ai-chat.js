@@ -198,8 +198,11 @@ var AiChatModule = (function() {
       input.addEventListener('input', function() { self._syncComposer(); });
     }
     this._bindWorkspace();
+    this._bindVoice();
     // 快捷提问 chips（随多轮上下文动态变化）
     this._refreshChips();
+    // composer 实测高度 → --ai-composer-h（Toast 避让用，见方法内注释）
+    this._watchComposer();
     // 文档级委托：对话里 data-speak 朗读 / data-prefill 预填查单词输入框
     // （data-goto 跳转已由 dashboard.js 全局委托处理）
     document.addEventListener('click', function(ev) {
@@ -210,6 +213,11 @@ var AiChatModule = (function() {
     this._chatToolbar();
     this._renderHistory();
     this._renderContext();
+    // 移动优先：窄屏默认收起「学习概况」，把首屏让给对话（details 原生折叠）
+    try {
+      var ov = document.getElementById('ai-overview');
+      if (ov && window.matchMedia && window.matchMedia('(max-width:767px)').matches) ov.open = false;
+    } catch (e) {}
   };
 
   // ---- v2 工作区：历史栏 / 抽屉 / 滚动 / 输入区 / 语音 ----
@@ -223,6 +231,39 @@ var AiChatModule = (function() {
     var search = q('ai-hist-search');
     if (search) search.addEventListener('input', function() { self._renderHistory(search.value); });
 
+    // 长按 500ms 唤出删除确认条：触屏没有 hover，删除入口必须可达（v3）
+    var histBox = q('ai-hist-list');
+    if (histBox) {
+      var lpTimer = null;
+      // 长按满 500ms 后抬手，浏览器仍会补发一次 click（触屏与鼠标皆然）。
+      // 不吞掉它，确认条会在滑出的瞬间被"点主体=收起"收走 —— 真机上变成
+      // "长按一下闪一下就没了"，长按删除等于不存在。这里沿用语音模块的
+      // suppressClick 模式：只吞紧随长按之后的那一发 click。
+      var lpFired = false;
+      histBox.addEventListener('pointerdown', function(ev) {
+        var item = ev.target && ev.target.closest ? ev.target.closest('.ai-hist-item') : null;
+        lpFired = false;
+        if (!item || item.classList.contains('is-confirm')) return;
+        if (lpTimer) clearTimeout(lpTimer);
+        lpTimer = setTimeout(function() {
+          var opened = histBox.querySelectorAll('.ai-hist-item.is-confirm');
+          for (var i = 0; i < opened.length; i++) opened[i].classList.remove('is-confirm');
+          item.classList.add('is-confirm');
+          lpFired = true;
+        }, 500);
+      });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(evt) {
+        histBox.addEventListener(evt, function() { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } });
+      });
+      // 冒泡阶段挂在 histBox 上即可抢在 document 级委托之前（document 是更外层）
+      histBox.addEventListener('click', function(ev) {
+        if (!lpFired) return;
+        lpFired = false;
+        ev.stopPropagation();
+        ev.preventDefault();
+      });
+    }
+
     // 抽屉 / 历史抽屉 / 遮罩
     var tog = q('ai-settings-toggle');
     if (tog) tog.addEventListener('click', function() { self._toggleDrawer(); });
@@ -233,7 +274,11 @@ var AiChatModule = (function() {
     var scrim = q('ai-scrim');
     if (scrim) scrim.addEventListener('click', function() { self._closeDrawer(); self._closeRail(); });
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') { self._closeDrawer(); self._closeRail(); }
+      if (e.key === 'Escape') {
+        self._closeDrawer(); self._closeRail();
+        // 录音中按返回键 = 取消（不发送），与系统返回语义一致
+        if (self._voice && self._voice.on) self._voiceFinish(false);
+      }
     });
 
     // 设置项
@@ -287,13 +332,8 @@ var AiChatModule = (function() {
     var jump = q('ai-jump-latest');
     if (jump) jump.addEventListener('click', function() { self._scrollToBottom(); });
 
-    // 语音输入：无 Web Speech API 时按钮保持隐藏（不给出点不动的入口）
-    var mic = q('ai-mic');
-    var SR = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-    if (mic && SR) {
-      mic.hidden = false;
-      mic.addEventListener('click', function() { self._voiceInput(); });
-    }
+    // 麦克风常驻可见：无 Web Speech API 的环境在 _voiceStart 里明确降级（toast 明说），
+    // 不再用 hidden 把入口藏掉——藏起来的按钮等于没有这个功能（v2 的教训）。
     this._syncComposer();
   };
 
@@ -311,13 +351,45 @@ var AiChatModule = (function() {
     if (counter) counter.textContent = input.value.length + ' / 1000';
   };
 
+  // ---- 移动端：把 composer 的真实高度写给 CSS（--ai-composer-h）----
+  // Toast 在 AI 页必须避开 composer，否则整块盖住消息操作栏（复制/朗读/重新生成）。
+  // 而 composer 的高度是活的：chips 横滑条随多轮上下文增减、输入框展开最高到 132px、
+  // meta 行聚焦才显示——写死一个数字必然在某一种状态下失配。
+  // 所以用 ResizeObserver 实测后挂到 <html>，由 mobile.css 的
+  // html[data-tab="ai"] .toast-container 消费（CSS 侧有 140px 兜底）。
+  // 只在有 .ai-composer 时跑；AI 页未激活时高度为 0，不发布（留给切页后的首次回调）。
+  AiChatModule.prototype._watchComposer = function() {
+    var composer = document.querySelector('.ai-composer');
+    var root = document.documentElement;
+    if (!composer || !root) return;
+    var publish = function() {
+      var h = Math.round(composer.getBoundingClientRect().height || 0);
+      if (h > 0) root.style.setProperty('--ai-composer-h', h + 'px');
+    };
+    publish();
+    if (typeof ResizeObserver === 'function') {
+      if (this._composerRO) { try { this._composerRO.disconnect(); } catch (e) {} }
+      this._composerRO = new ResizeObserver(publish);
+      this._composerRO.observe(composer);
+    }
+    // 兜底与补位：没有 ResizeObserver 的老环境，以及"聚焦唤出 meta 行"这种
+    // 不改变 composer 自身盒高、却会改变可见内容的路径。
+    var input = document.getElementById('ai-chat-input');
+    if (input) {
+      input.addEventListener('input', publish);
+      input.addEventListener('focus', publish);
+    }
+    window.addEventListener('resize', publish);
+  };
+
   // 在线增强状态徽章：NeuralEngine 探测 /api/ai/health。
   // key 已配置且未耗尽 → 在线增强；无 key 或额度耗尽 → 离线模式（原因写入 title）。
   // 幂等：重复调用会替换旧徽章（LLM 失败后的 refreshHealth 会触发重画）。
   // 接受可选 prefetched（refreshHealth 已探测好的结果），避免重复发 health 请求。
   AiChatModule.prototype._aiStatus = function(prefetched) {
-    // v2 挂在对话头部标题右侧；旧 DOM（单测里只有 .ai-chat-card）时回退到原选择器
-    var host = document.querySelector('.ai-conv-head .ai-card-title')
+    // v3 挂在对话身份栏的状态行；旧 DOM（单测里只有 .ai-chat-card）时逐级回退
+    var host = document.getElementById('ai-conv-status')
+      || document.querySelector('.ai-conv-head .ai-card-title')
       || document.querySelector('.ai-chat-card .ai-card-title')
       || document.querySelector('.ai-chat-card h3');
     if (!host) return;
@@ -384,20 +456,61 @@ var AiChatModule = (function() {
     if (!box) return;
     box.innerHTML = '';
     var self = this;
-    // 恢复上次对话（结构化卡片一并恢复）
+    // 恢复上次对话（结构化卡片 / 语音气泡一并恢复，跨天插入日期分隔）
     var history = this._history();
     if (history.length) {
       var recent = restoreAll ? history : history.slice(-2);
+      var lastDay = '';
       recent.forEach(function(m) {
-        if (!m || !m.html) return;
+        if (!m) return;
+        var day = self._dayKey(m.ts);
+        if (day !== lastDay) { self._appendDaySep(day); lastDay = day; }
+        if (m.voice) { self._appendVoice(m.voice.dur, m.voice.transcript, true); return; }
+        if (!m.html) return;
         self._append(m.role === 'user' ? 'user' : 'ai', m.html, true, m.card || null);
       });
+      this._lastDayKey = lastDay;
       var sep = document.createElement('div');
       sep.className = 'ai-hist-sep';
       sep.textContent = '—— 以上是上次的对话 ——';
       box.appendChild(sep);
+    } else {
+      this._lastDayKey = '';
     }
     this._append('ai', WELCOME_HTML, true, WELCOME_CARD);
+  };
+
+  // ---- 日期分隔（v3）：同一天的消息归组，跨天/新会话首条自动插分隔 ----
+  AiChatModule.prototype._dayKey = function(ts) {
+    var d = ts ? new Date(ts) : new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  };
+
+  AiChatModule.prototype._dayLabel = function(key) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var d = new Date(key + 'T00:00:00');
+    var diff = Math.round((today - d) / 86400000);
+    if (diff <= 0) return '今天';
+    if (diff === 1) return '昨天';
+    return ('0' + (d.getMonth() + 1)).slice(-2) + '月' + ('0' + d.getDate()).slice(-2) + '日';
+  };
+
+  AiChatModule.prototype._appendDaySep = function(key) {
+    var box = this._msgBox();
+    if (!box) return;
+    var sep = document.createElement('div');
+    sep.className = 'ai-day-sep';
+    sep.textContent = this._dayLabel(key);
+    box.appendChild(sep);
+  };
+
+  AiChatModule.prototype._maybeDaySep = function() {
+    var box = this._msgBox();
+    if (!box) return;
+    var key = this._dayKey(Date.now());
+    if (this._lastDayKey === key) return;
+    this._lastDayKey = key;
+    this._appendDaySep(key);
   };
 
   AiChatModule.prototype._history = function() {
@@ -532,13 +645,17 @@ var AiChatModule = (function() {
 
   // 会话历史：localStorage ai_ 前缀，最多 50 条（含按钮的安全 HTML，全部插值均已转义）
   // card 为可选结构化卡片，恢复历史时用它重渲染，没有则回退 html。
+  // meta 为可选附加数据（目前只有语音气泡的 {dur, transcript}）。
+  //   语音消息本体是 HTML 之外的音频，转写文本单独存，html 为空，
+  //   因此 meta 必须落盘，否则刷新后这条气泡会退化成空白气泡。
   // 兼容：早期版本只存 {role,html,ts}，缺 sessionId 的一律归入当前会话。
-  AiChatModule.prototype._storeHistory = function(who, html, card) {
+  AiChatModule.prototype._storeHistory = function(who, html, card, meta) {
     try {
       var key = 'ai_chat_history';
       var list = this._history();
       var item = { role: who, html: html, ts: Date.now() };
       if (card) item.card = card;
+      if (meta) item.voice = meta;
       list.push(item);
       if (list.length > 50) list = list.slice(list.length - 50);
       DataStore.setProgress(key, list);
@@ -571,11 +688,16 @@ var AiChatModule = (function() {
   };
 
   // 对外主入口：解析用户问题
-  AiChatModule.prototype.ask = function(text) {
+  // opts.skipUser：用户这一轮已经用语音气泡呈现过了（_appendVoice 已写入历史），
+  //   此处若再追加一条文本气泡，同一次发言会变成两条，语音消息因此必须走这个分支。
+  AiChatModule.prototype.ask = function(text, opts) {
     text = String(text || '').trim();
     if (!text) return;
     this._card = null;
-    this._append('user', escapeHtml(text));
+    if (!(opts && opts.skipUser)) {
+      this._maybeDaySep();
+      this._append('user', escapeHtml(text));
+    }
     var lower = text.toLowerCase();
     var reply = this._handle(lower, text);
     var card = this._card || null;
@@ -1175,7 +1297,12 @@ var AiChatModule = (function() {
   AiChatModule.prototype._newSession = function() {
     this._archiveCurrent();
     try { DataStore.setProgress('ai_chat_history', []); } catch (e) {}
-    this._sessionId = 's' + Date.now();
+    // 同一毫秒内连开两个会话时，'s'+Date.now() 会与刚归档的旧 id 撞车：
+    // _renderHistory 会按 id 跳过"当前会话"，于是归档项从列表里消失，
+    // 「新对话」看起来像没反应。让新 id 严格不同于上一个。
+    var nid = 's' + Date.now();
+    if (nid === this._sessionId) nid = 's' + (Date.now() + 1);
+    this._sessionId = nid;
     var box = this._msgBox();
     if (box) { box.innerHTML = ''; this._welcome(); }
     this._refreshChips();
@@ -1203,6 +1330,9 @@ var AiChatModule = (function() {
   AiChatModule.prototype._deleteSession = function(id) {
     if (!id) return;
     var self = this;
+    // 列表里的"当前对话"在还没有 sessionId 时用占位 id 'current' 表示。
+    // 不归一化的话，删当前对话只会重绘列表 + 弹"已删除"，实际什么都没删。
+    if (id === 'current') id = this._sessionId || null;
     var list = this._sessions().filter(function(s) { return s.id !== id; });
     this._saveSessions(list);
     if (id === this._sessionId) {
@@ -1250,13 +1380,19 @@ var AiChatModule = (function() {
       if (!groups[g].length) return;
       html += '<div class="ai-hist-group">' + g + '</div>';
       groups[g].forEach(function(s) {
-        html += '<div class="ai-hist-item" data-id="' + e(s.id) + '">'
+        html += '<div class="ai-hist-item' + (s.current ? ' is-current' : '') + '" data-id="' + e(s.id) + '">'
           + '<button type="button" class="ai-hist-main" aria-current="' + (s.current ? 'true' : 'false') + '">'
           + '<span class="t">' + e(s.title) + '</span>'
           + (s.count ? '<span class="n">' + s.count + '</span>' : '')
           + '</button>'
           + '<button type="button" class="ai-hist-del" data-del="' + e(s.id) + '" aria-label="删除该对话">'
           + '<svg class="icon" aria-hidden="true" focusable="false"><use href="#i-delete"/></svg></button>'
+          // 长按唤出的删除确认条：触屏没有 hover，删除必须二次确认才安全。
+          // 平时 translateY(102%) 收在条目下方，.is-confirm 时滑出。
+          + '<div class="ai-hist-confirm">'
+          + '<button type="button" class="ai-hc-no">取消</button>'
+          + '<button type="button" class="ai-hc-yes">删除</button>'
+          + '</div>'
           + '</div>';
       });
     });
@@ -1373,8 +1509,25 @@ var AiChatModule = (function() {
     // 历史项：删除 / 切换（容器 div + 两个并列 button，禁止嵌套可交互元素）
     var del = t.closest('[data-del]');
     if (del) { ev.stopPropagation(); this._deleteSession(del.getAttribute('data-del')); return; }
+
+    // 删除确认条（长按唤出）：必须由它挡在切换分支之前——长按结束时浏览器仍会补一次
+    // click，不拦的话确认条刚滑出就被"切换会话"吃掉了，等于长按功能不存在。
+    var cf = t.closest('.ai-hist-confirm');
+    if (cf) {
+      ev.stopPropagation();
+      var cfItem = cf.closest('.ai-hist-item');
+      if (t.closest('.ai-hc-yes') && cfItem) this._deleteSession(cfItem.getAttribute('data-id'));
+      else if (cfItem) cfItem.classList.remove('is-confirm');
+      return;
+    }
     var hist = t.closest('.ai-hist-item');
-    if (hist) { this._loadSession(hist.getAttribute('data-id')); this._closeRail(); return; }
+    if (hist) {
+      // 确认条展开期间点条目主体 = 收起，不切会话（否则"取消"很难点到）
+      if (hist.classList.contains('is-confirm')) { hist.classList.remove('is-confirm'); return; }
+      this._loadSession(hist.getAttribute('data-id'));
+      this._closeRail();
+      return;
+    }
 
     // 快捷提问 / 回答里的行动按钮
     var askBtn = t.closest('.ai-act[data-q], .ai-chip[data-q]');
@@ -1453,35 +1606,196 @@ var AiChatModule = (function() {
       .trim();
   };
 
-  // ---- 语音输入（Web Speech API；不支持时按钮保持隐藏） ----
-  AiChatModule.prototype._voiceInput = function() {
+  // ---- v3 语音输入：全屏覆盖层（波形 / 计时 / 实时转写 / 上滑取消） ----
+  // 双通道交互：按住麦克风说话（pointer 事件，上滑取消）+ 覆盖层上的取消/发送按钮
+  // （桌面评审不被挡）；识别用 Web Speech API，不可用时明确降级并提示。
+  AiChatModule.prototype._bindVoice = function() {
+    var self = this;
+    var mic = document.getElementById('ai-mic');
+    var overlay = document.getElementById('ai-voice');
+    if (!mic || !overlay) return;
+    this._voice = { on: false, t0: 0, timer: null, rec: null, transcript: '', cancelMode: false, ptrId: null, startY: 0, suppressClick: false };
+
+    mic.addEventListener('pointerdown', function(e) {
+      var v = self._voice;
+      if (v.on) return;
+      v.ptrId = e.pointerId;
+      v.startY = e.clientY || 0;
+      try { mic.setPointerCapture(e.pointerId); } catch (err) { /* 某些环境不支持捕获，退化为冒泡 */ }
+      self._voiceStart();
+    });
+    mic.addEventListener('pointermove', function(e) {
+      var v = self._voice;
+      if (!v.on || e.pointerId !== v.ptrId) return;
+      var dy = (e.clientY || 0) - v.startY;
+      var cancel = dy < -72;   // 上滑 72px 进入取消态（拇指自然滑动距离）
+      if (cancel !== v.cancelMode) {
+        v.cancelMode = cancel;
+        overlay.classList.toggle('is-cancel', cancel);
+        var hint = document.getElementById('ai-voice-hint');
+        if (hint) hint.textContent = cancel ? '松开手指，取消发送' : '松开发送 · 上滑取消';
+      }
+    });
+    mic.addEventListener('pointerup', function(e) {
+      if (e.pointerId !== self._voice.ptrId) return;
+      self._voice.suppressClick = true;   // 指针路径已处理，阻止随后的 click 二次触发
+      self._voiceFinish(true);
+    });
+    mic.addEventListener('pointercancel', function() {
+      self._voice.cancelMode = true;
+      self._voiceFinish(false);
+    });
+    // 键盘 / 辅助技术激活：click 兜底（指针路径用 suppressClick 防重）
+    mic.addEventListener('click', function() {
+      if (self._voice.suppressClick) { self._voice.suppressClick = false; return; }
+      self._voiceStart();
+    });
+
+    var cancelBtn = document.getElementById('ai-voice-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', function() {
+      self._voice.cancelMode = true;
+      self._voiceFinish(false);
+    });
+    var sendBtn = document.getElementById('ai-voice-send');
+    if (sendBtn) sendBtn.addEventListener('click', function() { self._voiceFinish(true); });
+  };
+
+  AiChatModule.prototype._fmtDur = function(ms) {
+    var s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  };
+
+  AiChatModule.prototype._buildWave = function(el, count, isStatic) {
+    if (!el) return;
+    var h = '';
+    for (var i = 0; i < count; i++) {
+      var pct = 18 + Math.round(Math.random() * 62);
+      var d = (Math.random() * -1.1).toFixed(2);
+      var t = (0.7 + Math.random() * 0.8).toFixed(2);
+      h += '<span class="wbar" style="--h:' + pct + '%;--d:' + d + 's;--t:' + t + 's;height:' + pct + '%"></span>';
+    }
+    el.innerHTML = h;
+    if (isStatic) {
+      var bars = el.querySelectorAll('.wbar');
+      for (var j = 0; j < bars.length; j++) bars[j].style.animation = 'none';
+    }
+  };
+
+  AiChatModule.prototype._voiceStart = function() {
+    var self = this;
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
+      // 诚实降级：明说当前环境不支持，而不是给一个点不动的入口
       if (typeof Toast === 'object' && Toast.info) Toast.info('当前环境不支持语音输入');
       return;
     }
-    var self = this;
+    var overlay = document.getElementById('ai-voice');
     var mic = document.getElementById('ai-mic');
-    var rec;
-    try { rec = new SR(); } catch (e) { return; }
-    rec.lang = this._settings.accent || 'en-US';
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
+    if (!overlay) return;
+    var v = this._voice;
+    v.on = true; v.cancelMode = false; v.transcript = ''; v.t0 = Date.now();
+    overlay.classList.remove('is-cancel');
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
     if (mic) mic.setAttribute('aria-pressed', 'true');
+    var timerEl = document.getElementById('ai-voice-timer');
+    var trEl = document.getElementById('ai-voice-transcript');
+    var hintEl = document.getElementById('ai-voice-hint');
+    var sendBtn = document.getElementById('ai-voice-send');
+    if (timerEl) timerEl.textContent = '0:00';
+    if (trEl) trEl.textContent = '正在聆听…';
+    if (hintEl) hintEl.textContent = '松开发送 · 上滑取消';
+    if (sendBtn) sendBtn.disabled = true;
+    this._buildWave(document.getElementById('ai-voice-wave'), 30, false);
+    v.timer = setInterval(function() {
+      var ms = Date.now() - v.t0;
+      if (timerEl) timerEl.textContent = self._fmtDur(ms);
+      if (ms >= 60000) self._voiceFinish(true);   // 60s 上限，自动发送
+    }, 200);
+
+    var rec;
+    try { rec = new SR(); } catch (e) { this._voiceStop(); return; }
+    v.rec = rec;
+    rec.lang = this._settings.accent || 'en-US';
+    rec.interimResults = true;    // 实时转写：说话过程中覆盖层里就跟出文字
+    rec.maxAlternatives = 1;
     rec.onresult = function(ev) {
-      var text = (ev.results && ev.results[0] && ev.results[0][0]) ? ev.results[0][0].transcript : '';
-      var input = document.getElementById('ai-chat-input');
-      if (input && text) {
-        input.value = (input.value ? input.value + ' ' : '') + text;
-        self._syncComposer();
-        if (input.focus) input.focus();
+      var text = '';
+      for (var i = 0; i < ev.results.length; i++) {
+        if (ev.results[i] && ev.results[i][0]) text += ev.results[i][0].transcript;
       }
+      v.transcript = String(text || '').trim();
+      if (trEl) trEl.textContent = v.transcript || '正在聆听…';
+      if (sendBtn) sendBtn.disabled = !v.transcript;
     };
     rec.onerror = function() {
       if (typeof Toast === 'object' && Toast.info) Toast.info('没听清，再说一次');
+      self._voiceStop();
     };
-    rec.onend = function() { if (mic) mic.removeAttribute('aria-pressed'); };
-    try { rec.start(); } catch (e) {}
+    try { rec.start(); } catch (e) { this._voiceStop(); }
+  };
+
+  AiChatModule.prototype._voiceStop = function() {
+    var v = this._voice;
+    if (!v) return;
+    v.on = false;
+    if (v.timer) { clearInterval(v.timer); v.timer = null; }
+    if (v.rec) {
+      try { v.rec.onresult = null; v.rec.onerror = null; v.rec.onend = null; v.rec.stop(); } catch (e) {}
+      v.rec = null;
+    }
+    var overlay = document.getElementById('ai-voice');
+    if (overlay) {
+      overlay.classList.remove('open');
+      overlay.classList.remove('is-cancel');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    var mic = document.getElementById('ai-mic');
+    if (mic) mic.setAttribute('aria-pressed', 'false');
+  };
+
+  AiChatModule.prototype._voiceFinish = function(send) {
+    var v = this._voice;
+    if (!v || !v.on) return;
+    var dur = this._fmtDur(Date.now() - v.t0);
+    var transcript = v.transcript;
+    var wasCancel = v.cancelMode;
+    this._voiceStop();
+    if (!send || wasCancel) {
+      if (wasCancel && typeof Toast === 'object' && Toast.info) Toast.info('已取消发送');
+      return;
+    }
+    if (!transcript) {
+      if (typeof Toast === 'object' && Toast.info) Toast.info('没有识别到语音内容');
+      return;
+    }
+    this._appendVoice(dur, transcript);
+    this.ask(transcript, { skipUser: true });
+  };
+
+  // 语音消息气泡：播放键 + 迷你波形 + 时长，转写落在气泡外（v3）
+  AiChatModule.prototype._appendVoice = function(dur, transcript, noStore) {
+    var box = this._msgBox();
+    if (!box) return null;
+    this._maybeDaySep();
+    var e = window.escapeHtml || function(s) { return String(s == null ? '' : s); };
+    var div = document.createElement('div');
+    div.className = 'ai-msg ai-msg-user';
+    var meta = '<div class="ai-msg-meta"><span class="who">我</span><span>' + this._hhmm() + '</span></div>';
+    div.innerHTML = '<div class="ai-msg-avatar"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-user"/></svg></div>'
+      + '<div class="ai-msg-body">' + meta
+      + '<div class="ai-msg-bubble"><span class="ai-msg-voice">'
+      + '<button type="button" class="ai-voice-play" data-speak="' + e(transcript) + '" aria-label="播放语音内容"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-volume"/></svg></button>'
+      + '<span class="ai-voice-mini" aria-hidden="true"></span>'
+      + '<span class="ai-voice-dur">' + e(dur) + '</span>'
+      + '</span></div>'
+      + '<p class="ai-voice-tr">' + e(transcript) + '</p>'
+      + '</div>';
+    box.appendChild(div);
+    this._buildWave(div.querySelector('.ai-voice-mini'), 16, true);
+    this._scrollToLatest();
+    if (!noStore) this._storeHistory('user', '', null, { dur: dur, transcript: transcript });
+    return div;
   };
 
   // ---- 上下文栏（≥1280 显示）：复用首页已有的统计口径 ----

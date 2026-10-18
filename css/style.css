@@ -145,7 +145,11 @@ body{
 
 .page{display:none;animation:fadeUp 0.4s var(--ease)}
 .page.active{display:block}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+/* 末帧用 transform:none 而非 translateY(0)：本文件与 mobile.css 都有以 fill-mode:both
+   跑 fadeUp 的选择器（mobile.css 的 .page.active > *）。填充后残留 translateY(0) 会让元素
+   永久建立层叠上下文，把子树里的 position:fixed 抽屉困住（定位基准变成该元素盒子、
+   被 overflow:hidden 裁剪、z-index 无法与外层兄弟节点正确比较）。视觉等价，此处统一。 */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
 h2{
   font-size: var(--text-2xl);font-weight:800;color:var(--text);
