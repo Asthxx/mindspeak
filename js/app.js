@@ -6308,6 +6308,9 @@ App.prototype.showTab = function(tab, opts) {
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
   document.querySelectorAll('.page').forEach(function(p) { p.classList.toggle('active', p.id === 'page-' + tab); });
+  // 挂在 <html> 上供 CSS 感知当前页（横屏等场景按当前页调整布局），
+  // 也让深链/路由回放时样式与 DOM 状态保持一致
+  document.documentElement.setAttribute('data-tab', tab);
   // 目标按钮所在的折叠分组自动展开
   var activeBtn = document.querySelector('.nav-btn[data-tab="' + tab + '"]');
   if (activeBtn) {

@@ -1,15 +1,22 @@
-// 底部导航三分类 Tab（学习 / 训练 / 工具）· 源码级 + 行为级
+// 底部导航分类 Tab（学习 / 训练 / 工具）+ AI Tab · 源码级 + 行为级
 //
 // 背景（2026-10-17）：这三个入口原在侧边栏抽屉里，是「可折叠分组标题」——
-// 只有 nav-group-title，没有 data-tab、不路由。现集成到底部导航成为 5 签
-// （首页 / 学习 / 训练 / 工具 / 我的），落点为三个聚合页；侧边栏分组
+// 只有 nav-group-title，没有 data-tab、不路由。现集成到底部导航成为 6 签
+// （首页 / 学习 / 训练 / 工具 / AI / 我的），落点为三个聚合页；侧边栏分组
 // 仅在移动端由 CSS 隐藏，桌面端保留原文（DOM 不动）。
 //
-// 本文件守住四条边界：
+// AI Tab 的来历（2026-10-18）：先做成了贴在药丸上方的独立常驻横条
+// （.nav-ai-bar），用户明确要求"放在导航栏下方、固定的、和他们那些一样"，
+// 即作为栏内一员。横条及其全部专属规则（--nav-ai-reserve / --nav-h /
+// AI 页自动隐藏 / 横屏收起）已删除，AI 改用时序在「我的」之前的第 5 个 Tab，
+// 与其余五个共用同一套 class / 交互 / 选中态，零专属样式。
+//
+// 本文件守住五条边界：
 //   1. 底部导航的标签 / 图标 / 路由与选中态机制不变（data-tab + showTab）；
-//   2. 三个聚合页完整承接侧边栏对应分组的子入口（一个都不能少）；
-//   3. 侧边栏 DOM 未被改动（19 个 nav-btn 原样），桌面端行为不受影响；
-//   4. 移动端 CSS 确实把分组藏进了抽屉、并覆盖横屏手机。
+//   2. AI 是栏内普通一员，没有专属类名、没有独立显隐开关、顺序固定在「我的」之前；
+//   3. 三个聚合页完整承接侧边栏对应分组的子入口（一个都不能少）；
+//   4. 侧边栏 DOM 未被改动（19 个 nav-btn 原样），桌面端行为不受影响；
+//   5. 移动端 CSS 确实把分组藏进了抽屉、并覆盖横屏手机。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -37,15 +44,22 @@ function gotosIn(pageId) {
 
 const bottomNav = (html.match(/<nav class="bottom-nav"[\s\S]*?<\/nav>/) || [''])[0];
 
-describe('底部导航结构（5 签 · 分类 Tab 承接侧边栏分组）', () => {
-  it('恰好 5 签，顺序为 首页/学习/训练/工具/我的', () => {
+describe('底部导航结构（6 签 · 分类 Tab 承接侧边栏分组 + AI Tab）', () => {
+  it('恰好 6 签，顺序为 首页/学习/训练/工具/AI/我的', () => {
     const tabs = [...bottomNav.matchAll(/data-tab="([a-z-]+)"/g)].map(x => x[1]);
-    expect(tabs, '底部导航签数或顺序变了：' + tabs.join(',')).toEqual(['home', 'learn', 'train', 'tool', 'settings']);
+    expect(tabs, '底部导航签数或顺序变了：' + tabs.join(',')).toEqual(['home', 'learn', 'train', 'tool', 'ai', 'settings']);
   });
 
-  it('文案与原侧边栏分组标题一致', () => {
+  it('★AI 紧贴「我的」之前——高频入口不必扫到栏尾', () => {
+    const tabs = [...bottomNav.matchAll(/data-tab="([a-z-]+)"/g)].map(x => x[1]);
+    expect(tabs.indexOf('ai'), 'AI 不在底部导航里：' + tabs.join(',')).toBeGreaterThan(-1);
+    expect(tabs.indexOf('ai'), 'AI 没有排在「我的」之前（现在是第 ' + (tabs.indexOf('ai') + 1) + ' 签）')
+      .toBe(tabs.indexOf('settings') - 1);
+  });
+
+  it('文案与原侧边栏分组标题一致 + AI', () => {
     const labels = [...bottomNav.matchAll(/<span>([^<]+)<\/span>/g)].map(x => x[1]);
-    expect(labels).toEqual(['首页', '学习', '训练', '工具', '我的']);
+    expect(labels).toEqual(['首页', '学习', '训练', '工具', 'AI', '我的']);
   });
 
   it('三个分类 Tab 沿用原分组标题的图标（#i-book / #i-target / #i-list）', () => {
@@ -55,6 +69,44 @@ describe('底部导航结构（5 签 · 分类 Tab 承接侧边栏分组）', ()
       .toMatch(/data-tab="train"[^>]*><svg[^>]*><use href="#i-target"/);
     expect(bottomNav, '「工具」Tab 的图标不是原分组那颗 #i-list')
       .toMatch(/data-tab="tool"[^>]*><svg[^>]*><use href="#i-list"/);
+  });
+
+  it('AI Tab 用精灵图里既有的机器人图标（#i-robot，与 AI 会话头像同源）', () => {
+    expect(bottomNav, 'AI Tab 的图标不是 #i-robot')
+      .toMatch(/data-tab="ai"[^>]*><svg[^>]*><use href="#i-robot"/);
+  });
+
+  it('★AI 是栏内普通一员：无专属类名、无独立显隐开关', () => {
+    // 曾是贴在上方的独立横条（.nav-ai-bar / #nav-ai-entry），
+    // 那次实现留下了 4 类专属机制，现在必须一个都不在。
+    // 注意断言要盯"声明/使用"而不是"字面出现"——mobile.css 里有一段注释
+    // 专门说明这批名字已删除，按字面匹配会把解释性注释当成回归。
+    expect(html, '又出现了 .nav-ai-bar 容器——AI 应该只是栏内一个 Tab')
+      .not.toMatch(/class="nav-ai-bar"/);
+    expect(html, '又出现了 #nav-ai-entry 按钮').not.toMatch(/id="nav-ai-entry"/);
+    expect(mobileCss, '又出现了 .nav-ai-bar 的 display 开关')
+      .not.toMatch(/\.nav-ai-bar\{display:none\}/);
+    expect(mobileCss, '又出现了 --nav-ai-reserve 的变量声明')
+      .not.toMatch(/--nav-ai-reserve\s*:/);
+    expect(mobileCss, '又出现了 --nav-ai-reserve 的使用')
+      .not.toMatch(/var\(--nav-ai-reserve/);
+    // AI Tab 自身不许有任何专属规则——否则就不是"和他们那些一样"
+    expect(mobileCss, 'AI Tab 出现了专属 CSS 规则')
+      .not.toMatch(/bottom-nav-btn\[data-tab="ai"\]/);
+  });
+
+  it('AI Tab 与其余五个结构完全同构（同 class / 同 aria 属性位）', () => {
+    const fullAi = (bottomNav.match(/<button[^>]*data-tab="ai"[\s\S]*?<\/button>/) || [''])[0];
+    const fullHome = (bottomNav.match(/<button[^>]*data-tab="home"[\s\S]*?<\/button>/) || [''])[0];
+    expect(fullAi, 'AI Tab 不是 button 元素').toMatch(/^<button type="button"/);
+    expect(fullAi, 'AI Tab 没有 bottom-nav-btn 类').toMatch(/class="bottom-nav-btn/);
+    // 同构：图标与文字两段式、aria-hidden + focusable=false 完全一致
+    expect(fullAi).toMatch(/<svg class="icon" aria-hidden="true" focusable="false">/);
+    expect(fullHome).toMatch(/<svg class="icon" aria-hidden="true" focusable="false">/);
+    expect(fullAi).toMatch(/<\/svg><span>[^<]+<\/span><\/button>$/);
+    expect(fullHome).toMatch(/<\/svg><span>[^<]+<\/span><\/button>$/);
+    // AI 签不带 aria-current（首页才是默认当前页），但保留属性位
+    expect(fullAi, 'AI 签不该预设 aria-current').not.toMatch(/aria-current/);
   });
 
   it('不再保留「背单词 / 练习」直达签——分类入口已上位，避免同页两套直达', () => {
@@ -136,6 +188,34 @@ describe('移动端 CSS：抽屉藏分组 + 横屏覆盖', () => {
   });
 });
 
+describe('Android 平台选中态配色（特异性陷阱守卫）', () => {
+  // android-nav.css 是被 head-boot.js 按平台注入的（插在 mobile.css 之前），
+  // 它这条规则特异性 (0,3,1) 高于 mobile.css 的 .bottom-nav-btn.active (0,2,1)，
+  // 所以 Android 上选中态文字用什么色，由这一条说了算——mobile.css 写了不算。
+  //
+  // 2026-10-18 之前这里写的是 var(--primary, #5B82A6)，而 --primary 就是 var(--sage)：
+  // 浅色主题下 #5B82A6 压在药纶白底上实测 4.05:1，不满足 WCAG AA 的 4.5:1；
+  // 同时图标仍走 mobile.css 的 --sage-deep，导致同一颗 Tab 文字浅、图标深。
+  it('选中态文字用 --sage-deep，不许用回 --primary', () => {
+    const androidNav = readFileSync(resolve(root, 'css/android-nav.css'), 'utf8');
+    const rule = (androidNav.match(/html\.platform-android \.bottom-nav-btn\.active\s*\{[^}]*\}/) || [''])[0];
+    expect(rule, 'android-nav.css 里找不到 .bottom-nav-btn.active 规则').not.toBe('');
+    expect(rule, '选中态又用回 --primary（解析成 --sage，白底仅 4.05:1，且与图标不同色）')
+      .not.toMatch(/var\(--primary/);
+    expect(rule, '选中态没有用 --sage-deep').toMatch(/var\(--sage-deep\)/);
+  });
+
+  it('不能靠删掉整条规则来"修"——.bottom-nav-btn 整块特异性仍高于 mobile.css', () => {
+    // 删掉 .active 规则会让 mobile.css 的 (0,2,1) 接管，颜色是对了，
+    // 但 android-nav.css 的 .bottom-nav-btn (0,2,1) 仍压着 mobile.css 的 (0,1,0)，
+    // 按钮的 padding / min-height / color 会一起回退到 Android 旧值。
+    // 所以正确解法是改令牌，不是删规则。这里把规则的存在性钉住。
+    const androidNav = readFileSync(resolve(root, 'css/android-nav.css'), 'utf8');
+    expect(androidNav, 'android-nav.css 的 .bottom-nav-btn.active 规则被整条删了')
+      .toMatch(/html\.platform-android \.bottom-nav-btn\.active\s*\{/);
+  });
+});
+
 describe('行为：三个分类 Tab 的跳转与选中态', () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -146,7 +226,7 @@ describe('行为：三个分类 Tab 的跳转与选中态', () => {
     window.location.hash = '';
   });
 
-  for (const [tab, label] of [['learn', '学习'], ['train', '训练'], ['tool', '工具']]) {
+  for (const [tab, label] of [['learn', '学习'], ['train', '训练'], ['tool', '工具'], ['ai', 'AI']]) {
     it('showTab("' + tab + '") 打开聚合页并点亮「' + label + '」签', () => {
       window.app.showTab('home');
       window.app.showTab(tab);
@@ -194,5 +274,68 @@ describe('行为：三个分类 Tab 的跳转与选中态', () => {
 
     expect(window.app.currentTab, '深链 #/train 没有直达').toBe('train');
     expect(document.getElementById('page-train').classList.contains('active')).toBe(true);
+  });
+});
+
+describe('行为：AI Tab 与其余五个同权', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    await bootstrapApp();
+  });
+
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  it('showTab("ai") 打开 AI 页并点亮 AI 签，其余五签全灭', () => {
+    window.app.showTab('home');
+    window.app.showTab('ai');
+
+    expect(document.getElementById('page-ai').classList.contains('active'), 'AI 页没有激活').toBe(true);
+    expect(document.getElementById('page-home').classList.contains('active'), '首页没有随之关闭').toBe(false);
+
+    const ai = document.querySelector('.bottom-nav-btn[data-tab="ai"]');
+    expect(ai.classList.contains('active'), 'AI 签没有高亮').toBe(true);
+    expect(ai.getAttribute('aria-current'), 'AI 签没有 aria-current').toBe('page');
+
+    for (const b of document.querySelectorAll('.bottom-nav-btn')) {
+      if (b === ai) continue;
+      expect(b.classList.contains('active'), '签 ' + b.dataset.tab + ' 应熄灭').toBe(false);
+      expect(b.getAttribute('aria-current'), '签 ' + b.dataset.tab + ' 应移除 aria-current').toBe(null);
+    }
+  });
+
+  it('★站在 AI 页上底栏仍在——AI 已是栏内一员，不再需要"让位"', () => {
+    // 旧实现是独立横条，在 AI 页要 display:none 并预留归零；
+    // 成为 Tab 后这两个特殊分支都该消失，底栏与其他页面保持同一状态。
+    // 注意：jsdom 不加载 CSS，算不出 display（拿到的 'block' 是 <nav> 的默认值），
+    // 所以这里只断言 DOM 与状态，"真的没被隐藏"由源码守卫 + 真实浏览器验收兜底。
+    window.app.showTab('ai');
+    const nav = document.getElementById('bottom-nav');
+    expect(nav, 'AI 页上底栏元素被移除').not.toBeNull();
+    expect(document.querySelectorAll('.bottom-nav-btn').length, 'AI 页上签数变少').toBe(6);
+    expect(document.documentElement.getAttribute('data-tab'), 'AI 页没有写 data-tab').toBe('ai');
+    for (const b of document.querySelectorAll('.bottom-nav-btn')) {
+      expect(b.style.display, '签 ' + b.dataset.tab + ' 被内联隐藏（绕过了样式表）').toBe('');
+      expect(b.hasAttribute('hidden'), '签 ' + b.dataset.tab + ' 被 hidden 属性藏起来了').toBe(false);
+    }
+  });
+
+  it('点击 AI 签即触发跳转（initNav 的通用 bottom-nav-btn 绑定，无专属分支）', () => {
+    window.app.showTab('home');
+    document.querySelector('.bottom-nav-btn[data-tab="ai"]').click();
+
+    expect(window.app.currentTab, '点击没有切页').toBe('ai');
+    expect(document.getElementById('page-ai').classList.contains('active')).toBe(true);
+  });
+
+  it('hash 直达 AI 页（深链 / 刷新保持）', async () => {
+    window.location.hash = '#/ai';
+    await new Promise(r => setTimeout(r, 80));
+
+    expect(window.app.currentTab, '深链 #/ai 没有直达').toBe('ai');
+    const ai = document.querySelector('.bottom-nav-btn[data-tab="ai"]');
+    expect(ai.classList.contains('active'), '深链进来 AI 签没亮').toBe(true);
+    expect(ai.getAttribute('aria-current')).toBe('page');
   });
 });

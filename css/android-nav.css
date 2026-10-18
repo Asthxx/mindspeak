@@ -26,8 +26,18 @@ html.platform-android .bottom-nav-btn {
   transition: color 0.2s;
 }
 
+/* 选中态文字色。
+   原先写的是 var(--primary, #5B82A6)，而 --primary 在 style.css 里就是 var(--sage)：
+   浅色主题下 #5B82A6 压在药纶白底上实测只有 4.05:1，不满足 WCAG AA 的 4.5:1。
+   更糟的是它特异性 (0,3,1) 压过了 mobile.css 的 .bottom-nav-btn.active (0,2,1)，
+   于是同一批 Tab 在 Android 上文字用浅的 --sage、图标却用深的 --sage-deep
+   （mobile.css 的 .bottom-nav-btn.active .icon 仍是 (0,3,0) 生效），颜色不一致。
+   这里改用 --sage-deep：实测白底 6.67:1，且与图标同色、与 iOS 端观感一致。
+   注意不能顺手删掉整条规则——.bottom-nav 那块的 left/right/height 虽被 mobile.css
+   按源码次序压回，但 .bottom-nav-btn 整块 (0,2,1) 仍高于 mobile.css 的 (0,1,0)，
+   删了会让 Android 的按钮内边距/最小高度一起回退。 */
 html.platform-android .bottom-nav-btn.active {
-  color: var(--primary, #5B82A6);
+  color: var(--sage-deep);
 }
 
 html.platform-android .bottom-nav-btn .icon {

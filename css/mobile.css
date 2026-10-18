@@ -4,6 +4,14 @@
    用于强制走手机布局，即使 WebView 没正确触发媒体查询。 */
 .bottom-nav{display:none}
 html.forced-mobile .bottom-nav{display:flex}
+
+/* --nav-h：底栏药丸的净高度（不含安全区）。
+   消费者是 AI 页的弹性布局——它要把对话工作区的底边抬到药丸上方，
+   否则悬浮药纶会压住输入区。平台/横屏各自覆盖。
+   只能挂 html：写 :root 会升到 (0,1,0)，压过下面媒体查询里的 html 覆盖，
+   手机端会永远拿到 64px（在 Android 62px 上差 2px、横屏 52px 上差 12px）。 */
+html{--nav-h:64px}
+
 html.forced-mobile .sidebar{position:fixed;top:var(--header);left:0;width:260px;max-width:80vw;height:calc(100dvh - var(--header));transform:translateX(-110%);transition:transform var(--duration-slower) var(--ease-out);z-index:100;overflow-y:auto}
 html.forced-mobile .sidebar.open{transform:translateX(0)}
 html.forced-mobile .content{margin-left:0;margin-top:var(--header);padding-bottom:calc(var(--sp-6) + 92px + env(safe-area-inset-bottom,0px));overflow-x:hidden}
@@ -167,6 +175,13 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   }
   .bottom-nav-btn.active .icon{color:var(--sage-deep)}
   .bottom-nav-btn:active{opacity:0.7}
+
+  /* ---- 底部导航药丸（六个 Tab）----
+     宽度分配完全交给 flex:1 自动均分，不设 min-width 之外的硬编码：
+     320px 窄屏下每个 Tab 仍分到约 46px，两字标签（24px）与 22px 图标都放得下。
+     「AI」Tab 与其余五个共用上面这套样式，没有任何专属规则——
+     入口从"贴在上方的独立横条"改成"栏内一员"后，原先那批
+     .nav-ai-bar / .nav-ai-entry / --nav-ai-reserve / --nav-h 已全部删除。 */
   h2{font-size: var(--text-xl);margin-bottom:var(--sp-3);letter-spacing:-0.01em}
   h3{font-size: var(--text-base)}
 
@@ -573,6 +588,7 @@ html.platform-ios .ai-chat-chips{
   -webkit-overflow-scrolling:touch;
 }
 /* iOS 底部 home indicator（横条）区域更精细：底部导航高度微调 */
+html.platform-ios{--nav-h:58px}
 html.platform-ios .bottom-nav{
   height:calc(58px + env(safe-area-inset-bottom,0px));
 }
@@ -604,6 +620,7 @@ html.platform-android .app-header{
   padding-top:0;
 }
 /* Android 手势条区：底部导航加一点留白避免与手势条重叠 */
+html.platform-android{--nav-h:62px}
 html.platform-android .bottom-nav{
   height:calc(62px + env(safe-area-inset-bottom,0px));
   padding-bottom:max(env(safe-area-inset-bottom,0px),4px);
@@ -727,6 +744,9 @@ html.platform-android{
   html.platform-ios .toast-container,
   html.platform-android .toast-container{
     top:auto;
+    /* 88px 是"底栏之上"（64 药纶 + 10 底距 + 14 余量）。
+       AI 入口曾是贴在上方的独立横条，那时要额外加一条预留才不会被它压住；
+       现在 AI 已是栏内 Tab，公式回到只有底栏的原始形态。 */
     bottom:calc(88px + env(safe-area-inset-bottom,0px));
     left:16px;right:16px;
     max-height:40vh;
@@ -757,6 +777,12 @@ html.forced-mobile .toast-container{
   .bottom-nav-btn{gap:1px;padding:2px}
   .bottom-nav-btn .icon{width:18px;height:18px}   /* 竖屏是 22px */
   .bottom-nav-btn span{font-size:var(--text-2xs)} /* 竖屏是 --text-xs */
+  /* --nav-h 跟着压到 52px。必须把 platform-* 两条一起写上：
+     单写 html{--nav-h:52px} 特异性 (0,0,1)，压不过上面的 html.platform-ios{--nav-h:58px}
+     (0,2,0)，横屏 iOS 上 AI 页会按 58px 预留，多出 6px 空白。 */
+  html,
+  html.platform-ios,
+  html.platform-android{--nav-h:52px}
   /* 内容区底部留白随导航高度收缩：竖屏是 sp-6 + 92px（64px 药纶 + 10px 边距 + 余量），
      这里压到 sp-4 + 68px（52px 药纶 + 8px 边距 + 余量） */
   .content{padding-bottom:calc(var(--sp-4) + 68px + env(safe-area-inset-bottom,0px))}

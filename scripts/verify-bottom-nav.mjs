@@ -29,6 +29,10 @@ const PORT = process.env.VBN_PORT || '3188';
 const DEBUG_PORT = '9677';
 const BASE = `http://127.0.0.1:${PORT}/`;
 const OUT = join(root, 'audit-shots');
+// 产物目录常被当可再生缓存清掉，脚本必须能自建——
+// 否则清理一次 audit-shots/ 之后，本脚本会以 ENOENT 崩在写第一张截图上，
+// 看起来像"验收挂了"，其实是目录没了。
+mkdirSync(OUT, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
@@ -97,7 +101,54 @@ const SNAP = `JSON.stringify({
   hoverNone: matchMedia('(hover:none)').matches,
   pointerCoarse: matchMedia('(pointer:coarse)').matches,
   land: matchMedia('(orientation:landscape)').matches,
+  // 「AI」Tab：与其余五个同款，顺序固定在「我的」之前
+  aiTab: (function () {
+    var btn = document.querySelector('.bottom-nav-btn[data-tab="ai"]');
+    if (!btn) return null;
+    var r = btn.getBoundingClientRect();
+    var icon = btn.querySelector('.icon');
+    var ir = icon ? icon.getBoundingClientRect() : null;
+    var label = btn.querySelector('span');
+    return {
+      exists: true,
+      w: Math.round(r.width), h: Math.round(r.height),
+      top: Math.round(r.top), bottom: Math.round(r.bottom),
+      left: Math.round(r.left), right: Math.round(r.right),
+      iconW: ir ? Math.round(ir.width) : 0,
+      label: label ? label.textContent : '',
+      active: btn.classList.contains('active'),
+      aria: btn.getAttribute('aria-current'),
+      dataTab: document.documentElement.getAttribute('data-tab') || ''
+    };
+  })(),
 })`;
+
+// AI Tab 的文字/图标对比度（文字 4.5:1，图标属非文本 3:1）。
+// 底色取药纶自身的背景——Tab 是栏内一员、没有独立底板，
+// 这正是"和他们那些一样"的含义：不必为它另设一套配色，
+// 于是它自动继承 .bottom-nav-btn 的 --text-tertiary / --sage-deep 令牌对。
+// 未选中与选中两种状态都要量（选中态换成 sage-deep 字 + sage-surface 底）。
+const AI_CONTRAST = `JSON.stringify((function () {
+  function lum(c) {
+    var m = String(c).match(/[\\d.]+/g) || [];
+    var v = m.slice(0, 3).map(function (x) { x = Number(x) / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  }
+  function ratio(a, b) {
+    var l1 = lum(a), l2 = lum(b);
+    return Math.round((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05) * 100) / 100;
+  }
+  var btn = document.querySelector('.bottom-nav-btn[data-tab="ai"]');
+  var nav = document.getElementById('bottom-nav');
+  var bg = getComputedStyle(nav).backgroundColor;
+  var label = btn.querySelector('span');
+  var icon = btn.querySelector('.icon');
+  return {
+    active: btn.classList.contains('active'),
+    label: ratio(getComputedStyle(label).color, bg),
+    icon: ratio(getComputedStyle(icon).color, bg)
+  };
+})())`;
 
 const MEDIA = `JSON.stringify({
   w768: matchMedia('(max-width:768px)').matches,
@@ -169,9 +220,13 @@ try {
   let s = JSON.parse(await evalJs(cdp, SNAP));
 
   check(s.navDisplay === 'none', '底部导航在桌面端隐藏', `display=${s.navDisplay}`);
+  // AI 作为栏内一员，随底栏同一套开关隐藏——不再需要为它单独写一条 display:none
+  check(!!s.aiTab && s.aiTab.h === 0, 'AI Tab 在桌面端随底栏一起隐藏（无独立开关）',
+    `h=${s.aiTab && s.aiTab.h}`);
   check(s.groupDisplay === 'flex', '侧边栏三个分组在桌面端原样展示', `display=${s.groupDisplay}`);
   check(s.menuDisplay === 'none', '汉堡按钮在桌面端隐藏', `display=${s.menuDisplay}`);
-  check(s.navLabels.length === 0 || s.navDisplay === 'none', '桌面端无底部签可点');
+  check(s.navLabels.length === 6 && s.navDisplay === 'none', '桌面端六个 Tab 均不可点（DOM 在、渲染被隐藏）',
+    `labels=${JSON.stringify(s.navLabels)}`);
 
   // 桌面折叠分组行为保留（点组标题 → collapsed）
   await evalJs(cdp, `document.getElementById('group-train-title').click(); 'ok'`);
@@ -198,9 +253,11 @@ try {
   s = JSON.parse(await evalJs(cdp, SNAP));
 
   check(s.navDisplay === 'flex', '底部导航在竖屏显示', `display=${s.navDisplay}`);
-  check(s.navCount === 5, '底部导航恰为 5 签', `count=${s.navCount}`);
-  check(JSON.stringify(s.navLabels) === JSON.stringify(['首页', '学习', '训练', '工具', '我的']),
-    '5 签文案与顺序：首页/学习/训练/工具/我的', JSON.stringify(s.navLabels));
+  check(s.navCount === 6, '底部导航恰为 6 签（AI 入列）', `count=${s.navCount}`);
+  check(JSON.stringify(s.navLabels) === JSON.stringify(['首页', '学习', '训练', '工具', 'AI', '我的']),
+    '★6 签文案与顺序：首页/学习/训练/工具/AI/我的', JSON.stringify(s.navLabels));
+  check(s.navLabels[4] === 'AI' && s.navLabels[5] === '我的',
+    '★AI 紧贴「我的」之前（高频入口不必扫到栏尾）', JSON.stringify(s.navLabels));
   check(s.navPos === 'fixed', '底部导航固定定位', `position=${s.navPos}`);
   check(s.navRect.left === 12 && s.navRect.right === 378, '药纶左右各留 12px（竖屏安全区为 0）',
     `left=${s.navRect.left} right=${s.navRect.right}`);
@@ -243,6 +300,70 @@ try {
   s = JSON.parse(await evalJs(cdp, SNAP));
   check(s.activePage === 'page-home', '点「首页」回到首页', `active=${s.activePage}`);
 
+  // ---- 「AI」Tab：与其余五个完全同款，顺序在「我的」之前 ----
+  const ai = s.aiTab;
+  check(!!ai && ai.exists, 'AI 是底栏里的一个 Tab（不再是贴上方的独立横条）', JSON.stringify(ai));
+  check(!!ai && ai.label === 'AI', 'AI 签文案为「AI」（两字宽，与其余标签等长）', `label=${ai && ai.label}`);
+  check(!!ai && ai.h >= 44, 'AI 签触控高度 ≥44px（Apple HIG 下限）', `h=${ai && ai.h}`);
+  check(!!ai && ai.w >= 40, '★六等分后 AI 签仍有 ≥40px 可点宽度', `w=${ai && ai.w}`);
+  check(!!ai && ai.iconW >= 18, 'AI 签图标 ≥18px（横屏压缩值）', `iconW=${ai && ai.iconW}`);
+  check(!!ai && ai.top >= s.navRect.top && ai.bottom <= s.navRect.bottom,
+    'AI 签垂直方向完整落在药纶内（不溢出、不贴边）',
+    `tabTop=${ai && ai.top} tabBottom=${ai && ai.bottom} navTop=${s.navRect.top} navBottom=${s.navRect.bottom}`);
+  check(!!ai && ai.left >= s.navRect.left && ai.right <= s.navRect.right,
+    'AI 签水平方向落在药纶内', `tabLeft=${ai && ai.left} tabRight=${ai && ai.right}`);
+  check(!!ai && !ai.active, '首页为当前页时 AI 签不抢占选中态', `active=${ai && ai.active}`);
+
+  // 未选中态：继承 .bottom-nav-btn 的 --text-tertiary 令牌
+  const cLight = JSON.parse(await evalJs(cdp, AI_CONTRAST));
+  check(!cLight.active, '对比度取样时 AI 签确为未选中态', `active=${cLight.active}`);
+  check(cLight.label >= 4.5, '浅色·AI 签文字对比度 ≥4.5:1', `${cLight.label}:1`);
+  check(cLight.icon >= 3, '浅色·AI 签图标对比度 ≥3:1（非文本）', `${cLight.icon}:1`);
+
+  // 深色主题下同一组令牌必须同样达标（深色会把 sage 系令牌整体翻亮）
+  await evalJs(cdp, `document.documentElement.setAttribute('data-theme','dark')`);
+  await sleep(300);
+  const cDark = JSON.parse(await evalJs(cdp, AI_CONTRAST));
+  check(cDark.label >= 4.5, '深色·AI 签文字对比度 ≥4.5:1', `${cDark.label}:1`);
+  check(cDark.icon >= 3, '深色·AI 签图标对比度 ≥3:1（非文本）', `${cDark.icon}:1`);
+  await evalJs(cdp, `document.documentElement.setAttribute('data-theme','light')`);
+  await sleep(200);
+
+  // 点 AI 签 → 直达 AI 对话页，且自身进入与其他五个一致的选中态
+  await tap('.bottom-nav-btn[data-tab="ai"]');
+  await sleep(700);
+  s = JSON.parse(await evalJs(cdp, SNAP));
+  check(s.activePage === 'page-ai', '★点 AI 签直达 AI 对话页', `active=${s.activePage}`);
+  check(s.activeTabLabel.includes('AI'), 'AI 签高亮', `label=${s.activeTabLabel}`);
+  check(s.activeAria === 'page', 'AI 签带 aria-current="page"（读屏可播报）', `aria=${s.activeAria}`);
+  check(!!s.aiTab && s.aiTab.active && s.aiTab.aria === 'page',
+    '★AI 签选中态与其余五个完全一致（同一套 class + aria 逻辑）', JSON.stringify(s.aiTab));
+  check(s.navDisplay === 'flex', 'AI 页上底栏仍在（AI 已是栏内一员，不再需要让位）', `display=${s.navDisplay}`);
+  check(s.hash === '#/ai', 'AI 页写入 hash（可分享/刷新保持）', `hash=${s.hash}`);
+  await shot('nav-ai-tab-on-ai.png');
+
+  // 选中态换成 sage-deep 字 + sage-surface 底，也要达标
+  const cActive = JSON.parse(await evalJs(cdp, AI_CONTRAST));
+  check(cActive.active, '选中态对比度取样时 AI 签确为选中', `active=${cActive.active}`);
+  check(cActive.label >= 4.5, '浅色·AI 签选中态文字对比度 ≥4.5:1', `${cActive.label}:1`);
+
+  // 离开 AI 页后选中态交还首页
+  await tap('.bottom-nav-btn[data-tab="home"]');
+  await sleep(600);
+  s = JSON.parse(await evalJs(cdp, SNAP));
+  check(s.activePage === 'page-home' && !!s.aiTab && !s.aiTab.active,
+    '离开 AI 页后选中态回到首页', `active=${s.activePage} aiActive=${s.aiTab && s.aiTab.active}`);
+  await shot('nav-ai-tab-home.png');
+
+  // 深链直接落在 AI 页：选中态不能依赖"先经过别的页"才生效
+  await evalJs(cdp, `location.hash = '#/ai'`);
+  await sleep(800);
+  s = JSON.parse(await evalJs(cdp, SNAP));
+  check(s.activePage === 'page-ai' && !!s.aiTab && s.aiTab.active && s.aiTab.aria === 'page',
+    '★深链直达 AI 页时 AI 签同样高亮', JSON.stringify(s.aiTab));
+  await tap('.bottom-nav-btn[data-tab="home"]');
+  await sleep(500);
+
   // 抽屉：三分组不再出现，其余入口保留
   await tap('#btn-menu');
   await sleep(700); // 等抽屉滑入过渡
@@ -268,13 +389,18 @@ try {
   s = JSON.parse(await evalJs(cdp, SNAP));
 
   check(s.navDisplay === 'flex', '旋到横屏后底部导航仍在（不消失）', `display=${s.navDisplay}`);
-  check(s.navCount === 5, '横屏仍是 5 签', `count=${s.navCount}`);
+  check(s.navCount === 6, '横屏仍是 6 签', `count=${s.navCount}`);
+  check(s.navLabels[4] === 'AI' && s.navLabels[5] === '我的', '横屏六签顺序不变', JSON.stringify(s.navLabels));
   check(s.navRect.h < portraitNavH, '横屏药纶高度压缩，给内容让路', `landscape=${s.navRect.h} portrait=${portraitNavH}`);
   check(s.navRect.left === 12 && s.navRect.right === 832, '横屏左右仍各留 12px（安全区为 0 时与竖屏一致）',
     `left=${s.navRect.left} right=${s.navRect.right}`);
   check(s.contentPadBottom < portraitPad && s.contentPadBottom >= s.navRect.h + 8,
     '横屏内容区留白随导航收缩且仍足够', `pad=${s.contentPadBottom} portraitPad=${portraitPad} navH=${s.navRect.h}`);
   check(s.navRect.bottom <= 390, '药纶不超出横屏视口底部', `bottom=${s.navRect.bottom}`);
+  // 横屏下 AI 签仍在：它是栏内一员、不占额外高度，
+  // 不再像独立横条那样需要为省空间而收起
+  check(!!s.aiTab && s.aiTab.h > 0, '★横屏下 AI 签仍在（不额外占高，无需收起）', `h=${s.aiTab && s.aiTab.h}`);
+  check(!!s.aiTab && s.aiTab.bottom <= 390, 'AI 签不超出横屏视口底部', `bottom=${s.aiTab && s.aiTab.bottom}`);
 
   // 横屏下点签仍可切页
   await tap('.bottom-nav-btn[data-tab="learn"]');
@@ -301,7 +427,7 @@ try {
     `now=${s.navRect.h} portrait=${portraitNavH}`);
 
   console.log(`\n===== 结果：${pass} 通过 / ${fail} 失败 =====`);
-  console.log(`截图：audit-shots/bottom-nav-{desktop,mobile,landscape}.png`);
+  console.log(`截图：audit-shots/bottom-nav-{desktop,mobile,landscape}.png + nav-ai-tab-{on-ai,home}.png`);
 } finally {
   try { chrome?.kill(); } catch (e) {}
   try { server?.kill(); } catch (e) {}
