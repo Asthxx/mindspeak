@@ -317,7 +317,12 @@ var SpeechUtil = {
       // 触发一个空 utterance 以"激活"speechSynthesis；
       // 统一经 TTSManager.speak 朗读（会套用所选声音，顺带预热在线声连接）。
       // immediate=true：iOS Safari 必须在用户手势上下文里立即 speak，不能延迟 100ms。
-      TTSManager.speak(' ', { volume: 0, rate: 0.5, immediate: true });
+      // noFailToast=true：这是后台解锁预热，不是用户点的朗读。此前没加这个标记，
+      // 一旦本机 TTS 不可用（无英文语音 / server 未起 / 在线声连不上），
+      // 预热失败会顺着 _speakLocal → _ttsLocalFail 弹一条红底错误 Toast——
+      // 用户什么都没点，屏幕上先红一条，且每次进页面都来一次（首屏任意一次
+      // click/touchstart 都会触发 unlock）。真正的朗读失败由用户主动点朗读时再报。
+      TTSManager.speak(' ', { volume: 0, rate: 0.5, immediate: true, noFailToast: true });
       this._unlocked = true;
     } catch(e) {}
   },
@@ -1739,6 +1744,10 @@ _markOnlineBroken: function() {
           lang: 'en-US',
           rate: 0.9,
           volume: keepAlive ? 0 : 0.2, // 保活预热静音：万一在无朗读窗口被播到也不出声
+          // 同为后台预热：本地音频路径失败时 _ttsLocalFail 也会读这个标记，
+          // 不加的话"在线声探不通"会以红底错误 Toast 的形式砸在用户面前。
+          // 预热本身的成败由下面的 onstart / onerror 记录，不影响判断。
+          noFailToast: true,
   
           onstart: function() {
             if (self._primeGuard) { clearTimeout(self._primeGuard); self._primeGuard = null; }
