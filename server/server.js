@@ -1012,6 +1012,15 @@ app.use(express.static(STATIC_ROOT, {
 // 404 -> JSON（对非静态资源）
 app.use((req, res) => res.status(404).json({ ok: false, message: 'Not Found' }));
 
+// 路由/中间件抛错 → 统一 JSON 500。
+// 必须注册在路由之后：文件顶部那个 4 参处理器只覆盖 express.json 的解析错误，
+// 后面路由抛的异常会跳过它，落到 Express 默认 HTML 错误页（非 production 下还带堆栈）。
+app.use((err, req, res, next) => {
+  logger.error('http', 'unhandled route error', { method: req.method, path: req.path }, err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ ok: false, message: 'internal error' });
+});
+
 // 监听地址与端口：默认 127.0.0.1 仅本机；server/.env 或环境变量 HOST=0.0.0.0
 // 可让局域网设备（安卓/苹果手机）访问，公网部署时配合防火墙/反代使用。
 // require.main 保护：被测试 require 时不启动监听（listen 只发生在直接运行 node server.js 时）。
