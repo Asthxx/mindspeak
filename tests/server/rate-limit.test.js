@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { createTtsLimiter } from '../../server/rate-limit.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // TTS 限流：防局域网/沙箱 no-cors 图片滥用（每请求 spawn PowerShell + 落盘 WAV）。
 
@@ -74,5 +79,28 @@ describe('TTS 限流中间件', () => {
     const res = mkRes();
     for (let i = 0; i < 600; i++) mw(mkReq('ip-' + i), res, () => nexted++);
     expect(nexted).toBe(600);
+  });
+});
+
+describe('POST 方法限流（/api/logs 的用法）', () => {
+  it('methods:[POST] 时 GET 不计数、POST 计数', () => {
+    const mw = createTtsLimiter({ limit: 2, windowMs: 60000, methods: ['POST'] });
+    const mk = (ip, method) => { const r = mkReq(ip); r.method = method; return r; };
+    const res = mkRes();
+    let nexted = 0;
+    mw(mk('9.9.9.9', 'GET'), res, () => nexted++);
+    mw(mk('9.9.9.9', 'GET'), res, () => nexted++);
+    expect(nexted, 'GET 不应消耗配额').toBe(2);
+    expect(res.statusCode, 'GET 不应触发 429').toBe(200);
+    mw(mk('9.9.9.9', 'POST'), res, () => nexted++);   // POST 1/2
+    mw(mk('9.9.9.9', 'POST'), res, () => nexted++);   // POST 2/2
+    mw(mk('9.9.9.9', 'POST'), res, () => nexted++);   // POST 3 → 429
+    expect(nexted).toBe(4);
+    expect(res.statusCode).toBe(429);
+  });
+
+  it('server.js 必须为 /api/logs 挂限流（最后一个无限制的可变更端点）', () => {
+    const src = readFileSync(join(root, 'server', 'server.js'), 'utf8');
+    expect(src).toMatch(/app\.use\('\/api\/logs',\s*createTtsLimiter/);
   });
 });

@@ -181,3 +181,39 @@
   建议在 Android 真机再复核一次手感（阈值 80px、指示器位置）。
 - **P0-2 Piper**：本机已完成"已有二进制 + 已有语音包"的端到端合成；
   "首次下载 20MB 包 → 解压 → 自检 → 合成"这段建议在干净目录（换个 `HOME`）跑一次。
+
+---
+
+## 第三轮定向审计（同日，dev-god 模式）
+
+范围：前两轮未覆盖的存储层、AI 代理安全、大列表渲染、常驻定时器、日志管道、SAPI 桥接参数安全。
+
+**修复 1 条**：
+
+- `/api/logs`（POST）此前是唯一无限流的可变更端点（其余 tts / ai / offline-voice 均已挂限流器）。
+  已挂 `createTtsLimiter`（POST 120 次/60s，`LOGS_LIMIT` 可调）：前端 flush 间隔 ≥4s（≤15 次/分），
+  正常使用不受影响。磁盘风险本已被日志轮转封顶（2MB × 3 份），此修复消除的是授权客户端
+  高频刷写带来的 IO/CPU 抖动。验证：`tests/server/rate-limit.test.js` +2
+  （POST 方法计数 / 服务端必须挂限流的源码守卫）。
+
+**标注 1 条（按规范不删）**：
+
+- `js/responsive-layout.js` 为死代码：`window.ResponsiveLayout` 全仓无消费方
+  （getColumns / isPhone / onBreakpointChange 均无人调用），但仍随 index.html 与 build.js
+  的 jsOrder 加载。下线需同步改 index.html / build.js / app-bootstrap 三张加载表，
+  属维护者决策 —— 文件头已加标注。
+
+**核查后无需修复**：
+
+- 存储层（`UserState.get/set`）：JSON.parse 有 try/catch、配额超限有用户提示、gamification 读取收敛。
+- AI 代理（`proxyAiChat`）：上游 URL 来自服务端配置（无用户输入参与，无 SSRF）、AbortController 超时、
+  响应截断 400 字符、不转发客户端头。
+- AI 输出渲染（`toHtml`）：模型输出先 `escapeHtml` 再插入，LLM 的 HTML/脚本注入被中性化。
+- SAPI 桥接（`/api/tts`）：lang / rate / voice / text 全部作为 PowerShell 位置参数传值
+  （非脚本内插值，无法注入代码）；voice 剥到 `[a-zA-Z]`（无 ReDoS）；rate 钳制 0.5–2；
+  临时文件唯一命名 + 原子 rename；内容寻址缓存；限流已挂。
+- 日志管道：服务端对 msg / mod / page / url / data / stack 逐字段截断（不信任客户端截断），
+  轮转 2MB × 3 份封顶磁盘。
+- 词表渲染：分页 20/页（词库 10k 也不会一次渲染），逐字段 `escapeHtml`，无卡顿来源。
+- story / listen-along：内容转义 + 高亮用 `escapeReg`；定时器有 seq 代次守卫与 stop 清理。
+- resize 监听仅 3 处且均为轻量回调；断点变化才通知监听者。

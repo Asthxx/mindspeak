@@ -1,6 +1,11 @@
 (function() {
   var TAG = 'ResponsiveLayout';
 
+  // ⚠ 死代码标注（2026-11-22 第三轮审计）：window.ResponsiveLayout 目前全仓无消费方
+  // （getColumns / isPhone / onBreakpointChange 均无人调用），但仍随 index.html 与
+  // build.js 的 jsOrder 加载。下线需同步改 index.html / build.js / app-bootstrap
+  // 三张加载表，属维护者决策 —— 此处仅标注，不在无关提交里私自删除。
+
   var ResponsiveLayout = {
     _currentBreakpoint: null,
     _listeners: [],

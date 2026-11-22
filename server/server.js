@@ -829,6 +829,10 @@ app.get('/api/ai/health', (req, res) => res.json(aiHealthStatus()));
 // ==================== 前端错误日志上报（AI 可读）====================
 // 浏览器端 logger.js 捕获的 error/warn 通过 POST /api/logs 批量上报，
 // 最终与 server 端日志合并写入 server/logs/app.log（JSON Lines）。
+// 与其他会改动服务端状态的端点（tts/ai/offline-voice）一致加限流：
+// 前端 flush 间隔 ≥4s（约 15 次/分），120 次/60s 留足余量；防已授权的
+// 局域网客户端高频刷写造成 IO/CPU 抖动（磁盘有轮转封顶，风险本就有限）。
+app.use('/api/logs', createTtsLimiter({ prefix: 'logs', limit: Number(process.env.LOGS_LIMIT) || 120, methods: ['POST'] }));
 app.post('/api/logs', (req, res) => {
   const body = Array.isArray(req.body) ? req.body : [];
   const now = Date.now();
