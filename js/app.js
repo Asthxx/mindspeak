@@ -4398,12 +4398,46 @@ var PhoneticModule = (function() {
     this.renderGrid();
     this.updateStats();
   };
+  // 按字母顺序展示（用户要求）：以 symbol 的 en 排序为准，同符号（极少）退化为按名称。
+  // 只在展示层排序、返回副本 —— 数据源顺序不动，详情弹层查找与掌握度统计不受影响。
+  PhoneticModule.prototype._sortSymbols = function(list) {
+    return list.slice().sort(function(a, b) {
+      var c = String(a.symbol).localeCompare(String(b.symbol), 'en');
+      if (c !== 0) return c;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'en');
+    });
+  };
+  // 进入音标页：数据就绪直接渲染；未就绪（首开慢网，data 脚本还在路上）挂起等待，
+  // 就绪后补渲染。此前初始化时数据未到 → 网格空挂且之后无重渲染钩子，慢网下该页永远空白。
+  PhoneticModule.prototype.onShow = function() {
+    if (typeof PHONETIC_DATA !== 'undefined' && PHONETIC_DATA && PHONETIC_DATA.vowels && PHONETIC_DATA.vowels.length) {
+      this.renderGrid();
+      this.updateStats();
+      return;
+    }
+    var self = this;
+    if (this._libWaitCancel) { try { this._libWaitCancel(); } catch (e) {} this._libWaitCancel = null; }
+    if (window.Loading && window.Loading.awaitLibrary) {
+      this._libWaitCancel = window.Loading.awaitLibrary({
+        ready: function() {
+          self._libWaitCancel = null;
+          self.renderGrid();
+          self.updateStats();
+        },
+        onTimeout: function() {
+          self._libWaitCancel = null;
+          if (window.Toast) Toast.error('词库加载超时，音标数据未能就绪，请稍后重试');
+        }
+      });
+    }
+  };
   PhoneticModule.prototype.renderGrid = function() {
     if (typeof PHONETIC_DATA === 'undefined') return;
     var cat = document.getElementById('phonetic-category').value;
     var items = [];
     if (cat === 'all' || cat === 'vowels') items = items.concat(PHONETIC_DATA.vowels);
     if (cat === 'all' || cat === 'consonants') items = items.concat(PHONETIC_DATA.consonants);
+    items = this._sortSymbols(items);
     var self = this;
     var grid = document.getElementById('phonetic-grid');
     grid.innerHTML = items.map(function(p) {
@@ -6591,6 +6625,8 @@ App.prototype.showTab = function(tab, opts) {
   if (tab === 'items') {
     if (this.themeShop) this.themeShop.render();
   }
+  // 音标页：进入时渲染网格（数据未就绪则等待，就绪后补渲染）
+  if (tab === 'phonetics' && this.phoneticModule && this.phoneticModule.onShow) this.phoneticModule.onShow();
   // 设置页：进入时按实际宽度重绘图表（隐藏状态下宽高为 0）
   if (tab === 'settings') {
     if (this.chartModule) this.chartModule.render();

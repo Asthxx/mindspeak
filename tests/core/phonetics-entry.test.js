@@ -91,6 +91,42 @@ describe('音标页行为（回归网：锁住已存在的模块行为，防止�
   });
 });
 
+describe('数据未就绪时进入音标页（首开慢网场景）', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    await bootstrapApp();
+  });
+
+  it('数据未到时进入音标页 → 走 awaitLibrary 等待，就绪后补渲染', () => {
+    const saved = window.PHONETIC_DATA;
+    window.PHONETIC_DATA = undefined;   // 模拟慢网：数据脚本还没注入
+    const captured = [];
+    const origAwait = window.Loading.awaitLibrary;
+    window.Loading.awaitLibrary = function (opts) { captured.push(opts); return function cancel() {}; };
+    try {
+      window.app.showTab('phonetics');
+      expect(captured.length, '数据未就绪应进入等待，而不是空网格永挂').toBe(1);
+      expect(typeof captured[0].ready).toBe('function');
+      // 数据到达：恢复并触发 ready 回调
+      window.PHONETIC_DATA = saved;
+      captured[0].ready();
+      expect(document.querySelectorAll('#phonetic-grid .ph-card').length).toBe(4);
+    } finally {
+      window.Loading.awaitLibrary = origAwait;
+    }
+  });
+
+  it('数据已就绪时进入音标页：直接渲染网格（不等待）', () => {
+    const calls = [];
+    const mod = window.app.phoneticModule;
+    const orig = mod.renderGrid;
+    mod.renderGrid = function () { calls.push(1); orig.apply(this, arguments); };
+    window.app.showTab('phonetics');
+    expect(calls.length, '数据就绪时应直接渲染').toBe(1);
+    expect(document.querySelectorAll('#phonetic-grid .ph-card').length).toBe(4);
+  });
+});
+
 describe('数据与守卫', () => {
   it('真实词库数据包含 48 个国际音标（元音 + 辅音），且每项可朗读', () => {
     const src = readFileSync(join(root, 'data', 'all-data.js'), 'utf8');
