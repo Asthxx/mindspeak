@@ -19,6 +19,30 @@
       if (!this._isAndroid()) return;
       this._ensurePermission();
       this._createChannel();
+      this._bindActions();
+    },
+
+    // 点通知回到对应页面。此前只有 handleNotificationData()，既没人调用、
+    // 又调用了不存在的 window.App.switchTab —— 整条深链是死代码（点通知只打开 App 不跳页）。
+    _bindActions: function() {
+      var P = this._plugin();
+      if (!P || typeof P.addListener !== 'function') return;
+      var self = this;
+      var handler = function(ev) {
+        var n = ev && ev.notification;
+        var extra = (n && (n.extra || n.data)) || (ev && (ev.extra || ev.data)) || null;
+        self.handleNotificationData(extra);
+      };
+      try {
+        var handle = P.addListener('localNotificationActionPerformed', handler);
+        if (handle && typeof handle.catch === 'function') {
+          handle.catch(function(err) {
+            Logger.log(TAG, '通知点击监听注册失败: ' + ((err && err.message) || err));
+          });
+        }
+      } catch (e) {
+        Logger.log(TAG, '通知点击监听注册失败: ' + ((e && e.message) || e));
+      }
     },
 
     _isAndroid: function() {
@@ -275,8 +299,12 @@
     handleNotificationData: function(data) {
       if (!data || !data.module) return;
       Logger.log(TAG, '通知深度链接: ' + JSON.stringify(data));
-      if (window.App && window.App.switchTab) {
-        window.App.switchTab(data.module);
+      // 页面切换的唯一入口是实例方法 app.showTab（window.App 是构造函数，没有 switchTab）
+      var app = window.app;
+      if (app && typeof app.showTab === 'function') {
+        try { app.showTab(data.module); } catch (e) {
+          Logger.log(TAG, '通知跳转失败: ' + ((e && e.message) || e));
+        }
       }
     },
   };
