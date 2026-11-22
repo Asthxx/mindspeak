@@ -33,11 +33,24 @@ const ok = (name, cond, extra = '') => checks.push({ name, pass: !!cond, extra }
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
 function findChrome() {
+  // 优先 Playwright 缓存的 Chromium；没有时回退系统 Chrome/Edge，
+  // 保证验收脚本在没装 Playwright 的机器上也能跑（2026-11-22）。
   const cache = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
-  if (!existsSync(cache)) return null;
-  for (const d of readdirSync(cache)) {
-    if (!/^chromium-\d+/.test(d)) continue;
-    for (const c of [join(cache, d, 'chrome-win64', 'chrome.exe'), join(cache, d, 'chrome-win', 'chrome.exe')]) {
+  if (existsSync(cache)) {
+    for (const d of readdirSync(cache)) {
+      if (!/^chromium-\d+/.test(d)) continue;
+      for (const c of [join(cache, d, 'chrome-win64', 'chrome.exe'), join(cache, d, 'chrome-win', 'chrome.exe')]) {
+        if (existsSync(c)) return c;
+      }
+    }
+  }
+  const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA]
+    .filter(Boolean);
+  for (const root of roots) {
+    for (const c of [
+      join(root, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+      join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+    ]) {
       if (existsSync(c)) return c;
     }
   }
