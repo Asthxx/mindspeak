@@ -936,6 +936,14 @@ app.use((req, res, next) => {
 // gzip/brotli .js/.css 等）。只为 Accept-Encoding 声明 gzip 的文本静态资源启用，
 // API 与二进制不压缩，避免重复压缩与内存开销。
 const zlib = require('node:zlib');
+// gzip 结果按「内容哈希」缓存：data/all-data.js 有 9.9MB，每次请求重新压约 0.25s CPU
+// （实测 0.257s vs 未压缩 0.035s），而内容在开发期几乎不变。缓存键取自实际响应体，
+// 内容一变键就变 —— 不存在"改了文件还发旧压缩包"的过期风险。
+// 仍然以 no-store 下发，不改变浏览器缓存语义，只省服务端重复压缩。
+const gzipCache = new Map();          // sha1 -> Buffer(gzip)
+let gzipCacheBytes = 0;
+const GZIP_CACHE_MAX_BYTES = 48 * 1024 * 1024;
+const GZIP_CACHE_MIN_BODY = 256 * 1024; // 只缓存大文件，小文件本身压得很快
 app.use((req, res, next) => {
   if (req.method !== 'GET' || !/\.(?:js|css|html|json|webmanifest|svg|txt)$/.test(req.path)) return next();
   if (!/gzip/.test(req.headers['accept-encoding'] || '')) return next();
@@ -947,19 +955,35 @@ app.use((req, res, next) => {
     return true;
   };
   res.end = function (chunk, encoding, cb) {
+    // 304/204 没有响应体：不能在这里补 Content-Length / gzip，否则会破坏协商缓存语义
+    if (res.statusCode === 304 || res.statusCode === 204) return origEnd(chunk, encoding, cb);
     if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
     if (typeof cb === 'function') cb();
     const body = Buffer.concat(chunks);
     if (body.length < 1024) { res.setHeader('Content-Length', body.length); return origEnd(body); }
+    const sendGz = (gz) => {
+      res.removeHeader('Content-Length');
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Content-Length', gz.length);
+      origEnd(gz);
+    };
+    const cacheKey = body.length >= GZIP_CACHE_MIN_BODY
+      ? crypto.createHash('sha1').update(body).digest('hex') : '';
+    if (cacheKey) {
+      const hit = gzipCache.get(cacheKey);
+      if (hit) return sendGz(hit);
+    }
     zlib.gzip(body, (err, gz) => {
       if (err || gz.length >= body.length) {
         res.setHeader('Content-Length', body.length);
         return origEnd(body);
       }
-      res.removeHeader('Content-Length');
-      res.setHeader('Content-Encoding', 'gzip');
-      res.setHeader('Content-Length', gz.length);
-      origEnd(gz);
+      if (cacheKey) {
+        if (gzipCacheBytes + gz.length > GZIP_CACHE_MAX_BYTES) { gzipCache.clear(); gzipCacheBytes = 0; }
+        gzipCache.set(cacheKey, gz);
+        gzipCacheBytes += gz.length;
+      }
+      sendGz(gz);
     });
     return res;
   };
@@ -967,8 +991,19 @@ app.use((req, res, next) => {
 });
 app.use(express.static(STATIC_ROOT, {
   index: 'index.html',
-  etag: false,
-  setHeaders: (res) => {
+  // ETag 只根据文件 size/mtime 生成（不读内容），代价可忽略；换来的是大文件二次请求
+  // 直接 304（0 字节），比每次都传 9.9MB 词库快一个量级。
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    if (/[\\/](?:data|assets)[\\/]/.test(filePath)) {
+      // 大体积、内容稳定的资源（词库 9.9MB / 图标 / 主题预览）：
+      // 允许浏览器存副本，但每次用 ETag 复验 —— 命中即 304，改了也立刻能拿到新版。
+      // 不能写 max-age 长缓存：这些文件名没有内容指纹，长缓存会让用户长期停在旧词库。
+      res.setHeader('Cache-Control', 'no-cache');
+      return;
+    }
+    // 代码资源（js/css/html）：开发期必须每次拿最新，禁用缓存避免"改了没生效"
     res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
   }
