@@ -36,6 +36,15 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// ==================== 防嵌入（CSP frame-ancestors 的正确落点） ====================
+// frame-ancestors 写在页面 <meta> 里无效（浏览器直接忽略并打警告，会被前端 logger
+// 收进 app.log）。防嵌入必须走响应头；X-Frame-Options 覆盖面最广（含旧 WebView）。
+// 静态托管（GitHub Pages）无法设响应头，那里也就没有这层防护（原本也没有）。
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  next();
+});
+
 // ==================== Host 白名单（审计 F-2.1 修复：防 DNS 重绑） ====================
 // 此前的信任判据有两个洞：令牌中间件看「socket 地址是否回环」，CORS 看「Origin 的
 // host 是否等于 Host」。DNS 重绑同时满足两者——浏览器把攻击者域名解析到 127.0.0.1 后，

@@ -21,7 +21,14 @@ describe('桌面打包 CSP 护栏', () => {
     expect(m[1]).toContain('connect-src');
     expect(m[1]).toContain('127.0.0.1:3000');
     expect(m[1]).toContain("object-src 'none'");
-    expect(m[1]).toContain("frame-ancestors 'self'");
+    // frame-ancestors 在 <meta> 里会被浏览器忽略（还会每次加载打一条 CSP 警告，
+    // 被前端 logger 写进 app.log）。防嵌入改由服务端 X-Frame-Options 下发。
+    expect(m[1]).not.toContain('frame-ancestors');
+  });
+
+  it('服务端必须下发 X-Frame-Options（meta 里没有 frame-ancestors，这是唯一防线）', () => {
+    const server = read('server/server.js');
+    expect(server).toContain("res.setHeader('X-Frame-Options', 'SAMEORIGIN')");
   });
 
   it('desktop-pack.js 打包时必须校验 meta CSP（防未来删除/放宽）', () => {
