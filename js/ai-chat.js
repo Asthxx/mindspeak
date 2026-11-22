@@ -70,10 +70,15 @@ var NeuralEngine = (function() {
       // 且探测未过期 → 直接规则兜底；过期（HEALTH_PROBE_MS）后放行一次侦察请求，额度恢复自动切回。
       if (_health && _health.enabled === false && (Date.now() - _healthAt) < HEALTH_PROBE_MS) return resolve(null);
       if (!allow()) return resolve(null);
-      // 服务端严格限制单条 content ≤500（含概况拼接）；超长截断避免整条被拒导致 LLM 丢池
-      if (content.length > 400) content = content.slice(0, 400);
-      var ctx = getAgentContext();
-      content += '（我的学习概况：' + JSON.stringify(ctx) + '）';
+      // 服务端限制单条 content ≤500，而这个 content 后面还要拼上学习概况。
+      // 必须按"最终长度"留预算：旧实现先把正文截到 400 再拼 ~120 字概况，
+      // 只要正文超过 ~380 字就整条 400 被拒 → LLM 静默失效，只回规则答案。
+      var ctxSuffix = '（我的学习概况：' + JSON.stringify(getAgentContext()) + '）';
+      var MAX_CONTENT = 500;
+      var budget = MAX_CONTENT - ctxSuffix.length;
+      if (budget < 80) budget = 80;   // 概况异常膨胀时至少保留一句正文
+      if (content.length > budget) content = content.slice(0, budget);
+      content += ctxSuffix;
       var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
       var done = false;
       var timer = setTimeout(function() { if (!done) { done = true; if (ctrl) ctrl.abort(); resolve(null); } }, timeoutMs);
@@ -673,6 +678,7 @@ var AiChatModule = (function() {
       + '<div class="ai-msg-body"><div class="ai-msg-meta"><span class="who">AI 教练</span><span>正在输入</span></div>'
       + '<div class="ai-msg-bubble" style="padding:0"><span class="ai-typing"><i></i><i></i><i></i></span></div></div>';
     box.appendChild(div);
+    this._typingEl = div;
     this._scrollToLatest();
     return div;
   };
@@ -703,6 +709,11 @@ var AiChatModule = (function() {
     var card = this._card || null;
     this._card = null;
     this._append('ai', reply, false, card);
+    // 规则答复先落地，再把"正在输入"占位移到末尾：_llmAppend 在 _handle 执行期间
+    // 就已插入占位，不搬的话打字气泡会停在答复上方，读起来像"先给答案再思考"。
+    if (this._typingEl && this._typingEl.parentNode) {
+      this._typingEl.parentNode.appendChild(this._typingEl);
+    }
     this._refreshChips();
     this._renderHistory();
     if (card && this._settings.autoSpeak) this._speak(this._plain(reply));
@@ -830,6 +841,7 @@ var AiChatModule = (function() {
     var typing = self._aiThinking();
     NeuralEngine.ask(intent, prompt).then(function(text) {
       if (typing && typing.parentNode) typing.parentNode.removeChild(typing);
+      if (self._typingEl === typing) self._typingEl = null;
       if (!text || !self._msgBox()) return;
       var plain = String(text).replace(/<[^>]*>/g, ' ').replace(/\[跳转:[a-z-]+\]/g, '').replace(/\s+/g, ' ').trim();
       self._append('ai', NeuralEngine.toHtml(text)
