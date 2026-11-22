@@ -36,6 +36,7 @@
 | P3-4 | 积分/等级内存值可超读取层封顶 | ✅ 已修 | points≤999999、level≤99，与 `UserState.get` 同口径 |
 | P3-5 | `frame-ancestors` 写在 meta 无效且刷日志 | ✅ 已修 | 从 meta 移除；服务端下发 `X-Frame-Options: SAMEORIGIN`；控制台无警告 |
 | P3-6 | 纯设置备份被判"格式错误" | ✅ 已修 | 校验放宽为"至少含一个已知备份字段" |
+| P3-7 | 朗读失败文案不区分原因；超长仍可能打到 400 | ✅ 已修 | `_ttsFailText()` 分三类提示（未联网/服务出错/设备无语音）；单块入口加长度兜底；`tts-fail-message` 测试 9 条 |
 
 未修（留待决策）：无。P2-8 已按"缺谁跳谁"处理，不需要再决定 dev 是否注册 SW。
 
@@ -158,7 +159,10 @@
 - `✅` `GamificationSystem.addPoints` 与 `UserState.get` 的封顶口径不一致（Lv.10000 vs 99）：已对齐。
 - `✅` `importData` 仅当含 `wordProgress/mistakes/favorites` 才导入，纯设置备份被判格式错误：
   校验放宽为"至少包含一个已知备份字段"。
-- `⬜` Google 合成失败不区分"超长"与"网络失败"，文案统一为「朗读失败」——纯文案优化，未改。
+- `✅` 朗读失败文案不区分原因：旧文案在 server 可达、只是合成出错时也说「本地发音服务未启动」，
+  用户会白折腾去启动服务；也没区分「设备没联网」。现按 未联网 / 服务出错 / 设备无英文语音
+  三类给不同提示（`SpeechUtil._ttsFailText`）；同时给 `_speakLocalOne`(>500) 与
+  `_speakGoogleOne`(>200) 加长度兜底，超长一律转分块入口，从结构上避免 400。
 
 ---
 

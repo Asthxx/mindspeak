@@ -970,6 +970,12 @@ var u;
   // 单块本地 SAPI 合成（原 _speakLocal 主体，行为保持不变）
   _speakLocalOne: function(text, lang, opts) {
     var self = this;
+    // 服务端单次上限 500：正常入口已按 460 分块，这里只防"新调用点直接传长文本"。
+    // 宁可自己再分一次块，也不要把必然 400 的请求发出去（用户只会看到"朗读失败"）。
+    if (String(text == null ? '' : text).length > 500) {
+      this._speakLocal(text, lang, opts);
+      return;
+    }
     // 网页部署（无 server）不得请求 /api/tts（必然 404）：走远程发音/系统语音兜底
     if (this._serverDown === true) {
       this._speakServerless(text, lang, opts);
@@ -1067,6 +1073,11 @@ var waFallback = function() {
   // 单块 Google 合成（原 _speakGoogleTTS 主体，行为保持不变）
   _speakGoogleOne: function(text, lang, opts) {
     var self = this;
+    // 代理上限约 200 字符：正常入口按 180 分块，这里兜住直接调用传长文本的情况
+    if (String(text == null ? '' : text).length > 200) {
+      this._speakGoogleTTS(text, lang, opts);
+      return;
+    }
     // 网页部署（无 server）：在线女声走 /api/online-tts 必 404，走远程发音/系统语音兜底
     if (this._serverDown === true) { this._speakServerless(text, lang, opts); return; }
     this._stopLocalAudio();
@@ -1724,8 +1735,27 @@ _markOnlineBroken: function() {
     if (this._tryOfflineFallback(opts)) return;
     if (opts && opts.onerror) opts.onerror(new Error('device-voice-fail'));
     if (!(opts && opts.noFailToast)) {
-      Toast.error('朗读失败：本机无可用的英文语音，在线发音服务也连接失败。请检查网络后重试，或到「设置-朗读声音」换一个声音');
+      Toast.error(this._ttsFailText('device'));
     }
+  },
+  // 朗读失败文案：按真实原因区分「没联网 / 服务在跑但合成出错 / 设备没有英文语音」。
+  // 旧文案在 server 明明可达、只是合成失败时也说"本地发音服务未启动"，
+  // 用户照着提示去启动 server 纯属白折腾；同理 Google/Edge 的 4xx 也被说成网络问题。
+  _ttsFailText: function(kind) {
+    var offline = false;
+    try { offline = (typeof navigator !== 'undefined' && navigator.onLine === false); } catch (e) {}
+    if (offline) {
+      return '朗读失败：设备当前未联网，且本机没有可用的英文语音。联网后重试，或到「设置-朗读声音」换一个声音';
+    }
+    if (kind === 'device') {
+      return '朗读失败：本机无可用的英文语音，在线发音也不可用。请检查网络后重试，或到「设置-朗读声音」换一个声音';
+    }
+    if (this._serverDown === true) {
+      // 网页版/无后端环境：不提示"启动 server"，引导安装/切换系统语音
+      return '朗读失败：当前设备没有可用的英文语音，请到系统设置中安装/启用英文 TTS 语音，或到「设置-朗读声音」换一个声音';
+    }
+    // server 可达（探测通过）却仍然失败：是合成链路/上游出错，不是"没启动"
+    return '朗读失败：语音服务暂时出错，请稍后重试；若持续失败，可到「设置-朗读声音」换一个声音';
   },
   _ttsLocalFail: function(opts) {
     this._stopLocalAudio();
@@ -1734,12 +1764,7 @@ _markOnlineBroken: function() {
     if (opts && opts.onerror) opts.onerror(new Error('tts-local-fail'));
     // 即时语音模式下 server 不可用由调用方回退在线声，不弹 Toast
     if (!(opts && opts.noFailToast)) {
-      if (this._serverDown === true) {
-        // 网页版/无后端环境不提示"server 未运行"，引导用系统语音或换声音
-        Toast.error('朗读失败：当前设备没有可用的英文语音，请到系统设置中安装/启用英文 TTS 语音，或到「设置-朗读声音」换一个声音');
-      } else {
-        Toast.error('朗读失败：浏览器在线语音不可用，本地发音服务也未启动。请确认 server 已运行（node server.js），或到「设置-朗读声音」换一个声音');
-      }
+      Toast.error(this._ttsFailText('local'));
     }
   },
   // 本地即时语音的预合成：翻卡/列词表时后台让 server 把即将点击的词先合成好
