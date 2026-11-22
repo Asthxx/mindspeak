@@ -4,14 +4,22 @@
 // data-theme="light|dark"。旧 head-boot 把 'system' 原样写进 data-theme —— 没有规则匹配，
 // 首帧只能落默认亮色，直到 DOMContentLoaded 才切深色（实测 21ms→199ms 闪白）。
 // 这里直接执行 head-boot.js 的真实源码，锁住"首帧即为最终配色"。
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+// 必须显式安装存储 mock：不能依赖环境自带的 localStorage。
+// 本地（Node 22 + jsdom）裸 localStorage 恰好可用，但 CI（Node 26）里它是 undefined，
+// 同一 worker 里前一个用例若没装过 mock，这里就 "Cannot read properties of undefined (reading 'clear')"。
+import { installFreshStorage } from '../helpers/app-bootstrap.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SRC = readFileSync(join(root, 'js', 'head-boot.js'), 'utf8');
 const origMatchMedia = globalThis.matchMedia;
+
+beforeAll(() => {
+  installFreshStorage();
+});
 
 function stubColorScheme(dark) {
   globalThis.matchMedia = (q) => ({
