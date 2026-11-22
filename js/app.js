@@ -2125,6 +2125,9 @@ var ThemeToggle = {
     this._mode = (theme === 'light' || theme === 'dark') ? theme : 'system';
     var resolved = this.resolve(this._mode);
     document.documentElement.setAttribute('data-theme', resolved);
+    // 与 head-boot 保持一致：data-theme 只放解析后的 light/dark，
+    // 三态原值放 data-theme-mode（head-boot 首帧也这么写，二者不会互相矛盾）。
+    document.documentElement.setAttribute('data-theme-mode', this._mode);
     Storage.set('theme', this._mode);
     this._syncNativeBars(resolved);
     this._syncMetaThemeColor(resolved);

@@ -41,10 +41,25 @@ window.addEventListener('unhandledrejection', function(e) {
 
 // ---------- 3. 主题防闪烁（原内联 L83） ----------
 // 在页面渲染前应用主题，防止深色模式闪烁。
+// 注意：localStorage 里的 theme 是「用户选择」（light/dark/system 三态），而 CSS 只认
+// data-theme="light|dark"。此前把 'system' 原样写进 data-theme —— 没有任何 CSS 规则
+// 匹配它，首帧就只能落到默认亮色，直到 DOMContentLoaded 后 ThemeToggle 解析完才切深色
+// （实测 21ms→199ms 闪白）。这里必须当场把 'system' 解析成实际生效值。
 (function() {
-  var theme = 'light';
-  try { theme = localStorage.getItem('theme') || 'light'; } catch(e) {}
-  document.documentElement.setAttribute('data-theme', theme);
+  var mode = 'system';
+  try {
+    var saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark' || saved === 'system') mode = saved;
+  } catch(e) {}
+  var resolved = mode;
+  if (mode === 'system') {
+    try {
+      resolved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    } catch(e) { resolved = 'light'; }
+  }
+  document.documentElement.setAttribute('data-theme', resolved);
+  // 原始三态单独存一份，供调试/将来按模式写样式（不要再从 data-theme 反推）
+  document.documentElement.setAttribute('data-theme-mode', mode);
 })();
 
 // ---------- 4. 平台检测 + Android 语音预热（原内联 L95） ----------
