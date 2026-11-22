@@ -592,6 +592,8 @@ _speakTTS: function(text, lang, opts) {
     // 记下本次要读的文本：降级链末级的 _deviceFail/_ttsLocalFail 拿不到 text 参数，
     // 而内置离线音兜底需要原文。只在本轮 speak 内存活，不持久化。
     this._currentSpeakText = text;
+    // 代次令牌：新一轮朗读立刻作废上一次的长文本分块接力（否则旧链会继续读完剩余块）
+    this._speakChain = (this._speakChain || 0) + 1;
     // 上一次在线声朗读还挂在队列里没 START（连接慢/断线），用户又点了新朗读：
     // 直接判定在线声已坏（本会话不再尝试），本次立即走 Google 合成/SAPI 出声。
     // 健康连接经 prime 预热后 START 实测仅 ~360ms，4s 内没 START 基本就是连不上。
@@ -909,7 +911,11 @@ var u;
   // 停止正在播放的 SAPI 保底音频（新朗读开始时调用，避免新旧声音重叠）
   _stopLocalAudio: function() {
     if (this._localAudio) {
-      try { this._localAudio.pause(); this._localAudio.src = ''; } catch(e) {}
+      var prev = this._localAudio;
+      try { prev.pause(); prev.src = ''; } catch(e) {}
+      // 必须同时从 DOM 摘掉：_attachAudioEl 会把 <audio> 挂到 body 上（Android WebView
+      // 不挂 DOM 不出声），只 pause 不摘会让节点随每次朗读累积（实测 3 次点击残留 3 个）。
+      this._detachAudioEl(prev);
       this._localAudio = null;
     }
     // Web Audio 播放路径（file:// 下用）：停掉当前声源，并使未完成的异步播放失效
@@ -931,7 +937,38 @@ var u;
   // 保底朗读：在线声不可用/浏览器不支持 speechSynthesis 时，
   // 用本地 server /api/tts（Windows SAPI Microsoft Zira/Huihui，完全离线）
   // 合成 WAV 播放，确保"点击朗读一定有声音"。只有保底也失败才提示用户。
-_speakLocal: function(text, lang, opts) {
+  // 长文本分块：服务端 /api/tts 单次上限 500 字符，整段请求必然 400 →
+  // 用户侧只表现为"点了没声音 / 朗读失败"。这里按句切成 ≤460 字符的小块串行接力
+  // （留 40 字符余量），第一块先出声，整体延迟 ≈ 单块合成时间。
+  // _speakChain 是代次令牌：任何新一轮朗读都会让它自增，旧链在下一块前自动退出。
+  _speakLocal: function(text, lang, opts) {
+    var full = text == null ? '' : String(text);
+    if (this._serverDown === true) { this._speakServerless(full, lang, opts); return; }
+    if (full.length > 460) {
+      var chunks = this._chunkRemoteText(full, 460);
+      var token = (this._speakChain = (this._speakChain || 0) + 1);
+      this._speakLocalChain(chunks, 0, lang, opts, token);
+      return;
+    }
+    this._speakLocalOne(full, lang, opts);
+  },
+  _speakLocalChain: function(chunks, i, lang, opts, token) {
+    var self = this;
+    if (token !== this._speakChain) return;          // 已被新一轮朗读接管
+    if (i >= chunks.length) {
+      if (opts && opts.onend) { try { opts.onend(); } catch (e) {} }
+      return;
+    }
+    var o = {};
+    if (opts) for (var k in opts) o[k] = opts[k];
+    if (i > 0) delete o.onstart;                     // onstart 只在第一块报一次
+    o.onend = function() { self._speakLocalChain(chunks, i + 1, lang, opts, token); };
+    // 单块失败不整段静音：跳过这一块继续读后面的（与远程发音的分块语义一致）
+    o.onerror = function() { self._speakLocalChain(chunks, i + 1, lang, opts, token); };
+    this._speakLocalOne(chunks[i], lang, o);
+  },
+  // 单块本地 SAPI 合成（原 _speakLocal 主体，行为保持不变）
+  _speakLocalOne: function(text, lang, opts) {
     var self = this;
     // 网页部署（无 server）不得请求 /api/tts（必然 404）：走远程发音/系统语音兜底
     if (this._serverDown === true) {
@@ -1000,7 +1037,35 @@ var waFallback = function() {
   // 拦截（WSS 全灭）且需 CORS；Node 直连可达 → 由本地 server /api/online-tts 代理抓音频，
   // 浏览器只访问同源。选中 __online_google__ 时朗读走这里；在线声失败时也降级到这里。
   // 连代理都失败才落 server SAPI（_speakLocal）保底。
-_speakGoogleTTS: function(text, lang, opts) {
+  // Google 代理同样有长度上限（实测 ~200 字符，超了直接 4xx）：整段朗读长文本
+  // 会走到 _speakLocal 再 400，最后弹"朗读失败"。按 180 字符切块串行接力。
+  _speakGoogleTTS: function(text, lang, opts) {
+    var full = text == null ? '' : String(text);
+    if (full.length > 180) {
+      var chunks = this._chunkRemoteText(full, 180);
+      var token = (this._speakChain = (this._speakChain || 0) + 1);
+      this._speakGoogleChain(chunks, 0, lang, opts, token);
+      return;
+    }
+    this._speakGoogleOne(full, lang, opts);
+  },
+  _speakGoogleChain: function(chunks, i, lang, opts, token) {
+    var self = this;
+    if (token !== this._speakChain) return;
+    if (i >= chunks.length) {
+      if (opts && opts.onend) { try { opts.onend(); } catch (e) {} }
+      return;
+    }
+    var o = {};
+    if (opts) for (var k in opts) o[k] = opts[k];
+    if (i > 0) delete o.onstart;
+    o.onend = function() { self._speakGoogleChain(chunks, i + 1, lang, opts, token); };
+    // 单块失败按"跳过该块"处理：不把整段判死（网络抖动很常见）
+    o.onerror = function() { self._speakGoogleChain(chunks, i + 1, lang, opts, token); };
+    this._speakGoogleOne(chunks[i], lang, o);
+  },
+  // 单块 Google 合成（原 _speakGoogleTTS 主体，行为保持不变）
+  _speakGoogleOne: function(text, lang, opts) {
     var self = this;
     // 网页部署（无 server）：在线女声走 /api/online-tts 必 404，走远程发音/系统语音兜底
     if (this._serverDown === true) { this._speakServerless(text, lang, opts); return; }
@@ -1387,6 +1452,8 @@ _markOnlineBroken: function() {
         var els = self._pendingAudio = self._pendingAudio || [];
         for (var pi = 0; pi < els.length; pi++) {
           try { els[pi].pause(); els[pi].src = ''; } catch(e) {}
+          // 停下来只是不再出声，节点还挂在 body 上；不摘掉会随每次失败累积
+          self._detachAudioEl(els[pi]);
         }
         // 整块超时 = 参与本次的源都没出声，全部记一次失败（健康降级）
         for (var hi = 0; hi < srcs.length; hi++) markSrcFail(srcs[hi].id);
@@ -1415,7 +1482,10 @@ _markOnlineBroken: function() {
             // 胜者确定后立刻停掉其余并行源，避免几路一起出声（双声/三声重叠）
             var els = self._pendingAudio;
             for (var pi2 = 0; pi2 < els.length; pi2++) {
-              if (els[pi2] !== audio) { try { els[pi2].pause(); els[pi2].src = ''; } catch(e) {} }
+              if (els[pi2] !== audio) {
+                try { els[pi2].pause(); els[pi2].src = ''; } catch(e) {}
+                self._detachAudioEl(els[pi2]);   // 败者同样要摘掉，否则每块都留几个死节点
+              }
             }
             self._pendingAudio = [];
           markSrcOk(srcObj.id);
@@ -1625,7 +1695,9 @@ _markOnlineBroken: function() {
       return true;
     }
     var text = this._currentSpeakText;
-    if (!text) return false;
+    // 空白文本（首屏手势解锁用的 ' '）不是真实朗读请求：
+    // 放行会一路走到这里，白下载 60MB 模型并弹一条用户没要过的下载提示。
+    if (!text || !String(text).trim()) return false;
     this._speakOfflineVoice(text, 'en-US', opts);
     return true;
   },
@@ -1680,24 +1752,29 @@ _markOnlineBroken: function() {
     var rate = this.getSettings().rate || 0.9;
     var lang = 'en-US';
     var base = window.API_BASE || '';
-    if (!this._prefetchPool) this._prefetchPool = [];
-    if (!this._prefetchSeen) this._prefetchSeen = {};
+    var pool = this._prefetchPool || (this._prefetchPool = []);
+    var seen = this._prefetchSeen || (this._prefetchSeen = {});
+    // 去重表按会话收敛：翻遍 12 万词会留下 12 万个键，纯内存泄漏且查表越来越慢
+    if (Object.keys(seen).length > 800) this._prefetchSeen = seen = {};
     for (var i = 0; i < words.length; i++) {
       var text = (words[i] == null ? '' : words[i]).toString().trim();
-      if (!text || this._prefetchSeen[text]) continue;
-      this._prefetchSeen[text] = 1;
-      this._prefetchPool.push(text);
+      if (!text || seen[text]) continue;
+      if (pool.length >= 24) break;   // 队列上限：快速翻卡时不无限堆积待合成请求
+      seen[text] = 1;
+      pool.push(text);
     }
-    var running = 0;
+    // 并发计数必须放在实例上：原来是每次调用的局部变量，连续翻卡会各自开 2 路，
+    // 实际并发 = 2 × 调用次数，每个请求在服务端都要起一个 PowerShell 合成进程。
+    this._prefetchRunning = this._prefetchRunning || 0;
     var next = function() {
-      while (running < 2 && self._prefetchPool.length) {
-        var t = self._prefetchPool.shift();
-        running++;
+      while (self._prefetchRunning < 2 && pool.length) {
+        var t = pool.shift();
+        self._prefetchRunning++;
         var url = base + '/api/tts?text=' + encodeURIComponent(t)
           + '&lang=' + encodeURIComponent(lang) + '&rate=' + encodeURIComponent(rate);
         fetch(url, { method: 'HEAD', cache: 'no-store' })
           .catch(function() {})
-          .then(function() { running--; setTimeout(next, 50); });
+          .then(function() { self._prefetchRunning--; setTimeout(next, 50); });
       }
     };
     next();
