@@ -3655,6 +3655,22 @@ var ReadingModule = (function() {
       if (document.getElementById('show-answer').checked) self.revealAnswers();
       else self.hideAnswers();
     });
+    // 阅读题作答：选项按钮是 innerHTML 动态生成的，只能走委托。
+    // 题号从最近的 .reading-q[data-q] 读，选项下标从按钮 data-opt 读；
+    // 已解锁（disabled）的按钮直接忽略，避免同一题重复判分。
+    var qBox = document.getElementById('r-questions');
+    if (qBox) {
+      qBox.addEventListener('click', function(e) {
+        var btn = e.target && e.target.closest ? e.target.closest('button[data-opt]') : null;
+        if (!btn || btn.disabled || !qBox.contains(btn)) return;
+        var box = btn.closest('.reading-q');
+        if (!box) return;
+        var qIdx = parseInt(box.getAttribute('data-q'), 10);
+        var optIdx = parseInt(btn.getAttribute('data-opt'), 10);
+        if (isNaN(qIdx) || isNaN(optIdx)) return;
+        self.checkAnswer(qIdx, optIdx, btn);
+      });
+    }
     // 鼠标按下滑动选中文章文字 → 浮窗翻译
     var area = document.getElementById('reading-area');
     if (area) {
@@ -3818,8 +3834,11 @@ pop.style.left = left + 'px';
       a.questions.forEach(function(q, i) {
         qHtml += '<div class="reading-q" data-q="' + i + '"><p>' + (i + 1) + '. ' + escapeHtml(q.question) + '</p>';
         q.options.forEach(function(opt, j) {
-          // 给每题正确答案那个按钮加 data-correct="1"，方便"显示答案"按钮揭晓时定位
-          qHtml += '<button class="btn btn-sm" data-correct="' + (j === q.answer ? 1 : 0) + '" onclick="window.app.readingModule.checkAnswer(' + i + ',' + j + ',this)">' + escapeHtml(opt) + '</button> ';
+          // 给每题正确答案那个按钮加 data-correct="1"，方便"显示答案"按钮揭晓时定位。
+          // 绝不写内联 onclick：CSP 是 script-src 'self'（无 unsafe-inline），内联事件
+          // 会被整条拦掉 —— 表现是"点了没反应"，且不在任何构建/静态检查里报错。
+          // 答题交互统一走 #r-questions 的事件委托（见 initUI），选项下标放 data-opt。
+          qHtml += '<button type="button" class="btn btn-sm" data-opt="' + j + '" data-correct="' + (j === q.answer ? 1 : 0) + '">' + escapeHtml(opt) + '</button> ';
         });
         qHtml += '</div>';
       });
@@ -3871,9 +3890,13 @@ pop.style.left = left + 'px';
     });
   };
   ReadingModule.prototype.checkAnswer = function(qIdx, selected, btn) {
+    if (!this.currentArticle || !this.currentArticle.questions) return;
     var q = this.currentArticle.questions[qIdx];
-    if (!q) return;
-    var buttons = btn.parentElement.querySelectorAll('.btn');
+    if (!q || !btn) return;
+    // 题组容器用 closest 取，而不是 btn.parentElement：按钮一旦被包一层装饰元素，
+    // parentElement 就只锁到那一层，同题其它选项不会被禁用 → 能重复作答刷分。
+    var box = (btn.closest && btn.closest('.reading-q')) || btn.parentElement;
+    var buttons = box.querySelectorAll('.btn');
     buttons.forEach(function(b) { b.disabled = true; b.dataset.userAnswered = '1'; });  // 标记"用户答过"，reveal/hide 不动这题
     if (selected === q.answer) {
       btn.classList.add('btn-correct');
