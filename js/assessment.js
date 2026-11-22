@@ -409,6 +409,9 @@ var AssessmentModule = (function() {
     if (modal) modal.classList.add('hidden');
     this._open = false;
     // 关闭时收掉等待态，否则按钮会一直停在"词库加载中…"且定时器还在跑
+    clearTimeout(this._libWaitTimer);
+    this._libWaitTimer = null;
+    if (this._libWaitCancel) { try { this._libWaitCancel(); } catch (e) {} this._libWaitCancel = null; }
     this._libraryBusy(false);
     this._stopListen();
     if (this._recognition) { try { this._recognition.abort(); } catch(e) {} this._recognition = null; }
@@ -433,9 +436,40 @@ var AssessmentModule = (function() {
       var self = this;
       this._libraryBusy(true);
       clearTimeout(this._libWaitTimer);
-      this._libWaitTimer = setTimeout(function() { self.start(); }, 800);
+      this._libWaitTimer = null;
+      // 统一走 Loading.awaitLibrary：它自带 15s 超时与"超时如实报错"。
+      // 旧的 800ms 自递归没有任何上限 —— 词库文件缺失时按钮永久转圈、定时器常驻。
+      if (window.Loading && window.Loading.awaitLibrary) {
+        if (this._libWaitCancel) this._libWaitCancel();
+        var btn = document.getElementById('btn-assessment-start');
+        this._libWaitCancel = window.Loading.awaitLibrary({
+          button: btn ? { el: btn, label: '词库加载中…' } : null,
+          ready: function() {
+            self._libWaitCancel = null;
+            self.start();
+          },
+          onTimeout: function() {
+            self._libWaitCancel = null;
+            self._libraryBusy(false);
+            Toast.error('词库加载超时，请检查网络后重试');
+          }
+        });
+      } else {
+        // 兜底（core/loading.js 未加载）：最多等 15s，之后放弃并提示
+        this._libRetries = (this._libRetries || 0) + 1;
+        if (this._libRetries > 18) {
+          this._libRetries = 0;
+          this._libraryBusy(false);
+          Toast.error('词库加载超时，请检查网络后重试');
+          return;
+        }
+        this._libWaitTimer = setTimeout(function() { self.start(); }, 800);
+      }
       return;
     }
+    // 词库就绪：若还有挂起的等待轮询，先取消，避免它稍后再触发一次 start()
+    if (this._libWaitCancel) { try { this._libWaitCancel(); } catch (e) {} this._libWaitCancel = null; }
+    this._libRetries = 0;
     this._libraryBusy(false);
     var includePron = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     var made = AssessmentEngine.createPaper({ includePron: includePron });
