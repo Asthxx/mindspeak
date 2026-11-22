@@ -7,7 +7,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const https = require('node:https');
 const crypto = require('node:crypto');
-const { execFile, exec } = require('node:child_process');
+const { execFile, exec, spawn } = require('node:child_process');
 const config = require('./config');
 const logger = require('./logger');
 
@@ -345,7 +345,22 @@ const PIPER_DIR = path.join(os.homedir(), '.local', 'share', 'mindspeak-piper');
 // 语音包缓存目录。此前这个常量只有两处使用、从未定义——ensurePiperVoice 一被调用就
 // ReferenceError，被 /api/piper-tts 的 try/catch 吞成 502，表现为"Piper 合成失败"。
 const PIPER_VOICE_DIR = path.join(PIPER_DIR, 'voices');
-const PIPER_BIN = path.join(PIPER_DIR, 'piper' + (process.platform === 'win32' ? '.exe' : ''));
+// 官方发布包（piper_windows_amd64.zip / piper_linux_*.tar.gz）解压后都多一层 piper/：
+//   <PIPER_DIR>/piper/piper.exe  + 同目录的 espeak-ng.dll / onnxruntime.dll …
+// 旧常量少写了一层，导致 existsSync 永远 false → 每次请求都重下 20MB、解压后仍然
+// ENOENT。这里按"官方层级优先、平铺布局兼容"兜底，绝不再假设单一位置。
+const PIPER_EXE = 'piper' + (process.platform === 'win32' ? '.exe' : '');
+const PIPER_BIN_CANDIDATES = [
+  path.join(PIPER_DIR, 'piper', PIPER_EXE),
+  path.join(PIPER_DIR, PIPER_EXE)
+];
+// 找不到时返回 null：调用方必须据此中止，不能把不存在的路径丢给 spawn。
+function findPiperBin() {
+  for (const p of PIPER_BIN_CANDIDATES) {
+    try { if (fs.existsSync(p)) return p; } catch (e) {}
+  }
+  return null;
+}
 // 固定版本 pin：rhasspy/piper release 2023.11.14-2（2026-09 已核查该 release 的 6 个资产
 // 均无 .sha256/校验和附件，官方未提供可信基准 → 无法做摘要强校验，只能依赖 HTTPS +
 // 版本 pin + piper-check 冒烟自检。升级版本前请再次核查上游是否补发校验和。）
@@ -401,7 +416,7 @@ async function downloadFile(url, dest) {
 }
 
 async function ensurePiperBinary() {
-  if (fs.existsSync(PIPER_BIN)) return true;
+  if (findPiperBin()) return true;
   const key = process.platform + '-' + process.arch;
   const archive = PIPER_PLATFORMS[key];
   if (!archive) return false;
@@ -416,23 +431,28 @@ async function ensurePiperBinary() {
         { timeout: 60000, windowsHide: true }, (err) => err ? reject(err) : resolve());
     });
   } else {
+    // 旧写法把参数数组当成 exec 的第二个参数，而 exec 的第二参是 options
+    // → 实际执行一个没有参数的 tar（等 stdin 到超时）。tar 必须走 execFile。
     await new Promise((resolve, reject) => {
-      exec('tar', ['xzf', archivePath, '-C', PIPER_DIR], { timeout: 60000 }, (err) => err ? reject(err) : resolve());
+      execFile('tar', ['xzf', archivePath, '-C', PIPER_DIR], { timeout: 60000 }, (err) => err ? reject(err) : resolve());
     });
   }
   try { fs.unlinkSync(archivePath); } catch (e) {}
   // 供应链加固：解压后的二进制必须通过冒烟自检（--help 输出含 piper 特征），
   // 失败视为被替换/损坏，删除并返回不可用（下次请求重新下载再自检）。
-  if (fs.existsSync(PIPER_BIN)) {
-    const { checkPiperBinary } = require('./piper-check');
-    const ok = await checkPiperBinary(PIPER_BIN);
-    if (!ok) {
-      logger.warn('piper-tts', 'Piper 二进制未通过冒烟自检，已丢弃', { bin: PIPER_BIN });
-      try { fs.unlinkSync(PIPER_BIN); } catch (e) {}
-      return false;
-    }
+  const bin = findPiperBin();
+  if (!bin) {
+    logger.warn('piper-tts', '解压后未找到 Piper 可执行文件', { tried: PIPER_BIN_CANDIDATES });
+    return false;
   }
-  return fs.existsSync(PIPER_BIN);
+  const { checkPiperBinary } = require('./piper-check');
+  const ok = await checkPiperBinary(bin);
+  if (!ok) {
+    logger.warn('piper-tts', 'Piper 二进制未通过冒烟自检，已丢弃', { bin });
+    try { fs.unlinkSync(bin); } catch (e) {}
+    return false;
+  }
+  return true;
 }
 
 async function ensurePiperVoice(voiceName) {
@@ -467,7 +487,12 @@ app.get('/api/piper-tts', async (req, res) => {
   if (waiting || piperInProgress.get(key)) { (waiting || piperPending.get(key) || (() => { const l = []; piperPending.set(key, l); return l; })()).push(res); return; }
   piperPending.set(key, [res]);
   piperInProgress.set(key, true);
+  // 整体 45s 超时与合成成功可能先后各调一次 finish（超时后子进程才 close），
+  // 没有守卫的话会二次写缓存 + 打一条误导性的"合成成功"日志。
+  let finished = false;
   const finish = (buf, reason) => {
+    if (finished) return;
+    finished = true;
     const list = piperPending.get(key) || [];
     piperPending.delete(key);
     piperInProgress.delete(key);
@@ -492,18 +517,54 @@ app.get('/api/piper-tts', async (req, res) => {
   // 整体 45s 超时：防止下载二进制/语音包挂起导致请求永不落定
   const piperTimeout = setTimeout(() => finish(null, 'piper timeout 45s'), 45000);
   try {
-    await ensurePiperBinary();
+    // 二进制不可用必须立刻中止：旧代码忽略返回值，继续 spawn 一个不存在的路径，
+    // 每次请求都先花 20MB 下载再 ENOENT。
+    const binOk = await ensurePiperBinary();
+    if (!binOk) throw new Error('Piper 二进制不可用（下载或冒烟自检失败）');
+    const piperBin = findPiperBin();
+    if (!piperBin) throw new Error('Piper 可执行文件缺失');
     const voicePath = await ensurePiperVoice(voice);
     const outWav = path.join(PIPER_DIR, key + '.wav');
-    if (!fs.existsSync(outWav)) {
+    // 0 字节残文件不能当缓存：上一次中断会留下空 wav，之后每次读出来都是"成功但无声"
+    const wavReady = fs.existsSync(outWav) && fs.statSync(outWav).size > 0;
+    if (!wavReady) {
       await new Promise((resolve, reject) => {
-        execFile(PIPER_BIN, ['--model', voicePath, '--output_file', outWav],
-          { input: text, timeout: 30000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
-          (err) => err ? reject(err) : resolve());
+        // piper CLI 从 stdin 读文本。execFile 的 options 里没有 input（那是 execFileSync 的），
+        // 旧写法 { input: text } 被静默忽略 → 子进程一直等 stdin 直到 30s 超时。
+        // 必须 spawn 后自己写 stdin 并 end()，否则永远合成不出音频。
+        const child = spawn(piperBin, ['--model', voicePath, '--output_file', outWav], {
+          cwd: path.dirname(piperBin),   // dll 与可执行同目录，Windows 按 cwd 解析依赖
+          windowsHide: true,
+          stdio: ['pipe', 'ignore', 'pipe']
+        });
+        let settled = false;
+        let errText = '';
+        const settle = (err) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(killTimer);
+          err ? reject(err) : resolve();
+        };
+        const killTimer = setTimeout(() => {
+          try { child.kill(); } catch (e) {}
+          settle(new Error('piper 合成超时 30s'));
+        }, 30000);
+        child.stderr.on('data', (d) => { if (errText.length < 4000) errText += String(d); });
+        child.on('error', (err) => settle(err));
+        child.on('close', (code) => settle(code === 0 ? null
+          : new Error('piper 退出码 ' + code + (errText ? '：' + errText.slice(0, 300) : ''))));
+        try {
+          child.stdin.on('error', () => {}); // 子进程提前退出时写管道会 EPIPE，别当未捕获异常
+          child.stdin.write(text + '\n');
+          child.stdin.end();
+        } catch (e) {
+          settle(e);
+        }
       });
     }
     const buf = fs.readFileSync(outWav);
     try { fs.unlinkSync(outWav); } catch (e) {} // 清理临时 .wav，避免磁盘泄漏
+    if (!buf.length) throw new Error('Piper 输出为空');
     clearTimeout(piperTimeout);
     finish(buf);
   } catch (err) {
