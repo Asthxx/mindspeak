@@ -2470,7 +2470,7 @@ function WordModule() {
     safeBind('btn-known', 'click', function() { self.markWord('known'); });
     safeBind('btn-fav-word', 'click', function() { self.favoriteCurrent(); });
     safeBind('btn-select-word', 'click', function() {
-      var w = self.getCurrentWords()[self.currentIndex];
+      var w = self._currentCardWord();
       if (w) self.toggleSelectWord(w.word);
     });
     safeBind('btn-learn-selected', 'click', function() { self.toggleLearnSelected(); });
@@ -2847,6 +2847,16 @@ cat.words = merged;
     if (!words.length) { this.currentIndex = 0; }
     else if (this.currentIndex >= words.length) { this.currentIndex = words.length - 1; }
   };
+  // 当前卡片词：全模块唯一取词入口。
+  // 卡片显示用 getCardWords()（精选模式下已过滤），而朗读/收藏/精选/主动回忆/错词入账
+  // 原先各自取 getCurrentWords()[currentIndex]（未过滤的分类全量池）—— 开了"只学精选"
+  // 之后两池下标语义不同，点朗读会读成别的词、收藏和错词也会记错对象。
+  WordModule.prototype._currentCardWord = function() {
+    var words = this.getCardWords();
+    if (!words.length) return null;
+    if (this.currentIndex < 0 || this.currentIndex >= words.length) return null;
+    return words[this.currentIndex] || null;
+  };
   // 精选池变化后统计必须全量重算：renderStats 缓存含 total（旧池），直接命中会把 10000 当精选总词
   WordModule.prototype._refreshStats = function() {
     this._statsCache = null;
@@ -2862,7 +2872,7 @@ cat.words = merged;
     }
     var btn = document.getElementById('btn-select-word');
     if (btn) {
-      var w = this.getCurrentWords()[this.currentIndex];
+      var w = this._currentCardWord();
       var on = !!(w && sel.indexOf(w.word) !== -1);
       btn.classList.toggle('active', on);
       btn.title = on ? '从精选移除' : '挑入精选';
@@ -3070,7 +3080,7 @@ cat.words = merged;
     var frontHidden = document.getElementById('word-front').classList.contains('hidden');
     var recallOn = DataStore.getProgress('active_recall', false) === true;
     if (!frontHidden && recallOn && !this._recallPassed && window.app) {
-      if (window.app.triggerRecall(this.getCurrentWords()[this.currentIndex])) return;
+      if (window.app.triggerRecall(this._currentCardWord())) return;
     }
     document.getElementById('word-front').classList.toggle('hidden');
     document.getElementById('word-back').classList.toggle('hidden');
@@ -3078,18 +3088,16 @@ cat.words = merged;
 WordModule.prototype.speakCurrent = function() {
     var self = this;
     try {
-      var words = this.getCurrentWords();
-      if (!words.length) { return; }
-      var w = words[this.currentIndex];
+      var w = this._currentCardWord();
+      if (!w) { return; }
       SpeechUtil.speakWord(w.word);
     } catch(e) {
     }
   };
   // 收藏按钮状态同步：已收藏 → 实心书签+填色；未收藏 → 描边书签+
   WordModule.prototype._syncFavBtn = function() {
-    var words = this.getCurrentWords();
-    if (!words.length) return;
-    var w = words[this.currentIndex];
+    var w = this._currentCardWord();
+    if (!w) return;
     var favs = DataStore.getProgress('favorites', []);
     var isFav = favs.some(function(f) { return f.word === w.word; });
     var btn = document.getElementById('btn-fav-word');
@@ -3105,9 +3113,8 @@ WordModule.prototype.speakCurrent = function() {
     else btn.classList.remove('active');
   };
   WordModule.prototype.favoriteCurrent = function() {
-    var words = this.getCurrentWords();
-    if (!words.length) return;
-    var w = words[this.currentIndex];
+    var w = this._currentCardWord();
+    if (!w) return;
     var favs = DataStore.getProgress('favorites', []);
     var idx = -1;
     favs.forEach(function(f, i) { if (f.word === w.word) idx = i; });
@@ -3329,9 +3336,8 @@ this.renderStats();
   };
   WordModule.prototype.getToday = function() { return getLocalDateStr(); };
   WordModule.prototype.currentReviewCount = function() {
-    var words = this.getCurrentWords();
-    if (!words.length) return 0;
-    var w = words[this.currentIndex];
+    var w = this._currentCardWord();
+    if (!w) return 0;
     var key = w.word + '-' + this.currentCategoryIndex;
     var p = this.wordProgress[key];
     return (p && p.reviewCount) ? p.reviewCount : 0;

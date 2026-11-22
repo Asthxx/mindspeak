@@ -270,9 +270,9 @@
           break;
         case 'mistake':
           var w = null;
-          if (app.wordModule && app.wordModule.getCurrentWords && typeof app.wordModule.currentIndex === 'number') {
-            var words = app.wordModule.getCurrentWords();
-            w = words[app.wordModule.currentIndex];
+          // 取词必须走 WordModule 的唯一入口（精选模式下全量池下标会指到别的词）
+          if (app.wordModule && app.wordModule._currentCardWord) {
+            w = app.wordModule._currentCardWord();
           }
           if (!w && word) w = { word: word };
           if (w && app.addMistake) {
