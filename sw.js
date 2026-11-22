@@ -23,11 +23,17 @@ const APP_SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    // 逐个缓存，而不是 c.addAll(APP_SHELL)：
+    // addAll 是"全有或全无"—— 列表里只要有一个文件不存在（例如 dev 服务器下没有
+    // 仅 dist 才生成的 js/bundle.js），整个 install 就 reject，SW 永远装不上，
+    // 本地也就没法验证离线缓存。这里缺谁跳谁，其余照常缓存。
+    await Promise.all(APP_SHELL.map(async (url) => {
+      try { await c.add(new Request(url, { cache: 'reload' })); } catch (err) { /* 缺失/网络失败：跳过该项 */ }
+    }));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', e => {
