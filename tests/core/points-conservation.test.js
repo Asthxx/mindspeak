@@ -109,11 +109,15 @@ describe('addPoints 运行时行为（真实执行）', () => {
     expect(G.data.points).toBe(0);
   });
 
-  it('正数加分始终成功且可超过 999999', () => {
+  it('正数加分始终成功；积分封顶 999999（与读取层同口径，避免 Lv.10000 与 Lv.99 打架）', () => {
     G.data.points = 999999;
     const ok = G.addPoints(500);
-    expect(ok).toBe(true);
-    expect(G.data.points).toBe(1000499);
+    expect(ok, '正数加分不应被拒绝').toBe(true);
+    // 原来是"可超过 999999"（1000499）—— 但 UserState.get 读取时会把 points 夹到 999999、
+    // level 夹到 99，于是同一份数据在内存里是 Lv.10000、刷新后变 Lv.99。
+    // 现在写入侧就饱和，保证"points ≤ 999999 且 level ≤ 99"始终成立。
+    expect(G.data.points).toBe(999999);
+    expect(G.data.level).toBeLessThanOrEqual(99);
   });
 
   it('积分为 0 时扣减被拒', () => {

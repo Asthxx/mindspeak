@@ -2036,7 +2036,10 @@ var DataStore = {
   },
   getDefaultGrammar: function() {
     var base = (typeof GRAMMAR_DATA !== 'undefined' && GRAMMAR_DATA) ? GRAMMAR_DATA : [];
-    var list = Array.isArray(base) ? base : (base.grammar_exercises || []);
+    // 必须复制：原实现直接 push 到 GRAMMAR_DATA 这个全局数组上，
+    // 每调一次就往数据集里塞一遍 EXTRA_GRAMMAR（靠 seen 去重才没出现重复项），
+    // 属于"读接口偷偷改全局数据"。
+    var list = Array.isArray(base) ? base.slice() : (base.grammar_exercises || []).slice();
     if (typeof EXTRA_GRAMMAR !== 'undefined' && Array.isArray(EXTRA_GRAMMAR)) {
       var seen = {};
       list.forEach(function(ex) { seen[ex.id] = true; });
@@ -5693,12 +5696,15 @@ var GamificationSystem = (function() {
       return false;
     }
     this.data.points += amount;
+    // 与 UserState.get 的读取口径对齐：points 封顶 999999、level 封顶 99。
+    // 否则内存里能到 Lv.10000，刷新一次又被读取层夹回 99 —— 同一份数据显示两个等级。
+    if (this.data.points > 999999) this.data.points = 999999;
     // 注意：不要在加积分时把 lastActiveDate 置为今天 —— 购买道具/领取奖励扣加分
     // 会先把当天"激活"，导致当天第一次 recordActivity 判 lastActiveDate===today
     // 而跳过 streak 累计。lastActiveDate 只由 recordActivity（有实际学习活动）统一维护。
-    // 每 100 分升一级
+    // 每 100 分升一级（封顶 99，与读取层一致）
     var oldLevel = this.data.level || 1;
-    var newLevel = Math.floor(this.data.points / 100) + 1;
+    var newLevel = Math.min(99, Math.floor(this.data.points / 100) + 1);
     var leveledUp = newLevel > oldLevel;
     if (leveledUp) {
       this.data.level = newLevel;
@@ -7847,8 +7853,14 @@ var base = window.API_BASE || '';
       reader.onload = function(ev) {
         try {
           var data = JSON.parse(ev.target.result);
-          // 兼容旧备份：字段名与 _backupFields 的导出字段名一致，直接应用
-if (data && typeof data === 'object' && (data.wordProgress || data.mistakes || data.favorites)) {
+          // 兼容旧备份：字段名与 _backupFields 的导出字段名一致，直接应用。
+          // 校验放宽为"至少包含一个已知字段"：只导出设置/目标的备份此前会被
+          // 判成"格式错误"（旧条件要求必须有 wordProgress/mistakes/favorites）。
+          var hasKnownField = data && typeof data === 'object' && !Array.isArray(data) &&
+            Object.keys(data).some(function(k) {
+              return self._backupFields.some(function(f) { return f[0] === k; });
+            });
+          if (hasKnownField) {
             var imported = self._applyBackup(self._sanitizeBackup(data));
             self._recallIndex = null; // 词库进度可能变化，主动回忆索引失效重建
             if (self.readingModule) self.readingModule._wordIndex = null;
@@ -7910,8 +7922,23 @@ App.prototype.resetData = function() {
     window.__resettingData = true;
     // 'items'/'item_buffs'/'voice_instant' 是已下线功能的键：功能不再读它们，
     // 留在这里只为清掉旧用户 localStorage 里的残留（resetData 时统一 Storage.remove）。
-    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done','nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history'];
+    var appKeys = ['word_progress','mistakes','checkins','phonetic_progress','favorites','gamification','daily_goal','theme','theme_color','custom_theme_color','custom_bg','custom_bg_opacity','shortcuts_enabled','reminder_enabled','reminder_time','english_app_backup','last_save_time','auto_save_enabled','auto_save_interval','pomodoro_sessions','pomodoro_minutes','pomodoro_sound_enabled','pomodoro_notify_enabled','active_recall','daily_review_plan','pk_history','word_card_pos','daily_challenge','adaptive_review','badges','badge_stats','items','item_buffs','voice_name','voice_rate','voice_pitch','voice_instant','owned_themes','applied_theme','assessment','assessment_history','assessment_last_keys','word_category_index','onboarding_done',
+      // 引导"关过"标记：只清 done 会让重置后的用户再也看不到首次引导（seen 还在）
+      'onboarding_seen',
+      'nav_collapsed','tts_voice','selectedVoice','learn_selected_only','ai_chat_history',
+      // AI 会话快照与设置、跟读记录、每日提醒（key 名与设置页/NotificationManager 一致）
+      'ai_chat_sessions','ai_assistant_settings','speak_sessions','daily_reminder_enabled','daily_reminder_time'];
     appKeys.forEach(function(k) { Storage.remove(k); });
+    // 动态键：每日提醒的「今天已提醒」标记（ms_daily_reminder_sent_YYYY_M_D）。
+    // 不清掉的话重置当天仍收不到提醒，且这类键会随天数无限堆积。
+    try {
+      var stale = [];
+      for (var li = 0; li < localStorage.length; li++) {
+        var lk = localStorage.key(li);
+        if (lk && lk.indexOf('ms_daily_reminder_sent_') === 0) stale.push(lk);
+      }
+      stale.forEach(function(k) { Storage.remove(k); });
+    } catch (e) {}
     var _cats = DataStore.getDefaultWords().categories || [];
     for (var i = 0; i < _cats.length; i++) {
       Storage.remove('custom_words_' + i);

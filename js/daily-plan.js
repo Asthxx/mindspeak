@@ -33,6 +33,9 @@ var DailyPlanModule = (function() {
     var newCount = 0, dueCount = 0, doneCount = 0;
     Object.keys(progress).forEach(function(k) {
       var p = progress[k];
+      // 脏数据防御：备份导入/手改可能留下 null 或非对象条目。这里直接读 p.firstSeen
+      // 会在 showTab('word') 的主链路上抛 TypeError，整页切不过去。
+      if (!p || typeof p !== 'object') return;
       if (p.firstSeen === t) newCount++;
       if (p.status !== 'mastered') {
         var nr = p.nextReview;
