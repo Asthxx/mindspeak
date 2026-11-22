@@ -91,9 +91,18 @@
 
       if (!wordPage) return;
 
+      // 真正的滚动容器是 #main-content（body 不滚动），window.scrollY 恒为 0。
+      // 旧判据 if (window.scrollY === 0) 因此恒真：列表滚到中间时下拉也会触发
+      // "刷新"（showTab 会复位滚动），表现成"列表莫名其妙跳回顶部"。
+      var scroller = document.getElementById('main-content') ||
+        document.scrollingElement || document.documentElement;
+      var atTop = function() {
+        try { return (scroller.scrollTop || 0) <= 0; } catch (e) { return false; }
+      };
+
       wordPage.addEventListener('touchstart', function(e) {
         if (refreshing) return;
-        if (window.scrollY === 0) {
+        if (atTop()) {
           startY = e.touches[0].clientY;
           pulling = true;
           thresholdReached = false;
