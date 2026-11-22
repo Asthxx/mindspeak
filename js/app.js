@@ -7305,7 +7305,7 @@ function fillVoiceOptions() {
       else if (e.key === 'phonetic_progress' && self.phoneticModule) {
         // 音标进度以最新快照为准，旧 tab markMastered 整表写回会冲掉其它 tab 的新进度
         self.phoneticModule.phoneticProgress = DataStore.getProgress('phonetic_progress', {});
-        if (self.currentTab === 'phonetic' && self.phoneticModule.renderGrid) self.phoneticModule.renderGrid();
+        if (self.currentTab === 'phonetics' && self.phoneticModule.renderGrid) self.phoneticModule.renderGrid();
       }
     } catch(err) { /* ignore */ }
   });

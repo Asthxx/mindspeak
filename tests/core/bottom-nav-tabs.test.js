@@ -158,9 +158,9 @@ describe('三个聚合页完整承接侧边栏分组', () => {
 });
 
 describe('侧边栏保持原样（桌面端不受影响）', () => {
-  it('19 个 nav-btn 一个没动（分组仍在 DOM 里，仅移动端 CSS 隐藏）', () => {
+  it('20 个 nav-btn 一个没动（分组仍在 DOM 里，仅移动端 CSS 隐藏；2026-11-22 恢复音标入口后为 20）', () => {
     const all = [...html.matchAll(/class="nav-btn" data-tab="([a-z-]+)"/g)].map(x => x[1]);
-    expect(all.length, '侧边栏入口总数变了：' + all.join(',')).toBe(19);
+    expect(all.length, '侧边栏入口总数变了：' + all.join(',')).toBe(20);
   });
 
   it('三个分组仍带折叠标题（桌面端折叠行为保留）', () => {

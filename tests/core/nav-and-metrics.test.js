@@ -47,7 +47,7 @@ describe('侧边栏分组语义（P2-7 · 最小搬迁方案）', () => {
 
   it('19 个入口一个都不能丢', () => {
     const all = [...html.matchAll(/class="nav-btn" data-tab="([a-z-]+)"/g)].map(x => x[1]);
-    expect(all.length, '侧边栏入口总数变了：' + all.join(',')).toBe(19);
+    expect(all.length, '侧边栏入口总数变了：' + all.join(',')).toBe(20);
   });
 });
 
