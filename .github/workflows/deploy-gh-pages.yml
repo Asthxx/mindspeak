@@ -40,7 +40,7 @@ jobs:
       # 构建时下载到 dist/voice/，由 Pages 托管（带 ACAO:*），
       # 网页版与 APK 的客户端按候选源回退到这里下载并缓存进 IndexedDB。
       - name: Cache offline voice model
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/voice
           key: piper-voice-en_US-lessac-medium-v1
