@@ -222,7 +222,8 @@
 .ai-hist-item.is-confirm .ai-hist-confirm { transform: none; }
 .ai-hist-confirm button {
   flex: 1;
-  min-height: 36px;
+  /* 决策按钮原 36px 偏矮：与全站 --tap-min 统一（此处特异性最高，改这里才生效） */
+  min-height: var(--tap-min);
   border: 0; border-radius: var(--radius-xs);
   font-family: var(--font-primary);
   font-size: var(--ai-fs-chip); font-weight: var(--weight-medium);
@@ -869,7 +870,7 @@
   /* 触屏无 hover：消息操作常驻 + 命中区补齐 */
   .ai-msg-actions { opacity: 1; }
   .ai-msg-actions button { min-height: 36px; }
-  .ai-chip { min-height: 36px; }
+  .ai-chip { min-height: var(--tap-min); }   /* 快捷胶囊与其它控件同高，触屏好点 */
   .ai-act { min-height: 36px; }
   .ai-ex-card .play { width: 36px; height: 36px; }
   .ai-send { width: 48px; height: 48px; }        /* 触屏 48px 命中区（拇指弧） */

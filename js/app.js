@@ -3802,7 +3802,9 @@ var ReadingModule = (function() {
       if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target)) self._hidePopup();
     });
     // 滚动/缩放时收起浮窗，避免错位
-    document.addEventListener('scroll', function() { self._hidePopup(); }, true);
+    // passive:true —— 捕获阶段的滚动监听默认是阻塞的（浏览器要等回调判断 preventDefault），
+    // 手指滑动时表现为"滚不一跟手"。这个回调只做隐藏浮层，绝不会 preventDefault。
+    document.addEventListener('scroll', function() { self._hidePopup(); }, { capture: true, passive: true });
     window.addEventListener('resize', function() { self._hidePopup(); });
   };
   // 加载全词库索引（词/短语 -> 词条），懒加载

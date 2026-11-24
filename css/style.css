@@ -443,14 +443,16 @@ h2{
 }
 .wj-go{
   display:inline-flex;align-items:center;justify-content:center;
-  width:24px;height:24px;flex-shrink:0;
+  /* 原本写死 24×24：比同行的 44px 输入框矮一半，视觉不齐且难点中。
+     统一到 --tap-min（与输入框同高），图标仍保持轻量观感。 */
+  width:var(--tap-min);height:var(--tap-min);flex-shrink:0;
   padding:0;border:0;border-radius:var(--radius-full);
   background:var(--sage-surface);color:var(--sage-deep);cursor:pointer;
   transition:background-color var(--duration-fast) var(--ease);
 }
 .wj-go:hover{background:var(--sage-light)}
 .wj-go:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
-.wj-go .icon{width:14px;height:14px}
+.wj-go .icon{width:16px;height:16px}
 
 /* ── P2-8：设置页顶部的紧凑学习概览条 ─────────────────────────────
    原来 4 张统计卡 + 7 天图表占掉首屏约 2 屏，压成一行后首屏即可操作设置。 */
@@ -2066,6 +2068,11 @@ h2{
 }
 
 /* ============ SEARCH ============ */
+/* 桌面端一条搜索输入拉到 1104px 过宽（要横跨整屏去读），
+   收敛到 860px 与设置页同宽；移动端仍占满。 */
+@media (min-width: 768px){
+  #page-search{max-width:860px;margin-inline:auto}
+}
 .search-box{
   display:flex;gap:var(--sp-3);margin-bottom:var(--sp-5);
 }

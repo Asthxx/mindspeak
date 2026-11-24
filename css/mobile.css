@@ -268,7 +268,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
 
   /* 背单词页顶部工具栏瘦身（用户反馈"按钮太大"）：
      上面 380 行的全站规则为了让触控目标 ≥44px，把 .content .btn-sm 的
-     padding 从桌面 6px 12px 放大到 12px 16px、并统一 min-height:44px。
+     padding 从桌面 6px 12px 放大到 12px 16px、并统一 min-height:var(--tap-min)。
      背单词页顶部这一串（词库下拉/精选学习/更多工具/每日目标/折叠区工具）
      全是低频次要控件，不需要那么大的体量——50px 高的全宽按钮会把单词卡
      挤出首屏。这里只收缩"次要控件"，主操作键（认识/有点印象/不认识/翻转/
@@ -279,7 +279,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   #page-word .word-tools-extra .btn-sm{min-height:32px;padding:8px 12px}
   /* 朗读：原 .btn-speak 是 --text-lg(18px) + 8px 14px，夹在两个 44px 小箭头
      之间显得格外粗。降一档字号并收紧内边距，与左右箭头更协调。
-     高度交给全站 .content .btn 的 min-height:44px，不再单独压。 */
+     高度交给全站 .content .btn 的 min-height:var(--tap-min)，不再单独压。 */
   #page-word .word-nav .btn-speak{font-size:var(--text-base);padding:8px 12px}
   /* 主操作行：收藏/挑入精选是纯图标按钮，却被 .word-actions .btn{flex:1}
      和带文字的四个键平均分配，拉成 114x52 的大空框——图标缩在中间，四周全是空白。
@@ -461,7 +461,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   /* 快捷提问 Chips：横向滚动，不换行撑高，拇指可横向滑动 */
   .ai-chat-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -2px;padding:var(--sp-hairline);scrollbar-width:none}
   .ai-chat-chips::-webkit-scrollbar{display:none}
-  .ai-chip{flex-shrink:0;white-space:nowrap;min-height:40px;display:inline-flex;align-items:center}
+  .ai-chip{flex-shrink:0;white-space:nowrap;min-height:var(--tap-min);display:inline-flex;align-items:center}
 
   /* ---- AI 输入区 meta 行（字数 + 快捷键提示）----
      触屏没有 Enter 键，"Enter 发送 · Shift+Enter 换行"在手机上纯属噪声
@@ -480,7 +480,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   .content .btn,.content .btn-sm,.content .btn-primary,.content .btn-accent,.content .btn-ghost,
   .content .btn-lg,.content .btn-icon,.content .view-btn,.content .filter-btn,
   .content .collapse-toggle,.content select,.content .nav-arrow{
-    min-height:44px;
+    min-height:var(--tap-min);
   }
   .content .btn-sm{padding:12px 16px}
   .btn-icon{width:44px;height:44px}
