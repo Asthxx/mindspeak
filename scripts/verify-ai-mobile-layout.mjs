@@ -327,6 +327,40 @@ try {
   check(tablet.compBottom !== null && tablet.compBottom <= tablet.bnTop + 2, '★平板宽度：输入框在首屏可见', `bottom=${tablet.compBottom} bnTop=${tablet.bnTop}`);
   check(tablet.docOver === 0, '★平板宽度：无横向溢出', `docOver=${tablet.docOver}`);
 
+  // ==================== ⑤ 矮视口 320×480（小屏手机/折叠屏外屏） ====================
+  // 缺陷（2026-11-24 扫描）：480/512 高的视口里 hero 标题行（66px）把工作区底边
+  // 压到导航条下面，composer 的发送/麦克风/口音选择沉入底栏后不可点。
+  await setMobile(320, 480, ANDROID_UA);
+  await cdp.send('Page.navigate', { url: BASE + '?v=short' }, sessionId);
+  let shortBoot = false;
+  for (let i = 0; i < 60; i++) {
+    try { shortBoot = await evalJs('!!(window.app && window.app.currentTab)'); } catch (e) {}
+    if (shortBoot) break;
+    await sleep(400);
+  }
+  check(shortBoot, '矮视口：应用启动完成', 'window.app 未就绪');
+  await evalJs(`(() => { try { DataStore.setProgress('onboarding_done', true); } catch(e){} return 'ok'; })()`);
+  const shortR = await evalJs(`(function(){
+    window.app.showTab('ai');
+    return new Promise(function(res){
+      setTimeout(function(){
+        var mc=document.getElementById('main-content');
+        mc.scrollTop=mc.scrollHeight;   // 滚到底：检验滚动可达性
+        setTimeout(function(){
+          var bn=document.querySelector('.bottom-nav');
+          var bnTop=bn?Math.round(bn.getBoundingClientRect().top):window.innerHeight;
+          var bad=[...document.querySelectorAll('.ai-composer button, .ai-composer select, .ai-composer textarea')].filter(function(b){
+            var r=b.getBoundingClientRect();
+            return r.height>0 && r.bottom>bnTop+2;
+          }).map(function(b){return (b.id||b.className).toString().slice(0,24)+'@'+Math.round(b.getBoundingClientRect().bottom);});
+          res({bnTop:bnTop, bad:bad, heroH:(function(){var h=document.querySelector('.ai-hero');return h?Math.round(h.getBoundingClientRect().height):-1;})()});
+        }, 300);
+      }, 500);
+    });
+  })()`);
+  check(shortR.bad.length === 0, '★矮视口 320×480：滚到底后 composer 全部控件在导航条上方', JSON.stringify(shortR));
+  check(shortR.heroH === -1 || shortR.heroH === 0, '★矮视口：hero 已收起（给对话让出高度）', `heroH=${shortR.heroH}`);
+
   console.log(`\n===== 结果：${pass} 通过 / ${fail} 失败 =====`);
   console.log(`截图：audit-shots/ai-mobile-layout-{portrait,narrow,landscape}.png`);
 } finally {

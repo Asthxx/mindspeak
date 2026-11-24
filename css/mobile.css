@@ -175,6 +175,17 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   html[data-tab="ai"] .ai-overview{flex:none}
   html[data-tab="ai"] .ai-workspace{flex:1;min-height:min(420px,56vh);height:auto;margin-top:var(--sp-3)}
 
+  /* ---- 矮视口（≤520px 高：320×480 小屏 / 717×512 折叠屏外屏）----
+     hero 标题行 66px 会把工作区底边压到导航条下面，composer 的发送/麦克风/
+     口音选择沉入底栏不可点（2026-11-24 扫描实测）。与横屏的 hero 隐藏同理：
+     对话与输入框优先，标题在矮屏上是奢侈品。 */
+  html[data-tab="ai"] #page-ai .ai-hero{display:none}
+  /* 快捷胶囊条 48px：次级功能，矮屏上优先保证输入区完整可见 */
+  html[data-tab="ai"] .ai-chat-chips{display:none}
+  /* 概况面板折叠后仍占一行摘要（~64-90px）：矮屏上连摘要行一起收起，
+     否则 composer 依然会被顶到导航条下面（717×512 实测 29px） */
+  html[data-tab="ai"] #page-ai .ai-overview{display:none}
+
   /* ---- 移动端底部导航（App 级）· 悬浮药丸壳体 ---- */
   .bottom-nav,html.platform-ios .bottom-nav,html.platform-android .bottom-nav{
     /* 左右安全区：竖屏下 inset-left/right 恒为 0（与改动前一致）；

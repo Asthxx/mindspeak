@@ -851,7 +851,10 @@
     transition: transform var(--ai-dur-slow) var(--ai-ease);
   }
   .ai-rail-history.open { transform: none; box-shadow: var(--shadow-lg); }
-  .ai-chat-msgs { padding: var(--sp-4) var(--sp-4) var(--sp-5); }
+  .ai-chat-msgs { padding: var(--sp-4) var(--sp-4) calc(var(--sp-5) + 12px);
+  /* 底部多留 12px：最后一条消息的操作行（朗读/复制）距消息体 0 间距，
+     预留不足时滚到底操作按钮仍会被底栏压住 11px（2026-11-24 实测）。
+     不动 .content 的 padding-bottom —— 那会破坏 composer 间距与 toast 避让契约。 */ }
   .ai-composer { padding-left: var(--sp-4); padding-right: var(--sp-4); }
   .ai-drawer { width: min(360px, 100vw); }
 }
@@ -865,7 +868,8 @@
   .ai-overview[open] .ai-grid { max-height: 45vh; overflow-y: auto; }
   .ai-conv-head { min-height: 52px; }
   .ai-conv-name .ai-card-title { font-size: var(--text-base); }
-  .ai-chat-msgs { padding: var(--sp-4) var(--sp-3) var(--sp-4); gap: var(--sp-4); }
+  .ai-chat-msgs { padding: var(--sp-4) var(--sp-3) calc(var(--sp-4) + 12px); gap: var(--sp-4); }
+  /* ↑ 底部 +12：最后一条消息的操作行距消息体 0 间距，不足会被底栏压住 11px */
   .ai-msg-avatar { width: 28px; height: 28px; }
   .ai-msg-body { max-width: 100%; }
   .ai-answer-lead { font-size: var(--text-base); }
