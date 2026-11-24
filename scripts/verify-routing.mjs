@@ -113,7 +113,7 @@ try {
   mkdirSync(profile, { recursive: true });
   chrome = spawn(chromePath, [
     `--user-data-dir=${profile}`, `--remote-debugging-port=${DEBUG_PORT}`,
-    '--no-first-run', '--no-default-browser-check', '--headless=new',
+    '--no-first-run', '--no-proxy-server', '--no-default-browser-check', '--headless=new',
     '--disable-gpu', '--window-size=1440,900', 'about:blank',
   ], { stdio: ['ignore', 'pipe', 'pipe'] });
 

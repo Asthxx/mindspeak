@@ -120,7 +120,7 @@ async function main() {
   if (!up) { console.log('LOCAL SERVER FAIL'); server.kill(); process.exit(1); }
 
   const chrome = spawn(findChrome(), [
-    '--headless=new', '--no-sandbox', '--disable-gpu',
+    '--headless=new', '--no-proxy-server', '--no-sandbox', '--disable-gpu',
     `--remote-debugging-port=${DEBUG_PORT}`,
     `--user-data-dir=${join(process.env.TEMP ?? '', 'cmp-' + Date.now())}`,
     '--window-size=1280,900', 'about:blank'

@@ -839,6 +839,9 @@
 @media (max-width: 1023px) {
   .ai-workspace { grid-template-columns: minmax(0, 1fr); }
   .ai-rail-toggle { display: inline-flex; }
+  /* 平板/桌面窄窗（768~1023）：概览收起后页面还要放下 composer，
+     工作区从 76vh/760 收到 66vh/700 —— 1024 高的视口实测恰好放满不溢出。 */
+  .ai-workspace { height: min(66vh, 700px); min-height: 440px; }
   .ai-rail-history {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 85;
     width: min(322px, 88vw);

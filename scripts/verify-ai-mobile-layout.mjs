@@ -135,7 +135,7 @@ try {
   if (!chromePath) throw new Error('未找到 Chromium');
   profile = join(process.env.TEMP ?? '', 'ms-vaml-' + Date.now());
   chrome = spawn(chromePath, [
-    '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+    '--headless=new', '--no-proxy-server', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`,
     '--lang=zh-CN', 'about:blank'
   ], { stdio: 'ignore' });
@@ -288,6 +288,44 @@ try {
   s = JSON.parse(await evalJs(SNAP));
   check(s.activePage === 'page-ai' && s.contentScrollH <= s.contentClientH + 2,
     '★切回 AI 页又回到"不滚动 + composer 在首屏"', `active=${s.activePage} scrollH=${s.contentScrollH}`);
+
+  // ==================== ④ 平板宽度 768×1024（≤1023 是单列工作区） ====================
+  // 缺陷（2026-11-24）：概况面板的收起阈值是 max-width:767px，而工作区单列断点是
+  // 1023px —— 768~1023 这段宽度里概况默认展开，把消息区挤到 0px、输入框挤出首屏。
+  await setMobile(800, 1024, ANDROID_UA);
+  await cdp.send('Page.navigate', { url: BASE + '?v=tablet' }, sessionId);
+  let bootOk = false;
+  for (let i = 0; i < 60; i++) {
+    try { bootOk = await evalJs('!!(window.app && window.app.currentTab)'); } catch (e) {}
+    if (bootOk) break;
+    await sleep(400);
+  }
+  check(bootOk, '平板宽度：应用启动完成', 'window.app 未就绪');
+  await evalJs(`(() => { try { DataStore.setProgress('onboarding_done', true); } catch(e){} return 'ok'; })()`);
+  const tablet = await evalJs(`(function(){
+    window.app.showTab('ai');
+    return new Promise(function(res){
+      setTimeout(function(){
+        var msg=document.querySelector('.ai-msg-scroll');
+        var comp=document.querySelector('.ai-composer');
+        var ov=document.getElementById('ai-overview');
+        var bn=document.querySelector('.bottom-nav');
+        var bnVisible = bn && getComputedStyle(bn).display !== 'none' && bn.getBoundingClientRect().height > 0;
+        var bnTop = bnVisible ? bn.getBoundingClientRect().top : window.innerHeight;
+        res({
+          msgH: msg ? Math.round(msg.getBoundingClientRect().height) : 0,
+          ovOpen: ov ? ov.open : null,
+          compBottom: comp ? Math.round(comp.getBoundingClientRect().bottom) : null,
+          bnTop: Math.round(bnTop),
+          docOver: document.documentElement.scrollWidth - window.innerWidth
+        });
+      }, 600);
+    });
+  })()`);
+  check(tablet.msgH >= 300, '★平板宽度：消息区可用高度 ≥300px（不被概况面板挤塌）', `msgH=${tablet.msgH}`);
+  check(tablet.ovOpen === false, '★平板宽度：「学习概况」默认收起（把首屏让给对话）', `open=${tablet.ovOpen}`);
+  check(tablet.compBottom !== null && tablet.compBottom <= tablet.bnTop + 2, '★平板宽度：输入框在首屏可见', `bottom=${tablet.compBottom} bnTop=${tablet.bnTop}`);
+  check(tablet.docOver === 0, '★平板宽度：无横向溢出', `docOver=${tablet.docOver}`);
 
   console.log(`\n===== 结果：${pass} 通过 / ${fail} 失败 =====`);
   console.log(`截图：audit-shots/ai-mobile-layout-{portrait,narrow,landscape}.png`);

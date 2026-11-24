@@ -221,7 +221,9 @@ var AiChatModule = (function() {
     // 移动优先：窄屏默认收起「学习概况」，把首屏让给对话（details 原生折叠）
     try {
       var ov = document.getElementById('ai-overview');
-      if (ov && window.matchMedia && window.matchMedia('(max-width:767px)').matches) ov.open = false;
+      // 收起阈值必须与工作区单列断点（≤1023）一致：768~1023 的平板/桌面窄窗
+      // 里概况展开会把 .ai-workspace 挤到 2px、输入框挤出首屏（2026-11-24 实测）。
+      if (ov && window.matchMedia && window.matchMedia('(max-width:1023px)').matches) ov.open = false;
     } catch (e) {}
   };
 

@@ -112,7 +112,7 @@ const profile = join(process.env.TEMP ?? '.', 'ms-gesture-' + Date.now());
 mkdirSync(profile, { recursive: true });
 mkdirSync(shotDir, { recursive: true });
 const chrome = spawn(chromePath, [
-  '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+  '--headless=new', '--no-proxy-server', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
   `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`,
   '--window-size=430,900', '--lang=zh-CN', 'about:blank'
 ], { stdio: ['ignore', 'pipe', 'pipe'] });

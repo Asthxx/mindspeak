@@ -110,7 +110,7 @@ try {
   if (!chromePath) throw new Error('未找到 Chromium');
   profile = join(process.env.TEMP ?? '', 'ms-vwlr-' + Date.now());
   mkdirSync(profile, { recursive: true });
-  chrome = spawn(chromePath, [`--user-data-dir=${profile}`, `--remote-debugging-port=${DEBUG_PORT}`, '--no-first-run', '--no-default-browser-check', '--headless=new', '--disable-gpu', '--window-size=420,900', 'about:blank'], { stdio: 'ignore' });
+  chrome = spawn(chromePath, [`--user-data-dir=${profile}`, `--remote-debugging-port=${DEBUG_PORT}`, '--no-first-run', '--no-proxy-server', '--no-default-browser-check', '--headless=new', '--disable-gpu', '--window-size=420,900', 'about:blank'], { stdio: 'ignore' });
 
   let target = null;
   for (let i = 0; i < 60 && !target; i++) { await sleep(250); try { const list = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json(); target = list.find(t => t.type === 'page'); } catch (e) {} }

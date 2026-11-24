@@ -125,7 +125,7 @@ async function main() {
   if (!chromePath) { console.log('FAIL no chromium'); server?.kill(); process.exit(1); }
   const profile = join(process.env.TEMP ?? '', 'ms-verify-' + Date.now());
   mkdirSync(profile, { recursive: true });
-  const chrome = spawn(chromePath, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+  const chrome = spawn(chromePath, ['--headless=new', '--no-proxy-server', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`, '--window-size=390,844', '--lang=zh-CN', 'about:blank'],
     { stdio: ['ignore', 'pipe', 'pipe'] });
   let dbg = null;

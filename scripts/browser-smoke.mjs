@@ -132,7 +132,7 @@ async function main() {
   const profile = join(process.env.TEMP ?? '', 'ms-smoke-' + Date.now());
   mkdirSync(profile, { recursive: true });
   const chrome = spawn(chromePath, [
-    '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+    '--headless=new', '--no-proxy-server', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`,
     '--window-size=1280,900', '--lang=zh-CN', 'about:blank'
   ], { stdio: ['ignore', 'pipe', 'pipe'] });

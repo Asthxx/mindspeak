@@ -69,7 +69,7 @@ async function main() {
   if (!chromePath) { console.log('FAIL no chromium'); server?.kill(); process.exit(1); }
   const profile = join(process.env.TEMP ?? '', 'ms-shot-' + Date.now());
   mkdirSync(profile, { recursive: true });
-  const chrome = spawn(chromePath, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`, '--lang=zh-CN', 'about:blank'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const chrome = spawn(chromePath, ['--headless=new', '--no-proxy-server', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`, '--lang=zh-CN', 'about:blank'], { stdio: ['ignore', 'pipe', 'pipe'] });
   let dbg = null;
   for (let i = 0; i < 40 && !dbg; i++) { await sleep(200); try { const r = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`); dbg = await r.json(); } catch (e) {} }
   if (!dbg) { console.log('FAIL debug'); chrome.kill(); server?.kill(); process.exit(1); }

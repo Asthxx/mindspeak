@@ -125,7 +125,7 @@ try {
   // 看起来像"合成失败"，其实是播放策略拦的。
   chrome = spawn(chromePath, [
     `--user-data-dir=${profile}`, `--remote-debugging-port=${DEBUG_PORT}`,
-    '--no-first-run', '--no-default-browser-check', '--headless=new', '--disable-gpu',
+    '--no-first-run', '--no-proxy-server', '--no-default-browser-check', '--headless=new', '--disable-gpu',
     '--mute-audio', '--autoplay-policy=no-user-gesture-required',
     '--window-size=390,844', 'about:blank',
   ], { stdio: 'ignore' });

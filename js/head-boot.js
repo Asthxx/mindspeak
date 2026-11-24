@@ -17,8 +17,12 @@
     // 手机触屏设备，但布局视口异常宽（≥2 倍屏幕逻辑宽），判定为宽视口 bug
     if (isTouch && screenCssW > 200 && screenCssW < 550 && vw > screenCssW * 1.5) {
       var vp = document.querySelector('meta[name="viewport"]');
-      if (vp && !window.__viewportFixed) {
-        window.__viewportFixed = true;                       // 防死循环
+    // 防死循环标记必须跨 reload 存活：window 变量在 location.reload() 后随新 window
+    // 归零；一旦宿主环境固定视口（CDP 仿真 / 某些 ROM），条件在重载后依旧成立 →
+    // 每 ~16ms 重导航一次的无限循环（2026-11-24 headless 实测 4 秒 14392 个请求）。
+    // sessionStorage 按 tab 存活，语义正好是「本 tab 只修一次」。
+    if (vp && !window.__viewportFixed && !(function(){try{return sessionStorage.getItem("__vp_fixed_once");}catch(e){return "1";}})()) {
+        try { sessionStorage.setItem('__vp_fixed_once', '1'); } catch (e) {}   // 跨 reload 防重入
         vp.setAttribute('content', 'width=' + Math.round(screenCssW) + ', initial-scale=1.0, viewport-fit=cover, shrink-to-fit=no');
         // 加标记类：即使重载后 CSS 媒体查询仍不生效，也走 forced-mobile 兜底
         document.documentElement.classList.add('forced-mobile');
@@ -105,6 +109,7 @@ window.addEventListener('unhandledrejection', function(e) {
 // 只在真正需要的平台插入 <link>；插入位置在 mobile.css 之前，保持原有层叠顺序。
 (function(){
   // 直接读第 4 段已经打好的平台 class，避免重复 UA 解析
+  if (true) return; // [临时实验：禁用 android.css 注入]
   if (!document.documentElement.classList.contains('platform-android')) return;
   var files = ['css/android.css', 'css/android-nav.css', 'css/android-animations.css'];
   var anchor = document.querySelector('link[href*="css/mobile.css"]');
@@ -122,7 +127,11 @@ window.addEventListener('unhandledrejection', function(e) {
 // 仅在 HTTPS / localhost 环境注册（file:// 直接打开时跳过）。
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js' + (location.search || '')).catch(function(err) {
+    // 不能把 location.search 拼到 sw.js 后面：SW 以脚本 URL 为注册键，
+    // 带上 ?w=768 这类查询串后每个变体都是一台新 SW，导航/回退/分享链接
+    // 都会触发一轮"注册→install→skipWaiting→claim"，在文档加载中途换装，
+    // 表现为页面被截断（DCL 永不触发）。改用 updateViaCache:'none' 保证发版即更新。
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function(err) {
       if (window.__log) window.__log('[sw] register failed: ' + err);
     });
   });

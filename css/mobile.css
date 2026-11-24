@@ -173,7 +173,7 @@ html.forced-mobile .page,html.forced-mobile .card-area,html.forced-mobile .word-
   html[data-tab="ai"] #page-ai{display:flex;flex-direction:column;flex:1;min-height:0}
   html[data-tab="ai"] .ai-hero{flex:none;margin-bottom:var(--sp-3)}
   html[data-tab="ai"] .ai-overview{flex:none}
-  html[data-tab="ai"] .ai-workspace{flex:1;min-height:0;height:auto;margin-top:var(--sp-3)}
+  html[data-tab="ai"] .ai-workspace{flex:1;min-height:min(420px,56vh);height:auto;margin-top:var(--sp-3)}
 
   /* ---- 移动端底部导航（App 级）· 悬浮药丸壳体 ---- */
   .bottom-nav,html.platform-ios .bottom-nav,html.platform-android .bottom-nav{

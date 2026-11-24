@@ -158,7 +158,7 @@ try {
   if (!chromePath) throw new Error('未找到 Chromium');
   profile = join(process.env.TEMP ?? '', 'ms-vr-' + Date.now());
   mkdirSync(profile, { recursive: true });
-  chrome = spawn(chromePath, [`--user-data-dir=${profile}`, `--remote-debugging-port=${DEBUG_PORT}`, '--no-first-run',
+  chrome = spawn(chromePath, [`--user-data-dir=${profile}`, `--remote-debugging-port=${DEBUG_PORT}`, '--no-first-run', '--no-proxy-server',
     '--no-default-browser-check', '--headless=new', '--disable-gpu', '--mute-audio',
     '--autoplay-policy=no-user-gesture-required', '--window-size=390,844', 'about:blank'], { stdio: 'ignore' });
 
