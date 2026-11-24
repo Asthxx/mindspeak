@@ -56,6 +56,27 @@ self.addEventListener('fetch', e => {
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.includes('/sw.js')) return;
 
+  // 导航请求（打开页面 / 深链）：网络优先，失败回退缓存的应用壳。
+  // 必须单独处理：缓存按"完整 URL（含查询串）"匹配，带 ?utm=... 的分享链接
+  // 命中不了预缓存的 index.html；旧逻辑此时 respondWith(undefined)，
+  // 离线打开这类链接直接落到浏览器错误页，而应用壳其实就在缓存里。
+  if (req.mode === 'navigate') {
+    e.respondWith(
+      fetch(req)
+        .then(res => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match('index.html')
+          .then(r => r || caches.match('./'))
+          .then(r => r || Response.error()))
+    );
+    return;
+  }
+
   // 资源分类：
   //   代码资源（HTML/CSS/JS）→ 网络优先：样式/脚本改动刷新即见，离线时回退缓存
   //   数据/大文件（data/assets/manifest）→ 缓存优先：离线可用，网络结果后台更新
