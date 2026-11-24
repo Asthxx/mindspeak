@@ -23,6 +23,9 @@ const jsOrder = [
   'js/notification-manager.js', // Android 本地通知管理（学习提醒、复习调度）
   'js/responsive-layout.js', // 响应式断点布局（手机/平板/桌面自适应）
   'js/app.js',
+  'js/modules/phonetic.js', // 音标学习（2026-11-24 从 app.js 拆出）
+  'js/modules/pk.js',       // 单词 PK
+  'js/modules/pomodoro.js', // 番茄钟
   'js/daily-plan.js',
   'js/dashboard.js',
   'js/items.js',

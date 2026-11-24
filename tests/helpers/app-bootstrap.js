@@ -170,6 +170,9 @@ const MODULES = [
   'js/onboarding.js',
   'js/notification-manager.js',
   'js/app.js',
+  'js/modules/phonetic.js',
+  'js/modules/pk.js',
+  'js/modules/pomodoro.js',
   'js/responsive-layout.js',
 ];
 
