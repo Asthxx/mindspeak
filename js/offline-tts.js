@@ -38,15 +38,35 @@
     }
   };
   var DEFAULT_VOICE = '__offline_piper_us_lessac__';
-  var MODEL_BASE = (function () {
-    // 模型文件的下载源。空 = 同源，走 server 的 /api/offline-voice/ 路由
-    // （注意不是站点根：拼成根路径会 404，而失败表现只是"下载失败"四个字）；
-    // APK 里页面是本地协议，必须在 api-config.js 的 OFFLINE_VOICE_BASE 填公网地址。
-    var base = '';
-    try { base = (window.MS && window.MS.OFFLINE_VOICE_BASE) || ''; } catch (e) {}
-    if (base) return base.replace(/\/+$/, '') + '/';
-    try { return location.origin + '/api/offline-voice/'; } catch (e) { return ''; }
-  })();
+  // 模型在 worker 里的固定 key（模型实体来自 IndexedDB，不依赖下载源）
+  var MODEL_KEY_ONNX = 'offline-model://model.onnx';
+  var MODEL_KEY_CFG = 'offline-model://model.onnx.json';
+  // 模型文件的下载源候选链（按顺序尝试，任一成功即用）：
+  //   ① MS.OFFLINE_VOICE_BASE —— 显式配置（自建反代/CDN），最高优先
+  //   ② 同源 /api/offline-voice/ —— 桌面 node server.js、局域网反代
+  //   ③ MS.OFFLINE_VOICE_MIRROR —— 站点托管目录（GitHub Pages 带 ACAO:*，
+  //      APK 的 https://localhost 也能跨域取）。②③ 缺一不可：
+  //      网页版与 APK 里没有后端，只靠 ② 必然"下载失败"（2026-11-24 用户报障的根因）。
+  function normalizeBase(b) { return String(b || '').replace(/\/+$/, '') + '/'; }
+  function modelBases() {
+    var out = [];
+    var explicit = '';
+    try { explicit = (window.MS && window.MS.OFFLINE_VOICE_BASE) || ''; } catch (e) {}
+    if (explicit) out.push(normalizeBase(explicit));
+    try {
+      var origin = location.origin;
+      if (origin && origin !== 'null') out.push(normalizeBase(origin + '/api/offline-voice/'));
+    } catch (e) {}
+    var mirror = '';
+    try { mirror = (window.MS && window.MS.OFFLINE_VOICE_MIRROR) || ''; } catch (e) {}
+    if (mirror) out.push(normalizeBase(mirror));
+    var seen = {};
+    return out.filter(function (b) {
+      if (seen[b]) return false;
+      seen[b] = 1;
+      return true;
+    });
+  }
 
   // ---- 状态 ----
   // unknown（未探测）→ idle（未下载）→ downloading → ready → failed
@@ -133,20 +153,36 @@
     }
   }
 
-  // ---- 模型下载（带进度）----
+  // ---- 模型下载（带进度，多源回退）----
+  // 逐个源尝试 onnx + onnx.json；任一环节失败就换下一个源，全失败才抛错，
+  // 错误里带上每个源的失败原因（否则用户只看到"下载失败"四个字，无从排查）。
+  function fetchModelFrom(bases, v, onProgress) {
+    var errors = [];
+    function attempt(i) {
+      if (i >= bases.length) {
+        var e = new Error('已尝试 ' + bases.length + ' 个下载源均失败：' + errors.join('；'));
+        e.attempts = errors;
+        throw e;
+      }
+      var base = bases[i];
+      return fetchWithProgress(base + v.model + '.onnx', onProgress)
+        .then(function (model) {
+          return fetch(base + v.model + '.onnx.json').then(function (r) {
+            if (!r.ok) throw new Error('config http ' + r.status);
+            return r.blob().then(function (cfg) { return { model: model, cfg: cfg, base: base }; });
+          });
+        })
+        .catch(function (err) {
+          errors.push(base + ' → ' + ((err && err.message) || err));
+          return attempt(i + 1);
+        });
+    }
+    return Promise.resolve().then(function () { return attempt(0); });
+  }
   function downloadVoice(voiceKey, onProgress) {
     var v = VOICES[voiceKey] || VOICES[DEFAULT_VOICE];
-    var modelUrl = MODEL_BASE + v.model + '.onnx';
-    var cfgUrl = MODEL_BASE + v.model + '.onnx.json';
-    return Promise.all([
-      fetchWithProgress(modelUrl, onProgress),
-      fetch(cfgUrl).then(function (r) {
-        if (!r.ok) throw new Error('model config http ' + r.status);
-        return r.blob();
-      })
-    ]).then(function (res) {
-      var model = res[0], cfg = res[1];
-      return idbPut(v.model, { model: model, cfg: cfg, at: Date.now() });
+    return fetchModelFrom(modelBases(), v, onProgress).then(function (got) {
+      return idbPut(v.model, { model: got.model, cfg: got.cfg, at: Date.now() });
     });
   }
   function fetchWithProgress(url, onProgress) {
@@ -273,6 +309,10 @@
       return cb;
     },
     status: function () { return snapshot(); },
+    // 下载源诊断/回退用：返回当前环境的候选源列表（测试与设置页排障都可用）
+    modelBases: modelBases,
+    // 内部：按候选源顺序取模型（测试用；生产走 ensure → downloadVoice）
+    _fetchModelFrom: fetchModelFrom,
 
     // 探测本地是否已有缓存模型。不联网，只读 IndexedDB。
     probe: function (voiceKey) {
@@ -343,14 +383,17 @@
           kind: 'init',
           input: text,
           speakerId: null,
-          blobs: {
+          blobs: (function () {
             // 模型与配置直接喂 Blob：worker 的 getBlob 优先用 blobs[url]，
-            // 命中就不再走网络。URL 只当 key 用，随便给但必须稳定。
-            [MODEL_BASE + v.model + '.onnx']: row.model,
-            [MODEL_BASE + v.model + '.onnx.json']: row.cfg
-          },
-          modelUrl: MODEL_BASE + v.model + '.onnx',
-          modelConfigUrl: MODEL_BASE + v.model + '.onnx.json',
+            // 命中就不再走网络。URL 只当 key 用，所以用固定合成 key ——
+            // 不能再用 MODEL_BASE：下载源是动态回退的，这里并不知道当初是哪个源。
+            var o = {};
+            o[MODEL_KEY_ONNX] = row.model;
+            o[MODEL_KEY_CFG] = row.cfg;
+            return o;
+          })(),
+          modelUrl: MODEL_KEY_ONNX,
+          modelConfigUrl: MODEL_KEY_CFG,
           piperPhonemizeJsUrl: base + 'piper_phonemize.js',
           piperPhonemizeWasmUrl: base + 'piper_phonemize.wasm',
           piperPhonemizeDataUrl: base + 'piper_phonemize.data',

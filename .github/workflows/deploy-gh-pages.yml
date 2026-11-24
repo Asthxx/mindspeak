@@ -36,6 +36,28 @@ jobs:
       - name: Build web assets (dist/)
         run: node build.js
 
+      # 内置离线音（Piper 语音包，61MB）不进 git，也不进 APK：
+      # 构建时下载到 dist/voice/，由 Pages 托管（带 ACAO:*），
+      # 网页版与 APK 的客户端按候选源回退到这里下载并缓存进 IndexedDB。
+      - name: Cache offline voice model
+        uses: actions/cache@v4
+        with:
+          path: .cache/voice
+          key: piper-voice-en_US-lessac-medium-v1
+
+      - name: Fetch offline voice model (61MB, served by Pages)
+        continue-on-error: true
+        run: |
+          mkdir -p .cache/voice dist/voice
+          BASE='https://hf-mirror.com/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium'
+          for f in en_US-lessac-medium.onnx en_US-lessac-medium.onnx.json; do
+            if [ ! -s ".cache/voice/$f" ]; then
+              curl -fL --retry 3 --retry-delay 5 --connect-timeout 20 -o ".cache/voice/$f" "$BASE/$f" || echo "::warning::下载 $f 失败，本次部署将缺少该文件"
+            fi
+            [ -s ".cache/voice/$f" ] && cp ".cache/voice/$f" "dist/voice/$f"
+          done
+          ls -lh dist/voice || true
+
       - name: Run tests
         run: npm test
 

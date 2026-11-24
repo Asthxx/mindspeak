@@ -19,7 +19,14 @@ window.MS.LOCAL_API_BASE = 'http://localhost:3000';
 //   - APK 里页面是 capacitor:// 本地协议，必须填公网地址，例如：
 //     window.MS.OFFLINE_VOICE_BASE = 'https://你的域名/offline-voice/';
 // 两个文件都要放上去，且主机必须返回正确的 Content-Length（否则下载进度只能显示 0/100）。
+// 留空 = 自动候选链（推荐）：同源 /api/offline-voice/ → 下面的站点镜像。
+// 桌面 node server.js / 局域网反代命中第一个；网页版与 APK 自动回退到镜像。
 window.MS.OFFLINE_VOICE_BASE = '';
+
+// 站点托管的模型目录（GitHub Pages 部署产物里的 voice/ 目录，CI 构建时放入）。
+// GitHub Pages 会返回 Access-Control-Allow-Origin: *，所以 APK 的
+// https://localhost 页面也能跨域取到这两个文件。
+window.MS.OFFLINE_VOICE_MIRROR = 'https://asthxx.github.io/mindspeak/voice/';
 
 window.API_BASE = (function () {
   // ★ 部署到 GitHub Pages / 公网时，把这里改成你的后端地址，例如：
