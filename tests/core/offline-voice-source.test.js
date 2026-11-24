@@ -90,3 +90,24 @@ describe('离线语音包下载源', () => {
     expect(progress[progress.length - 1]).toBe(1);
   });
 });
+
+describe('下载进度钳制', () => {
+  it('body 字节数大于 Content-Length（压缩传输）时进度不超过 100%', async () => {
+    vi.resetModules();
+    await bootstrapApp();
+    const realFetch = window.fetch;
+    const progress = [];
+    window.fetch = (url) => {
+      const u = String(url);
+      if (u.includes('/api/offline-voice/')) return Promise.resolve(new Response('', { status: 503 }));
+      // 声称 2 字节，实际给 6 字节 —— 模拟解码后大于 content-length
+      return Promise.resolve(new Response('ABCDEF', { status: 200, headers: { 'Content-Length': '2' } }));
+    };
+    try {
+      await window.OfflineTTS._fetchModelFrom(
+        window.OfflineTTS.modelBases(), { model: 'en_US-lessac-medium' }, p => progress.push(p));
+      expect(Math.max(...progress), '进度不应超过 1').toBeLessThanOrEqual(1);
+      expect(progress[progress.length - 1]).toBe(1);
+    } finally { window.fetch = realFetch; }
+  });
+});

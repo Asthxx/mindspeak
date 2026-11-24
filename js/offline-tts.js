@@ -204,7 +204,9 @@
           }
           chunks.push(r.value);
           loaded += r.value.length;
-          if (onProgress) onProgress(total ? loaded / total : 0);
+          // 钳到 1：压缩传输（如 Pages 的 gzip/br）时解码后的字节数会大于
+          // Content-Length，直接相除会让进度条跑到 108%，看起来像 bug。
+          if (onProgress) onProgress(total ? Math.min(1, loaded / total) : 0);
           return pump();
         });
       }
